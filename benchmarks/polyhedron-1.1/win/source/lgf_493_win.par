@@ -1,1 +1,0 @@
-lgf -64 -ofast -unroll -wpo -stack 64000000 %n.f90 -o %n

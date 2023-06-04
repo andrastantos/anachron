@@ -1,1 +1,0 @@
-rm *.mod %r.cmp %r.run %r.chk *.map *.o %a *.dat dummyfile *.out *.err *.ipa *.ipo

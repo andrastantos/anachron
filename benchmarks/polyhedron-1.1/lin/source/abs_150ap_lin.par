@@ -1,1 +1,0 @@
-af95 %n.f90 -o %n -m64 -mavx -O5 -speed_math=10 -march=core -xINTEGER

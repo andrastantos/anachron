@@ -1,1 +1,0 @@
-nagfor %n.f90 -o %n -abi=64 -O4 -s -v -V

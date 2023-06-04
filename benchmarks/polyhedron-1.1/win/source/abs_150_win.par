@@ -1,1 +1,0 @@
-af90 %n.f90 -m64 -O4 -speed_math=10  -fast_math -march=core -xINTEGER -stack:0x30000000

@@ -1,1 +1,0 @@
-pgf90 %n.f90 -V -fast -Mipa=fast,inline -Msmartalloc -Mfprelaxed -Mstack_arrays -Mconcur=innermost,allcores -o %n

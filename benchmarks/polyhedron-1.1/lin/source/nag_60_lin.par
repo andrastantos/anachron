@@ -1,1 +1,0 @@
-nagfor -O4 -s -v -V %n.f90 -o %n

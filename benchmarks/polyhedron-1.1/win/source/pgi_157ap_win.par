@@ -1,1 +1,0 @@
-pgf90 -V -fastsse -Munroll=n:4 -Mipa=fast,inline -Mconcur=innermost,allcores %n.f90

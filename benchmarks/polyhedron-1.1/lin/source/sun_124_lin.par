@@ -1,1 +1,0 @@
-sunf95 %n.f90 -o %n -fast -xtarget=native -m64 

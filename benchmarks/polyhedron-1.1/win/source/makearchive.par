@@ -1,5 +1,0 @@
-move archives\%r-2.zip archives\%r-3.zip
-move archives\%r-1.zip archives\%r-2.zip
-move archives\%r.zip archives\%r-1.zip
-zip archives\%r.zip %r.par %r.cmp %r.sum %r.run runtimes.txt bldtimes.txt exesizes.txt *.exe
-@tidy.par

@@ -1,1 +1,0 @@
-del *.mod %r.cmp %r.run %r.chk *.map *.obj *.exe *.dat dummyfile *.out *.err *.pdb *.dbk

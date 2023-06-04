@@ -1,6 +1,0 @@
-ac aermod air capacita channel doduc fatigue gas_dyn induct linpk mdbx nf protein rnflow test_fpu tfft
-2000 0.1 1 1
-../pbvalid %r.run ../../f90valid.in>%r.chk
-cat %r.chk>>%r.sum
-cat %r.chk
-@makearchive.par

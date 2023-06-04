@@ -1,1 +1,0 @@
-ifort -fast -O3 -ipo %n.f90 -o %n

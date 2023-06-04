@@ -1,1 +1,0 @@
-gfortran -ffast-math -funroll-loops -O3 %n.f90 -o %n

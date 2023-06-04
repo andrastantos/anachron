@@ -1,1 +1,0 @@
-ifort %n.f90 /fast /link /stack:64000000

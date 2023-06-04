@@ -1,6 +1,0 @@
-ac aermod air capacita channel2 doduc fatigue2 gas_dyn2 induct2 linpk mdbx mp_prop_design nf protein rnflow test_fpu2 tfft2
-7200 0.1 10 60
-..\pbvalid %r.run ..\..\f90valid.in>%r.chk
-type %r.chk>>%r.sum
-type %r.chk
-@makearchive.par
