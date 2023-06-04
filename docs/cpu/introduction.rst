@@ -1,6 +1,8 @@
 Introduction
 ============
 
+Espresso is the main processor of the Anachronistic Computer (Anachron). It is a simple, low-end implementation of the Brew processor architecture.
+
 The Brew (as in home-brew) Processor design explores a few ideas that have been rattling in my head for a while. It is at it's heart a RISC architecture, but with some twists that I will quickly introduce:
 
 The processor uses 4-bit fields to encode register addresses, which normally would allow for 16 registers. The ISA however only has 15 addressable registers. This allows us to use the 16th code (0xf) to escape several easy to decode instruction spaces
