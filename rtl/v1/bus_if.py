@@ -178,6 +178,17 @@ class BusIf(GenericModule):
     # bit 11: DRAM bank swap: 0 - no swap, 1 - swap
     refresh_counter_size = 8
 
+    #### TODO:
+    #### - Wait-state selection should probably change. Have only three bits and decode as follows:
+    ####    7 - 0  wait states
+    ####    6 - 1  wait state
+    ####    5 - 2  wait states
+    ####    4 - 4  wait states
+    ####    3 - 6  wait states
+    ####    2 - 8  wait states
+    ####    1 - 12 wait states
+    ####    0 - 15 wait states
+    ####   Or maybe even consider specifying wait-states in us, instead of cycles?
     def body(self):
         refresh_counter = Wire(Unsigned(self.refresh_counter_size))
         # CSR interface
@@ -363,30 +374,16 @@ class BusIf(GenericModule):
         input_row_addr <<= Select(
             dram_addr_muxing,
             req_addr[21:11],
-            Select(
-                dram_bank_size,
-                req_addr[15:8],
-                req_addr[17:9],
-                req_addr[19:10],
-                req_addr[21:11]
-            )
+            concat(req_addr[21], req_addr[19], req_addr[17], req_addr[15:8])
         )
         row_addr = Wire()
         row_addr <<= Reg(Select(req_rfsh, input_row_addr, refresh_addr), clock_en=start)
         col_addr = Wire()
-        # NOTE: I don't think we need to change muxing of COL address based on target device.
-        #col_addr <<= Reg(Select(
-        #    dram_addr_muxing,
-        #    req_addr[10:0],
-        #    Select(
-        #        dram_bank_size,
-        #        req_addr[7:0],
-        #        req_addr[8:0],
-        #        req_addr[9:0],
-        #        req_addr[10:0]
-        #    )
-        #), clock_en=req_advance)
-        col_addr <<= Reg(req_addr[10:0], clock_en=req_advance)
+        col_addr <<= Reg(Select(
+            dram_addr_muxing,
+            req_addr[10:0],
+            concat(req_addr[20], req_addr[18], req_addr[16], req_addr[7:0])
+        ), clock_en=req_advance)
         read_not_write = Wire()
         read_not_write <<= Reg(req_read_not_write, clock_en=start, reset_value_port=1) # reads and writes can't mix within a burst
         data_out_en = Wire()
