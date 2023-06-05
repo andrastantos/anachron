@@ -22,6 +22,8 @@ Source: https://en.wikipedia.org/wiki/Instructions_per_second
 ==============   ========   =========
 Chip             Year       MIPS/MHz
 ==============   ========   =========
+6502             1977       0.43
+Z80              1976       0.145
 Intel 8088       1979       0.075
 MC68000          1979       0.175
 Intel 80286      1982       0.107
@@ -32,6 +34,8 @@ ARM2             1986       0.5
 MC68040          1987       0.36
 Intel 80486      1989       0.3
 ==============   ========   =========
+
+There seems to be a good micro-computer comparison table here: https://drolez.com/retro/
 
 I'm currently standing at 0.23, slightly better then the competition, but not enormously.
 
