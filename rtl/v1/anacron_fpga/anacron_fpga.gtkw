@@ -2,10 +2,10 @@
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
 [*] Sat May 27 00:48:20 2023
 [*]
-[dumpfile] "/home/tantos/brew/rtl/v1/anacron_fpga/anacron_fpga.vcd"
+[dumpfile] "./anacron_fpga.vcd"
 [dumpfile_mtime] "Sat May 27 00:48:20 2023"
 [dumpfile_size] 101601280
-[savefile] "/home/tantos/brew/rtl/v1/anacron_fpga/anacron_fpga.gtkw"
+[savefile] "./anacron_fpga.gtkw"
 [timestart] 0
 [size] 1920 990
 [pos] -1 -1
