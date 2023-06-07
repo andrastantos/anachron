@@ -74,8 +74,8 @@ Non-DRAM accesses:
                              <-- even read ---><--- odd write ---><- even read w. wait -->
     CLK             \__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/
     n_nren          ^^^^^^^^^\___________/^^^^^\___________/^^^^^\_________________/^^^^^^
-    DRAM_nCAS_A     ^^^^^^^^^^^^\________/^^^^^^^^^^^^^^^^^^^^^^^^^^\______________/^^^^^^
-    DRAM_nCAS_B     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\_______/^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    DRAM_nCAS_A     ^^^^^^^^^^^^^^^\_____/^^^^^^^^^^^^^^^^^^^^^^^^^^\______________/^^^^^^
+    DRAM_nCAS_B     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\_____/^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     DRAM_ADDR       ---------<==X========>-----<==X========>-----<==X==============>------
     DRAM_nWE        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     DRAM_DATA       ---------------------<>----------------<>----------------------<>-----
@@ -99,6 +99,8 @@ Non-DRAM accesses:
 4. n_wait is sampled on the rising edge of every cycle, after internal wait-states are accounted for
 5. There is at least one internal wait-state
 6. For writes, the relevant byte of 'req_data' should be valid.
+
+TODO: These timings don't really support external devices with non-0 data hold-time requirements. Maybe we can delay turning off data-bus drivers by half a cycle?
 
 DRAM banks:
 
@@ -197,8 +199,8 @@ class BusIf(GenericModule):
 
         reg_addr = self.reg_if.paddr
 
-        refresh_divider = Reg(self.reg_if.pwdata[self.refresh_counter_size-1:0], clock_en=(reg_addr == self.reg_dram_config_ofs) & reg_write_strobe)
-        refresh_disable = ~Reg(self.reg_if.pwdata[self.refresh_counter_size], clock_en=(reg_addr == self.reg_dram_config_ofs) & reg_write_strobe)
+        refresh_divider = Reg(self.reg_if.pwdata[self.refresh_counter_size-1:0], clock_en=(reg_addr == self.reg_dram_config_ofs) & reg_write_strobe, reset_value_port=128)
+        refresh_disable = Reg(self.reg_if.pwdata[self.refresh_counter_size], clock_en=(reg_addr == self.reg_dram_config_ofs) & reg_write_strobe)
         dram_bank_size = Reg(self.reg_if.pwdata[self.refresh_counter_size+2:self.refresh_counter_size+1], clock_en=(reg_addr == self.reg_dram_config_ofs) & reg_write_strobe)
         dram_bank_swap = Reg(self.reg_if.pwdata[self.refresh_counter_size+3], clock_en=(reg_addr == self.reg_dram_config_ofs) & reg_write_strobe)
         self.reg_if.prdata <<= concat(
@@ -294,7 +296,7 @@ class BusIf(GenericModule):
         start <<= (state == BusIfStates.idle) & req_valid
         req_addr <<= Select(arb_port_select, self.fetch_request.addr, self.mem_request.addr, self.dma_request.addr)
         req_data <<= Select(arb_port_select, self.fetch_request.data, self.mem_request.data, None)
-        req_read_not_write <<= Select(arb_port_select, self.fetch_request.read_not_write, self.mem_request.read_not_write, self.dma_request.read_not_write)
+        req_read_not_write <<= Select(arb_port_select, self.fetch_request.read_not_write, self.mem_request.read_not_write, self.dma_request.read_not_write, 1)
         req_byte_en <<= Select(arb_port_select, self.fetch_request.byte_en, self.mem_request.byte_en, self.dma_request.byte_en)
         req_advance = req_valid & req_ready
 
@@ -521,7 +523,7 @@ class BusIf(GenericModule):
             row_addr
         )
         self.dram.addr        <<= dram_addr
-        self.dram.n_we         <<= read_not_write
+        self.dram.n_we        <<= read_not_write
         self.dram.data_out_en <<= data_out_en
         data_out_low = Wire()
         data_out_low <<= NegReg(
