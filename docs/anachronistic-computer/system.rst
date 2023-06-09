@@ -9,14 +9,14 @@ For the processor:
 * Internal data-path: 32-bit
 * External data width: 8/16-bit
 * Clock speed: ~10MHz (depends on DRAM speed)
-* IPC: 0.4 sustained with graphics, 1 peak
+* IPC: 0.3 sustained with graphics, 1 peak
 
 Memory:
 
 * Data width: 16-bit
 * Size: 128kB to 16MB
 * Number of banks: 2
-* Technology: NMOS DRAM
+* Technology: Page mode DRAM
 
 Graphics:
 

@@ -1,89 +1,67 @@
-Micro-architecture V1
-=====================
+Micro-architecture of Espresso
+==============================
 
-General comments
+The environment for Espresso
+----------------------------
+
+Espresso is the processor for the 'Anachronistic Computer' or 'Anachron'. It is targeting 1.5um technology, a ~10MHz clock rate and intends to compete in the early '80s computer market. It is intended to be a contemporary of the Intel 80286 processor, in its earliest incarnations.
+
+It is intended to work with a page-mode (not even FPM) DRAM through a direct interface. It has to share this memory with all other bus-masters, chief amongst them, the display controller
+
+This environment has certain impact on the way Espresso looks on the inside.
+
+Memory access patterns
+-----------------------------
+
+Espresso supports 8-beat bursts for instruction fetches, and 2-beat bursts for memory accesses. Each beat transfers 16-bits of data. Each burst is preceded and followed by a clock-cycle of extra activity. This means that a 16-byte instruction fetch burst takes 10 clock cycles, while a 32-bit load or store takes 4 clock cycles on the bus.
+
+IPC expectations
 ----------------
 
-This is the processor for the earliest version of the 'Anachronistic Computer'. It is targeting a clock speed of 10MHz (12MHz in the highest speed-grade). It is intended to work with a 16-bit NMOS (not even FPM) DRAM through a direct interface. It has to share this memory with the display controller (technically the DMA controller, but that's irrelevant for now). We intend to support up-to 4-beat bursts with the DRAM, completed in 5 clock cycles.
+We should expect about 25% of our operations to be memory accesses, stalling for 3 cycles. Branches, which happen about 12.5% of the time would have a penalty of ~5 clock cycles. Other hazards will add about one stall every 8 instructions. On top of this, our instruction length on average is 24 bits, so we should expect 0.5 cycles of stall just from instruction assembly. An extra 2/10th of stall comes from the burst overhead of the DRAM access patterns for fetches. This gives us 2.2 stall cycles for every instruction executed, or an expected IPC of 0.31.
 
-The 10MHz clock frequency coupled with the bursts and DRAM timing results in a peak memory bandwidth of 16MByte/sec. Of course with less optimal burst sizes or any arbitration overhead the bandwidth drops.
+Memory bandwidth calculations
+-----------------------------
 
-The video refresh alone will eat up about 12.5MBps of this, leaving precious little to the processor. In fact, arguably this system is not really capable of 320x240x8bpp resolution at a 32kHz HSync. Going back to NTSC timing would halve video bandwidth requirements to 6.25MBps, leaving about 10MBps for the processor. There of course is also HBlank and VBlank during which the full bandwidth is available to the CPU.
+A video of 320x240 resolution, 8 bits per pixel and 50Hz update rate (this is PAL video) would need 3.84MByte/sec of data on average. Higher during active lines, but nothing during blanking and sync periods. With the 10-cycles-for-16-bytes burst rate, we would need 2.4M memory cycles every second to refresh the screen. However, we should probably add about 4 cycles of memory arbitration lost between the CPU and the video controller for every burst, resulting in 3.36M cycles lost. At a 10MHz clock rate, this leaves us with 6.64M cycles for CPU access.
 
-We should expect about 25% of our operations to be memory accesses, which would incur (as we'll see) a 2-cycle stall, minimum. Branches, which happen about 12.5% of the time would have a penalty of 3 clock cycles. Other hazards will add about one stall every 8 instructions. This would mean that all accounted for, we would have 5 stalls every 8 clock cycles, or a target IPC ~= 0.4.
+An IPC of 0.31 at 10MHz means that the processor would need to fetch 3.1M instructions (at 24 bits each) every second, resulting in 9.3MByte/sec fetch requirements. That amount of data needs 5.81M cycles to transfer after considering the burst overhead.
 
-Turning it around, at 10MHz with an IPC of 0.4 and a memory operation every 4th instruction, we see that we need 12MBps for instruction fetches and another 4MBps for load/stores. This gives us 16MBps of total memory bandwidth requirement.
+Out of the 3.1M instructions, 0.775M would either a load or a store, each requiring 4 cycles on the bus to complete. This is an extra 3.1M cycles.
 
-We can see that the CPU even with this rather appalling IPC target will be memory starved. The achievable IPC is around 0.25. That is, our 10MHz processor has a MIPS of 2. To turn it another way, we could have a multi-cycle, non-pipelined implementation with a 4-cycles-per-instruction implementation and not lose much in terms of efficiency.
+Adding it up: 3.36M for video, 5.81M for fetch and 3.1M for load/store = 12.27M cycles. But we're running at 10MHz, we only have 10M cycles to work with in every second.
 
-This is rather sad...
+The result is that the processor will get throttled by video: we won't be able to achieve even our 0.31 IPC once we turn on video. The real number should be around 0.23 instead.
 
-Notice how the trouble of memory bandwidth is most punishing around instruction fetches: they consume inordinate amount of bandwidth. So, an ICache would be highly beneficial. Can we have it? Even in version 1? In a chip, designed in the late '70-s, very early '80-s?
-
-ISA support
------------
-
-The V1 implementation doesn't support types or any type-related operations.
-
-It doesn't have floating-point support either.
-
-Fence operations are no-ops, and barrier instructions behave as normal load/stores.
-
-Lane swizzle and reduction-sum aren't supported either
-
-Most importantly though, the V1 implementation doesn't support indirect jumps:
-
-======================  ============================    ==================
-Instruction code        Assembly                        Operation
-======================  ============================    ==================
-0x2ee.                  $pc <- MEM[32][$rA]             32-bit load from MEM[$rA] into $PC
-0x3ee.                  $tpc <- MEM[32][$rA]            32-bit load from MEM[$rA] into $TPC
-0x2fe. 0x****           $pc <- MEM[32][$rA+FIELD_E]     32-bit load from MEM[$rA+FIELD_E] into $PC
-0x3fe. 0x****           $tpc <- MEM[32][$rA+FIELD_E]    32-bit load from MEM[$rA+FIELD_E] into $TPC
-0x2fef 0x**** 0x****    $pc <- MEM[32][FIELD_E]         32-bit load from MEM[FIELD_E] into $PC
-0x3fef 0x**** 0x****    $tpc <- MEM[32][FIELD_E]        32-bit load from MEM[FIELD_E] into $TPC
-======================  ============================    ==================
-
-These instructions generate an exception. The reason is that jump targets are evaluated in the execute stage. That stage is before the memory stage, which means that the branch target is not known for these instructions. This functionality must be achieved through a general-purpose register in two instructions. This makes subroutine epilogs longer and method calls more painful.
-
-.. TODO:: GCC will need to be aware of this...
-
-.. TODO::
-  Can we make these jumps work? Since they are not conditional, anything after them is just busy-work. Execute could identify that and stall further execution, then have either memory or the register-file finish the branch.
-
-ICache
-------
-
-Let's start with something very simple:
-
-- We have a 4-way set-associative cache. Each way is 128 bytes long.
-- A cache line is 32-bit long, the same as the fetch
-- The only tag for a line is a valid bit
-- We have a common (25-bit) base address tag for each way
-- Lines are filled in parallel with the fetch logic: no prefetch of any sort
-- A miss simply allocates the ways in a round-robin fashion.
-- No line-invalidate logic: only the whole cache can be invalidated. That happens through a CSR.
-
-This is a 512-byte large cache, consuming about 25k transistors. The 68000 had about 68k transistors at that time, and that was probably very large for it's time. So this cache is about a 3rd of that. Damn!
-
-Let's say this cache has a hit-rate of 50%! Since we don't do any prefetch, we don't incur any penalty for it, so it's pure gravy. Now, our 0.4 IPC processor only needs 6MBps for instruction fetches and another 4MBps for loads/stores. That's 10MBps, the bandwidth we have.
-
-So, let's plan for this and hope that:
-
-#. We can fit the cache
-#. We can get 50% hit-rate
+Notice how the trouble of memory bandwidth is most punishing for instruction fetches: they consume inordinate amount of bandwidth. This is why the first order of business in the <<TODO: ADD LINK!!!>> road-map is to add even a teeny-tiny ICache. I checked: sadly, we can't have it in 1.5um; there's just not enough silicon area.
 
 The pipeline
 ------------
 
-Due to memory bandwidth constraints, aiming for more than a 0.4 IPC is a fools errand. Thus, the pipeline is very very simple, more geared towards being small then efficient and thus freeing up silicon area for more ICache.
+Due to memory bandwidth constraints, aiming for more than a 0.31 IPC is a fools errand. Thus, the pipeline is very very simple, more geared towards being small then efficient. Of course it's also a requirement of the target process: we just don't have all that many transistors to use.
 
-This is a simple 5-stage pipeline.
+Espresso is using a simple 5-stage pipeline.
 
 Fetch
 ~~~~~
 
-We have 7-entry FIFO between the memory and the decode engine. Every time there are at least 4 free entries, a 4-beat burst is request. Bursts are 64-bit aligned, and thus there is a little problem in the first burst after a jump. This burst has two ways to go:
+Fetch is created of three entities:
+
+1. The `InstBuffer` entity fetches instructions from memory and places them in the instruction queue
+2. The 11x16-bit entry `InstQueue` is a simple FIFO
+3. The `InstQueue` FIFO is emptied by the `InstAssembly` stage, creating full length instructions to pass on to decode.
+
+`InstBuffer` initiates a new burst every time there is at least 8 free entries in `InstQueue`. The bursts are generated at the
+
+
+
+
+
+
+
+
+
+We have an 11-entry InstBufferIFO between the memory and the decode engine. Every time there are at least 4 free entries, a 4-beat burst  entity is request. Bursts are 64-bit aligned, and thus there is a little problem in the first burst after a jump. This burst has two ways to go:
 
 - In case of an ICache hit, it's directly filled from the ICache, no memory transactions are generated.
 - In case of an ICache miss, a cache-way is allocated and the memory request is generated. The response is bisected into the decode FIFO and the ICache line.
