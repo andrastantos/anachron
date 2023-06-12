@@ -59,10 +59,10 @@ from copy import copy
 Since DRAM_nCAS_x is asserted for 1.5 cycles, it's minimum pulse length is 150ns. That's much much shorter
 then the ISA bus spec of 700ns (http://www.bitsavers.org/pdf/intel/_busSpec/Intel_ISA_Spec2.01_Sep89.pdf).
 
-That means that we have to insert many many wait-states, not just one as with I/O cycles. Since the bus_req_if
-is generating a memory access, we can't use high-order bits to describe wait-states. These wait-states
-should be programmable in the DMA controller per channel: we might not want to waste that many bus-cycles
-for a single transfer if we know the peripheral is fast enough.
+That means that we have to insert many many wait-states, not just one as with I/O cycles. The bus interface
+will use the high-order bits of the target address (even if it's in DRAM) to generate the right number of
+wait-states, in other words, wait-state programming is done through some of the top address bits, the same
+was as for I/Os.
 
 All in all that the DMA interface is somewhat special.
 """
@@ -77,6 +77,8 @@ class CpuDma(Module):
 
     drq = Input()
 
+    interrupt = Output(logic)
+
     def body(self):
         self.ch_count = self.drq.get_num_bits()
 
@@ -84,22 +86,24 @@ class CpuDma(Module):
         ################################
         ch_addr_ofs = 0
         ch_limit_ofs = 1
-        int_reg_ofs = self.ch_count*2+0
-        #stat_reg_ofs = self.ch_count*2+1 # read-only, thus not directly used as a constant
-        config_reg_ofs = self.ch_count*2+2
-        config2_reg_ofs = self.ch_count*2+3
-        ch_bit_shift = 4
-        # status register bits (each channel is shifted by 4 bits)
-        stat_active_bit = 0
-        stat_req_pending_bit = 1
-        # config register bits (each channel is shifted by 4 bits)
+        ch_config_ofs = 2
+        #ch_stat_ofs = 3 Read-only, so offset constant is not directly used
+
+        ch_reg_bank_size = 4
+
+        int_reg_ofs = self.ch_count*ch_reg_bank_size+0
+        # status register bits
+        #stat_active_bit = 0
+        #stat_req_pending_bit = 1
+        #stat_int_pending_bit = 2
+        # config register bits
         cfg_single_bit         = 0
         cfg_read_not_write_bit = 1
-        cfg_is_master_bit      = 2
-        cfg_high_priority_bit  = 3
-        # config2 register bits (each channel is shifted by 4 bits)
-        cfg2_req_polarity_bit = 0 # 0 for active low, 1 for active high request
-        cfg2_req_no_cdc_bit   = 1 # 0 for async requestors (that need CDC), 1 for synchronous requestors (no CDC needed)
+        cfg_int_enable_bit     = 2
+        cfg_is_master_bit      = 3
+        cfg_high_priority_bit  = 4
+        cfg_req_polarity_bit   = 5 # 0 for active low, 1 for active high request
+        cfg_req_no_cdc_bit     = 6 # 0 for async requestors (that need CDC), 1 for synchronous requestors (no CDC needed)
 
         next_addr = Wire(BrewAddr)
         tc = Wire(logic)
@@ -113,6 +117,7 @@ class CpuDma(Module):
                 # Configuration bits
                 self.single = Wire(logic)
                 self.read_not_write = Wire(logic)
+                self.int_enable = Wire(logic)
                 self.is_master = Wire(logic)
                 self.high_priority = Wire(logic)
                 self.req_polarity = Wire(logic)
@@ -140,7 +145,7 @@ class CpuDma(Module):
         prev_drq = Reg(drq)
 
         for idx, ch_info in enumerate(ch_infos):
-            ch_base = idx*2
+            ch_base = idx*ch_reg_bank_size
             ch_served = served_dma_channel[idx] & self.bus_rsp_if.valid
 
             ch_info.addr <<= Reg(
@@ -156,13 +161,13 @@ class CpuDma(Module):
             )
             ch_info.limit <<= Reg(self.reg_if.pwdata, clock_en = (reg_addr == ch_base + ch_limit_ofs) & reg_write_strobe)
 
-            ch_info.single         <<= Reg(self.reg_if.pwdata[idx*ch_bit_shift+cfg_single_bit        ], clock_en = (reg_addr == config_reg_ofs) & reg_write_strobe)
-            ch_info.read_not_write <<= Reg(self.reg_if.pwdata[idx*ch_bit_shift+cfg_read_not_write_bit], clock_en = (reg_addr == config_reg_ofs) & reg_write_strobe)
-            ch_info.is_master      <<= Reg(self.reg_if.pwdata[idx*ch_bit_shift+cfg_is_master_bit     ], clock_en = (reg_addr == config_reg_ofs) & reg_write_strobe)
-            ch_info.high_priority  <<= Reg(self.reg_if.pwdata[idx*ch_bit_shift+cfg_high_priority_bit ], clock_en = (reg_addr == config_reg_ofs) & reg_write_strobe)
-
-            ch_info.req_polarity   <<= Reg(self.reg_if.pwdata[idx*ch_bit_shift+cfg2_req_polarity_bit ], clock_en = (reg_addr == config2_reg_ofs) & reg_write_strobe)
-            ch_info.req_no_cdc     <<= Reg(self.reg_if.pwdata[idx*ch_bit_shift+cfg2_req_no_cdc_bit   ], clock_en = (reg_addr == config2_reg_ofs) & reg_write_strobe)
+            ch_info.single         <<= Reg(self.reg_if.pwdata[cfg_single_bit        ], clock_en = (reg_addr == ch_base + ch_config_ofs) & reg_write_strobe)
+            ch_info.read_not_write <<= Reg(self.reg_if.pwdata[cfg_read_not_write_bit], clock_en = (reg_addr == ch_base + ch_config_ofs) & reg_write_strobe)
+            ch_info.int_enable     <<= Reg(self.reg_if.pwdata[cfg_int_enable_bit    ], clock_en = (reg_addr == ch_base + ch_config_ofs) & reg_write_strobe)
+            ch_info.is_master      <<= Reg(self.reg_if.pwdata[cfg_is_master_bit     ], clock_en = (reg_addr == ch_base + ch_config_ofs) & reg_write_strobe)
+            ch_info.high_priority  <<= Reg(self.reg_if.pwdata[cfg_high_priority_bit ], clock_en = (reg_addr == ch_base + ch_config_ofs) & reg_write_strobe)
+            ch_info.req_polarity   <<= Reg(self.reg_if.pwdata[cfg_req_polarity_bit  ], clock_en = (reg_addr == ch_base + ch_config_ofs) & reg_write_strobe)
+            ch_info.req_no_cdc     <<= Reg(self.reg_if.pwdata[cfg_req_no_cdc_bit    ], clock_en = (reg_addr == ch_base + ch_config_ofs) & reg_write_strobe)
 
             ch_info.active <<= Reg(
                 Select(
@@ -177,7 +182,7 @@ class CpuDma(Module):
             )
             ch_info.int_pending <<= Reg(
                 Select(
-                    tc_reg & ch_served,
+                    tc_reg & ch_served & ch_info.int_enable,
                     Select(
                         (reg_addr == int_reg_ofs) & reg_write_strobe & self.reg_if.pwdata[idx],
                         ch_info.int_pending,
@@ -214,27 +219,32 @@ class CpuDma(Module):
 
         self.reg_if.prdata <<= Reg(Select(
             reg_addr,
-            # offset 0 through n: channel address and limit registers
-            *(itertools.chain.from_iterable((ch_info.addr, ch_info.limit) for ch_info in ch_infos)),
+            *(itertools.chain.from_iterable((
+                # offset 0: channel address
+                ch_info.addr,
+                # offset 1: channel limit
+                ch_info.limit,
+                # offset 2: channel config
+                concat(
+                    ch_info.req_polarity,
+                    ch_info.req_no_cdc,
+                    ch_info.is_master,
+                    ch_info.high_priority,
+                    ch_info.read_not_write,
+                    ch_info.single
+                ),
+                # offset 3: channel status
+                concat(
+                    ch_info.int_pending,
+                    ch_info.req_pending,
+                    ch_info.active
+                )
+            ) for ch_info in ch_infos)),
             # int_reg_ofs
             concat(*(ch_info.int_pending for ch_info in reversed(ch_infos))),
-            # stat_reg_ofs
-            concat(
-                *(itertools.chain.from_iterable(("1'b0", "1'b0", ch_info.req_pending, ch_info.active) for ch_info in reversed(ch_infos)))
-            ),
-            # config_reg_ofs
-            #    cfg_single_bit = 0
-            #    cfg_read_not_write_bit = 1
-            #    cfg_is_master_bit = 2
-            #    cfg_high_priority_bit = 3
-            concat(
-                *(itertools.chain.from_iterable((ch_info.is_master, ch_info.high_priority, ch_info.read_not_write, ch_info.single) for ch_info in reversed(ch_infos)))
-            ),
-            # config2_reg_ofs
-            concat(
-                *(itertools.chain.from_iterable((ch_info.req_polarity, ch_info.req_no_cdc, "1'b0", "1'b0") for ch_info in reversed(ch_infos)))
-            ),
         ))
+
+        self.interrupt <<= or_gate(*(ch_info.int_pending for ch_info in reversed(ch_infos)))
 
         # Arbitration logic (we have a high-priority and a low-priority arbiter, each implementing their own round-robin)
         # NOTE: We step both arbiters at the same time, independent of whether they were the ones providing the requestor.
