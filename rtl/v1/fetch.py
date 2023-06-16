@@ -198,7 +198,7 @@ class InstBuffer(GenericModule):
             0
         ))
 
-        fetch_av = task_mode_fetch & (fetch_addr[BrewInstAddr.get_length()-1:BrewMemShift] > self.mem_limit)
+        fetch_av = task_mode_fetch & (fetch_addr[BrewInstAddr.get_length()-1:BrewMemShift-1] > self.mem_limit)
 
         self.fsm = FSM()
 
