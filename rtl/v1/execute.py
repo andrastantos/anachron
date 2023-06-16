@@ -355,9 +355,9 @@ class BranchUnit(Module):
             1 << exc_mip
         )
 
-        # We set the ECAUSE bits even in scheduler mode: this allows for interrupt polling at and after a reset,
-        # we can check it to determine the reason for the reset
-        interrupt_mask =  Select(self.input_port.interrupt & self.input_port.task_mode, 0, 1 << exc_hwi)
+        # We set the ECAUSE bits even in scheduler mode: this allows for interrupt polling and,
+        # after a reset, we can check it to determine the reason for the reset
+        interrupt_mask =  Select(self.input_port.interrupt, 0, 1 << exc_hwi)
         self.output_port.ecause <<= exception_mask | interrupt_mask
         self.output_port.is_exception <<= is_exception
 
@@ -1175,7 +1175,7 @@ def sim():
 
                 eff_addr = op_b + op_c
                 phy_addr = eff_addr + (self.sideband_state.mem_base << 10)
-                mem_av = (eff_addr > (self.sideband_state.mem_limit << 10)) and not fetch_av
+                mem_av = (eff_addr[BrewAddr.get_length()-1:BrewMemShift] > self.sideband_state.mem_limit) and not fetch_av
                 if not fetch_av:
                     if mem_access_len == access_len_8:
                         mem_unaligned = False
