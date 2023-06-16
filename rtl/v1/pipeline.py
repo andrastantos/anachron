@@ -49,6 +49,8 @@ class Pipeline(GenericModule):
     csr_if = Output(ApbIf)
 
     # Things that need CSR access
+    ecause_write_pulse = Input(logic)
+    ecause_write_data = Input(Unsigned(12))
     ecause    = Output(Unsigned(12))
     eaddr     = Output(BrewAddr)
     pmem_base  = Input(BrewMemBase)
@@ -146,7 +148,12 @@ class Pipeline(GenericModule):
         execute_stage.spc_in        <<= spc
         execute_stage.tpc_in        <<= tpc
         execute_stage.task_mode_in  <<= task_mode
-        execute_stage.ecause_in     <<= self.ecause
+        execute_stage.ecause_in     <<= Select(
+            self.ecause_write_pulse,
+            self.ecause,
+            ~self.ecause_write_data & self.ecause
+        )
+
         execute_stage.interrupt     <<= self.interrupt
 
         will_execute = decode_to_exec.ready & decode_to_exec.valid & ~decode_to_exec.fetch_av & ~execute_stage.do_branch

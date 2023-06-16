@@ -55,11 +55,6 @@ class BrewV1Top(GenericModule):
         self.csr_dmem_limit_reg = (self.csr_base << 30) + self.csr_top_level_ofs + 4*4
         self.csr_ecause_reg     = (self.csr_base << 30) + self.csr_top_level_ofs + 5*4
         self.csr_eaddr_reg      = (self.csr_base << 30) + self.csr_top_level_ofs + 6*4
-        self.csr_event_sel_reg  = (self.csr_base << 30) + self.csr_top_level_ofs + 7*4
-        self.csr_event_cnt0_reg = (self.csr_base << 30) + self.csr_top_level_ofs + 8*4
-        self.csr_event_cnt1_reg = (self.csr_base << 30) + self.csr_top_level_ofs + 9*4
-        self.csr_event_cnt2_reg = (self.csr_base << 30) + self.csr_top_level_ofs + 10*4
-        self.csr_event_cnt3_reg = (self.csr_base << 30) + self.csr_top_level_ofs + 11*4
 
     def body(self):
         bus_if = BusIf(nram_base=self.nram_base)
@@ -114,6 +109,11 @@ class BrewV1Top(GenericModule):
         pipeline.bus_to_mem <<= bus_to_mem
         csr_if <<= pipeline.csr_if
 
+        ecause_write_pulse = Wire(logic)
+        ecause_write_data = Wire(Unsigned(12))
+
+        pipeline.ecause_write_pulse <<= ecause_write_pulse
+        pipeline.ecause_write_data <<= ecause_write_data
         ecause <<= pipeline.ecause
         eaddr  <<= pipeline.eaddr
         pipeline.pmem_base  <<= pmem_base
@@ -275,6 +275,9 @@ class BrewV1Top(GenericModule):
         pmem_limit <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == 2) & csr_write_strobe)
         dmem_base  <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == 3) & csr_write_strobe)
         dmem_limit <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == 4) & csr_write_strobe)
+        ecause_write_pulse <<= (csr_addr == 5) & csr_write_strobe
+        ecause_write_data <<= csr_if.pwdata[ecause_write_data.get_net_type().get_num_bits()-1:0]
+
 
 def gen():
     def top():
