@@ -1,3 +1,4 @@
+.. _dma:
 DMA engine
 ----------
 
@@ -18,6 +19,8 @@ DMA channels can be configured as 'high' or 'low' priority. The DMA controller u
 The DMA controller supports programmable polarity on the `drq` lines and allows for lower latency by disabling the CDC crossing on them as well. It is important to note that if no CDC circuitry is used, setup and hold times on the `drq` lines must be observed relative to the clock of Espresso: in this case the DMA requestor must be a synchronous peripheral.
 
 The DMA engine registers are mapped as CSRs. The layout of the registers is as follows:
+
+The base address for these registers is 0x4000_0c00.
 
 ========== =================== ================================
 Offset     Name                Notes

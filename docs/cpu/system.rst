@@ -1,38 +1,75 @@
-System level considerations
-===========================
+Control and Status Registers (CSRs)
+-----------------------------------
 
-On top of the core, the following system components are important for the implementation:
+Espresso has a set of internal peripherals and registers controlling its operation. These are collectively called CSRs. This address space is only available for loads and stores (not instruction fetches) and is mapped into the physical memory space from 0x4000_0000 to 0x7fff_ffff. The following CSRs are defined:
 
-Operating System
-----------------
+DMA controller
+~~~~~~~~~~~~~~
 
-The 'scheduler' context is primarily used for interrupt processing (that is to decide which task to schedule after a particular interrupt)
+The built-in DMA controller and it's CSRs are described in the :ref:`DMA <dma>` chapter.
 
-OS functions are implemented as tasks, though of course the scheduler context is part of it as well. That is to say, the only reason OS tasks have more privilege then user ones is because of the way the MMU is set up, since everything (including CSRs) are memory-mapped.
+The base address for the DMA CSRs is 0x4000_0c00
 
-.. todo::
-   The SCHEDULER context might actually be special in that it doesn't go through the MMU: it's logical and physical addresses are the same. This simplifies a few things, but makes booting more difficult.
+Basic CSRs
+~~~~~~~~~~
+The currently active base- and limit- registers are set in the following CSRs:
 
-Since interrupts are always disabled in SCHEDULE-mode, most of the OS must live in TASK-mode. The consequence of this design is that SYSCALLs need to transition into scheduler mode and out of it again (and the same on the way back). This essentially mean twice as many task switches as a reguler ring-based (monolithic kernel) OS design would need. To remedy this problem somewhat very quick SYSCALLs can be handled in the scheduler completely, if the fact that interrupts are disabled the whole time is an acceptable trade-off.
+The base address for these CSRs is 0x4000_0000
 
-.. todo::
-  I'm not sure how much of hit this actually is: One would think that the OS spends an inordinate amount of time validating inputs from SYSCALLs anyway, and the overhead of actually reaching the kernel is relatively minor. This needs some quantification though which I don't have the tools to do just yet.
+========= =================================== ============================================
+Offset    Name                                Note
+========= =================================== ============================================
+0x00      csr_cpu_ver_reg                     Version and capability register. For Espresso, this read only register returns 0x0
+0x04      csr_pmem_base_reg                   The base address for the code (instruction fetches). The lower 10 bits are ignored and return constant 0. In other words, the base register is 1kByte aligned
+0x08      csr_pmem_limit_reg                  The limit address for the code (instruction fetches). The lower 10 bits are ignored and return constant 0. In other words, the base register is 1kByte aligned
+0x0c      csr_dmem_base_reg                   The base address for the data (loads and stores). The lower 10 bits are ignored and return constant 0. In other words, the base register is 1kByte aligned
+0x10      csr_dmem_limit_reg                  The limit address for the data (loads and stores). The lower 10 bits are ignored and return constant 0. In other words, the base register is 1kByte aligned
+0x14      csr_ecause_reg                      Contains the reason for the last exception. This register is cleared by the `stm` instruction.
+0x18      csr_eaddr_reg                       The address that caused the latest exception
+========= =================================== ============================================
 
-To further minimize the overhead, task context switch should be very quick in order to make this architecture anywhere remotely performant:
+Logical vs. physical addresses
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#. Save registers into the task control block
-#. Determine source of interrupt (read interrupt cause register)
-#. Determine task to handle interrupt
-#. Re-jiggle MMU config for new task
-#. Load registers from new tasks control block
-#. STM - this returns control to the new task
-#. jump to step 1.
+For both code and data, there is a base and limit register. These are 22-bit registers, containing addresses aligned to 1kByte boundaries. For easy access from SW, they are accessible as the top 22 bits of their corresponding CSRs. The bottom 10 bits are ignored on writes and return 0 on reads.
 
-Most of the penalty comes from the load/restore of register content and the fact that we're changing the MMU config (which might
-wreck havoc with the caches).
+All TASK-mode operations use logical addresses. These addresses are subject to address translation and limit checking.
 
-Interconnect
-------------
+**Address translation**: The top 22 bits of the logical address is added to the appropriate base register to gain the top 22 bits of the physical address. The bottom 10 bits of the logical and physical addresses are the same.
+
+**Limit checking**: If the top 22 bits of the logical address is greater then the appropriate limit register, an access violation exception is raised.
+
+For instruction fetches, the 'appropriate' base and limit registers are :code:`csr_pmem_base_reg` and :code:`csr_pmem_limit_reg`. For loads and stores, the appropriate registers are :code:`csr_pmem_base_reg` and :code:`csr_pmem_limit_reg`.
+
+In SCHEDULER mode, all operations (instruction fetches, loads or stores) use physical registers.
+
+.. note::
+  If a limit register is set to 0, this still allows a TASK mode process to access 1kB of memory. There is no way to disallow any memory access to a TASK mode process
+
+.. note::
+  To allow full access to the whole physical address space to a TASK mode process (make logical and physical address one and the same), set base registers to 0 and limit registers to 0xffff_fc00
+
+Exception cause and address
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The :code:`csr_ecause_reg` contains a bit-field for where each bit corresponds to a particular possible exception cause.
+
+The ecause register is 'write-one-to-clear', that is to say: to clear a bit in the ecause register SW needs to write a '1' to that bit. If an exception happens on the same cycle when the ecause bit is cleared by SW, the ecause bit stays set.
+
+ecause bits are set even in SCHEDULER mode. This is useful for polling for pending interrupts. Other exceptions in SCHEDULER mode cause a processor reset (to be more precise, a jump to address 0). The ecause register in these cases can be interrogated to determine the (approximate) reset cause. In some cases the cause of the reset can't be fully determined. One instance would be if a TASK-mode exception sets an ecause bit, resulting in a transfer to SCHEDULER mode. Then, a second SCHEDULER mode exception sets a second ecause bit before SCHEDULER-mode SW had a chance to clear the previous ecause bit. When code starts executing from address 0, two ecause bits would be set and the cause of the reset would not be unambiguously determined.
+
+A second register :code:`csr_eaddr_reg` contains the address for the operating causing the latest exception. This address could be an instruction address (in case of a fetch AV) or a memory address (in case of a read/write AV). Care should be take when interpreting this data: :code:`$pc` is stored as a logical address, while memory access addresses are stores as physical addresses.
+
+
+
+
+
+
+
+
+
+
+
 
 We should have self-describing HW, I think. That would mean that the highest few bytes of anything in the address space should
 say what that thing is.
@@ -66,7 +103,7 @@ Booting
 
 If SCHEDULER-mode goes through the MMU, the following process works: on reset, we start in SCHEDULER mode, at (logical) address 0. This generates a TLB mis-compare upon address translation. The MMU page table address is also set to 0, so the first entry of the top-level page table is loaded from physical address 0. Based on that, the second-level (if that's how it is set up) page table entry is also loaded, from whatever address (say 4096). At this point the physical address for the first instruction can be determined (say 8192) and the fetch can progress.
 
-If SCHEDULE-mode uses physical addresses, the MMU is not involved, so we can still simply start executing from address 0. Even though the MMU top level page table also points to address 0, that only starts playing a role when we enter TASK mode. So, boot code simply need to make sure to set up the MMU properly before exiting to the first task.
+If SCHEDULER-mode uses physical addresses, the MMU is not involved, so we can still simply start executing from address 0. Even though the MMU top level page table also points to address 0, that only starts playing a role when we enter TASK mode. So, boot code simply need to make sure to set up the MMU properly before exiting to the first task.
 
 The end result is that we can boot the machine with all registers defaulting to 0.
 
