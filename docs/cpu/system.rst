@@ -58,102 +58,97 @@ The ecause register is 'write-one-to-clear', that is to say: to clear a bit in t
 
 ecause bits are set even in SCHEDULER mode. This is useful for polling for pending interrupts. Other exceptions in SCHEDULER mode cause a processor reset (to be more precise, a jump to address 0). The ecause register in these cases can be interrogated to determine the (approximate) reset cause. In some cases the cause of the reset can't be fully determined. One instance would be if a TASK-mode exception sets an ecause bit, resulting in a transfer to SCHEDULER mode. Then, a second SCHEDULER mode exception sets a second ecause bit before SCHEDULER-mode SW had a chance to clear the previous ecause bit. When code starts executing from address 0, two ecause bits would be set and the cause of the reset would not be unambiguously determined.
 
-A second register :code:`csr_eaddr_reg` contains the address for the operating causing the latest exception. This address could be an instruction address (in case of a fetch AV) or a memory address (in case of a read/write AV). Care should be take when interpreting this data: :code:`$pc` is stored as a logical address, while memory access addresses are stores as physical addresses.
+A second register, :code:`csr_eaddr_reg` contains the address for the operating causing the latest exception. This address could be an instruction address (in case of a fetch AV) or a memory address (in case of a read/write AV). The address stored in this register is a logical address.
+
+The following exception causes are defined:
+
+========== ============ =================================
+Bit-field  Name         Description
+========== ============ =================================
+ 0         exc_swi_0    SWI 0 instruction executed
+ 1         exc_swi_1    SWI 1 instruction executed
+ 2         exc_swi_2    SWI 2 instruction executed
+ 3         exc_swi_3    SWI 3 instruction executed
+ 4         exc_swi_4    SWI 4 instruction executed
+ 5         exc_swi_5    SWI 5 instruction executed
+ 6         exc_swi_6    SWI 6 instruction executed
+ 7         exc_swi_7    SWI 7 instruction executed
+ 8         exc_cua      Unaligned memory access
+ 9         exc_mdp      Memory access AV
+10         exc_mip      Instruction fetch AV
+11         exc_hwi      Hardware interrupt
+========== ============ =================================
 
 
+Event Counters
+~~~~~~~~~~~~~~
 
+Espresso contains a number of event sources and a number of event counters. These events and counters can be used to profile the performance of code or certain aspects of the hardware.
 
+The following events are defined:
 
+======================== =============== ==========================================
+Event name               Event index     Description
+======================== =============== ==========================================
+event_clk_cycles         0               This event occurs every clock cycle
+event_fetch_wait_on_bus  1               Occurs when the instruction fetch stage waits on the bus interface
+event_decode_wait_on_rf  2               Occurs when the decode stage is waiting on the register file
+event_mem_wait_on_bus    3               Occurs when the memory unit waits on the bus interface
+event_branch_taken       4               Occurs whenever a branch is taken
+event_branch             5               Occurs when a branch instruction is executed
+event_load               6               Occurs when a load is performed by the memory unit
+event_store              7               Occurs when a store is performed by the memory unit
+event_load_or_store      8               Occurs when either a load or a store is performed by the memory unit
+event_execute            9               Occurs when an instruction is executed
+event_bus_idle           10              Occurs when the bus interface is in idle
+event_fetch              11              Occurs when a word is fetched from memory
+event_fetch_drop         12              Occurs when a word is dropped from the instruction queue
+event_inst_word          13              Occurs when a word is handed to instruction decode
+======================== =============== ==========================================
 
+These events are counted by a number of event counters. The number of counters is a configuration parameter for Espresso. In it's default configuration there are 8 event counters.
 
+For each event counter, there is a pair of registers: one for selecting the event to count and another to read the number of counted events.
 
+The base address for these CSRs is 0x4000_0404+8*event_counter_idx
 
+========= =================================== ============================================
+Offset    Name                                Note
+========= =================================== ============================================
+0x00      event_select_reg                    Selects one of the event sources to count
+0x04      event_cnt_reg                       Returns the number of events counted (20 bits)
+========= =================================== ============================================
 
+There is no way to reset the counter. Instead, the counter value should be read at the beginning of the measurement, then again at the end and subtracted from one another to attain the number of events counted. For frequent events, or long measurements care should be taken for counter overflows. The counters themselves have 20 bits so can count a little over 1 million events before rolling over.
 
+The recommended way of dealing with counter overflows is to regularly read them and use SW-controlled accumulators to store the values. Whenever the read value is smaller then the previous value, an overflow has occurred and 2^21 should be added to the accumulator. If the readout periodicity is less then about 1 million clock cycles, it is guaranteed that no more than a single overflow occurs between read-outs.
 
-We should have self-describing HW, I think. That would mean that the highest few bytes of anything in the address space should
-say what that thing is.
+To allow for precise measurement of code sections, a global event counter enable register is provided. This allows for setup of event counters then a single, atomic write operation to enable all of them. At the end ofr the measurement interval a second write operation can be used to freeze the value of all registers at the exact same clock cycle.
 
-Now, this is not possible for all things (memories for example), so the interconnect should step in for those items.
+The base address for this CSR is 0x4000_0400
 
-'Things' are identified by UUIDs, which are 128-bit long.
+========= =================================== ============================================
+Offset    Name                                Note
+========= =================================== ============================================
+0x00      event_enable                        Writing a '1' enables event counters; a '0' disables counting of events
+========= =================================== ============================================
 
-The interconnect also contains a descriptor of the following format:
+Bus interface configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-32-bit region length (32-bit aligned)
-32-bit region start (32-bit aligned)
-Optional 128-bit UUID for region, if LSB of region start is set
+The bus interface needs some basic understanding of the attached memory devices. A single register is provided at offset 0x4000_0800 for this purpose:
 
-The table is read backwards from the highest offset (which is the interconnect UUID) and read until region-length 0 is encountered. Regions must not be overlapping, but they are not necessarily listed in any particular order.
-
-Region length 0 terminates the scan.
-
-Each subsection either contains its own UUID or the UUID is in the interconnect descriptor one level above.
-
-This setup allows SW to completely scan and understand the address map of the HW without any prior knowledge. (NOTE: since the tables and IDs are hard-coded, there's no HW complexity involved in coding them, except of course for the need of the actual storage)
-
-.. note::
-  Most peripherals simply need to have a 128-bit read-only register, containing their UUID decoded at their highest addressable I/O region. If peripherals also have memory mapped memories, those are described by the interconnect.
-
-.. todo::
-  This needs thought, way more though. The UUID approach gives you exact HW versioning, but not revisioning or any sort of capability listing. Thus, any minor HW change would require a complete SW recompile. There's no backwards compatibility what so ever. So, maybe a list of compatible UUIDs? But then how long is the list? What if there's partial compatibility with some other IP? (Such as two interconnects that have completely different control mechanisms (thus different UUIDs), but would still need to support the above discovery process? How about a backwards compatible, but increased functionality serial port of instance?
+======== ================================ =======================================
+Bits     Name                             Description
+======== ================================ =======================================
+0..7     refresh_counter                  The divider counter to control the DRAM refresh period. Reset value is 128, so a refresh is generated every 128th clock cycle.
+8        refresh_disable                  Write '1' to disable DRAM refresh operation
+9..10    dram_bank_size                   Select DRAM bank size; 0: 128k, 1: 512k, 2: 2M, 3: 8M
+11       dram_bank_swap                   Write '1' to swap DRAM banks in the memory map
+======== ================================ =======================================
 
 Booting
 -------
 
-If SCHEDULER-mode goes through the MMU, the following process works: on reset, we start in SCHEDULER mode, at (logical) address 0. This generates a TLB mis-compare upon address translation. The MMU page table address is also set to 0, so the first entry of the top-level page table is loaded from physical address 0. Based on that, the second-level (if that's how it is set up) page table entry is also loaded, from whatever address (say 4096). At this point the physical address for the first instruction can be determined (say 8192) and the fetch can progress.
+Upon reset, Espresso starts executing from address 0, in SCHEDULER mode. Registers, including CSRs assume their reset value only on power-on, or external reset. If a SCHEDULER mode exception occurs, that only vectors the processor to address 0, but doesn't reset registers. Because of that, the state of Espresso can only be assumed to be initialized, if the :code:`ecause` register reads 0.
 
-If SCHEDULER-mode uses physical addresses, the MMU is not involved, so we can still simply start executing from address 0. Even though the MMU top level page table also points to address 0, that only starts playing a role when we enter TASK mode. So, boot code simply need to make sure to set up the MMU properly before exiting to the first task.
-
-The end result is that we can boot the machine with all registers defaulting to 0.
-
-I/O AND CSR
------------
-
-The process doesn't have a separate address space for I/Os and CSRs. This means that all such things need to be memory mapped. They probably would occupy high ranges of the physical address space, so that they don't interfere with booting. The difference between CSRs and I/O is that there is one copy of CSRs for each processor (in a multi-processor system) while there is only one copy of I/O. This is something that can be handled on the interconnect level (CSR peripherals are replicated and the CPUID is pre-pended to the physical address coming out of the CPUs).
-
-CSRs occupy the top physical page, that is PA_FFFFE000...PA_FFFFFFFF
-
-The following CSRs are defined:
-
-Cache and TLB
-~~~~~~~~~~~~~
-
-TBASE - see above
-SBASE - see above
-TLB_LA1
-TLB_DATA1
-TLB_LA2
-TLB_DATA2
-TINV  - if written, invalidates TASK mode TLB entries
-SINV  - if written, invalidates SCHEDULER mode TLB entries
-CINV  - bit 0: invalidate INST CACHE, bit 1: invalidate DATA CACHE
-
-Perf counters
-~~~~~~~~~~~~~
-
-PERF_CNT0
-PERF_CNT1
-PERF_CNT2
-PERF_CNT3
-PERF_CFG0
-PERF_CFG1
-PERF_CFG2
-PERF_CFG3
-
-Interrupt / reset cause
-~~~~~~~~~~~~~~~~~~~~~~~
-
-ECAUSE - exception cause
-EADDR - exception address
-RCAUSE - reset cause
-RADDR
-
-.. todo::
-  We have the exception code (read/write/execute) as well. We can probably put that in ECAUSE.
-
-.. todo::
-  How to handle interrupts in a multi-core system? This could be just an interrupt routing problem...
-
-.. todo::
-  What of the above is truly replicated per core?

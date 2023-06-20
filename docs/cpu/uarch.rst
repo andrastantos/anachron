@@ -1,14 +1,16 @@
 Micro-architecture of Espresso
 ==============================
 
-The environment for Espresso
+Implementation in a nutshell
 ----------------------------
 
-Espresso is the processor for the 'Anachronistic Computer' or 'Anachron'. It is targeting 1.5um technology, a ~10MHz clock rate and intends to compete in the early '80s computer market. It is intended to be a contemporary of the Intel 80286 processor, in its earliest incarnations.
+There will be a lot of details coming, but just to set the stage...
 
-It is intended to work with a page-mode (not even FPM) DRAM through a direct interface. It has to share this memory with all other bus-masters, chief amongst them, the display controller
+Espresso is a rather bare-bones pipelined RISC implementation. It has no caches, no MMU even. It stalls for loads and stores, does completely in-order issue and execution. It doesn't have a branch predictor, or to be more precise, it predicts all branches not taken. Something that might be a tiny bit out of the mold is that it has a pre-fetch stage (and the requisite instruction queue).
 
-This environment has certain impact on the way Espresso looks on the inside.
+Another slightly unusual feature is that the 'execute' stage encompasses memory accesses, but has a two-cycle latency.
+
+All in all, pretty basic.
 
 Memory access patterns
 -----------------------------
@@ -159,33 +161,6 @@ CSRs
 
 Memory protection
 -----------------
-
-
-Virtual processor technology for Espresso
------------------------------------------
-
-Of course, Espresso is *actually* implemented in an FPGA. However, to assess what would have been possible in it's intended time-frame, the early '80s is important.
-
-What technology node would it have used? Processors in the late '70-s used 3um NMOS process. The Intel 80286 used 1.5um in 1982.
-
-As far as processor speeds go, almost all 3um chips used speeds of less than 5MHz. It was the 1.5um crop that managed to get to 8-10MHz clock ranges.
-
-For Espresso, the clock rate is very important, as it's integrated memory controller directly ties processor speed to memory speed. To be useful, it must maximize memory bandwidth, which means a minimum of 6MHz clock (150ns access time DRAM) and a maximum of 12MHz (80ns access time DRAM). This means that this chip would not have really been possible before the advent of 1.5um technology. It also puts it as a direct competitor with the 80286.
-
-To assess how well the design is doing, we need a way to back-project performance metrics to that ancient node. Luckily `Dennard Scaling <https://en.wikipedia.org/wiki/Dennard_scaling>`_ gives us a way. All we need is some modern process. Here we're lucky again: the `Open Road <https://openroad.readthedocs.io/en/latest/>`_ initiative gives us the tools and even a PDK at 130nm.
-
-To double-check our assumptions, the article: '`Dependence on Feature Size <https://psec.uchicago.edu/workshops/fast_timing_conf_2011/system/docs/25/original/110429_psec_workshop_drake_size_dependence.pdf>`_' provides a comparison of ring oscillators in various old process nodes.
-
-.. figure:: process_speed.png
-
-  Technology node vs. ring oscillator speed
-
-A 130nm process should have an inverter delay of about 35ps. Roughly the same for the other (180nm) node that's available through OpenSilicon.
-
-HMOS 1 as we know is at 3um and the minimum gate-delay (I'm going to say that's an inverter) is 1ns.
-
-The tech node ratio is 23:1. The speed ratio is 28:1. I would say, that's a pretty good fit. In other words, Dennard scaling is applicable.
-
 
 
 

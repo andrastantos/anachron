@@ -33,3 +33,9 @@ Toolchain
 
 .. todo:: we need a predefined macro for -msoft-float
 
+Espresso
+--------
+
+Seriously think through page size: right now base and limit registers are 1k aligned. That works well for memory-constrained systems, but will be hell to emulate with an MMU. 4k alignment is actually something that can be programmed into an MMU.
+
+Update :code:`roadmap.rst` with whatever the conclusion is.

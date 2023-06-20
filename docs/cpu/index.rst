@@ -11,17 +11,14 @@ Brew Processor
    :caption: Contents:
 
    introduction
-   isa
-   isa_details
-   interpolation
-   lr-sr
-   abi
+   dma
    system
    uarch
-   decode
-   competition
    todo
-   gpu
+   software
+   memory
+   fpga_debug
+   synthesis_results
 
 Todos
 =====

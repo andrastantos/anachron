@@ -5,6 +5,11 @@ Espresso has a rather simplified memory model:
 
 Loads and stores are performed in-order and they stall the pipeline until completion (in case of writes, until all side-effects are reflected in the target).
 
+Memory access patterns
+-----------------------------
+
+Espresso supports 8-beat bursts for instruction fetches, and 2-beat bursts for memory accesses. Each beat transfers 16-bits of data. Each burst is preceded and followed by a clock-cycle of extra activity. This means that a 16-byte instruction fetch burst takes 10 clock cycles, while a 32-bit load or store takes 4 clock cycles on the bus.
+
 Access rights and protection
 ----------------------------
 
