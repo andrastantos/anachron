@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath("./_ext"))
 
 # -- Project information -----------------------------------------------------
 
-project = 'Brew processor'
+project = 'Espresso processor'
 copyright = '2022, Andras Tantos'
 author = 'Andras Tantos'
 
