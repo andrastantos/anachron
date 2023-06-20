@@ -378,6 +378,7 @@ class LoadStoreInputIf(Interface):
 
 class LoadStoreOutputIf(Interface):
     phy_addr = BrewAddr
+    eff_addr = BrewAddr
     mem_av = logic
     mem_unaligned = logic
 class LoadStoreUnit(Module):
@@ -400,6 +401,7 @@ class LoadStoreUnit(Module):
         )
 
         self.output_port.phy_addr <<= phy_addr
+        self.output_port.eff_addr <<= eff_addr
         self.output_port.mem_av <<= mem_av
         self.output_port.mem_unaligned <<= mem_unaligned
 
@@ -701,7 +703,7 @@ class ExecuteStage(GenericModule):
         self.eaddr_out <<= Reg(Select(
             self.input_port.fetch_av | ((self.input_port.exec_unit == op_class.branch) & (self.input_port.branch_op == branch_ops.swi)),
             pc,
-            ldst_unit.output_port.phy_addr
+            ldst_unit.output_port.eff_addr
         ), clock_en=branch_output.is_exception & ~self.do_branch)
 
         #self.complete <<= stage_2_reg_en
