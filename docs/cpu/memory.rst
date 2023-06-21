@@ -10,40 +10,6 @@ Memory access patterns
 
 Espresso supports 8-beat bursts for instruction fetches, and 2-beat bursts for memory accesses. Each beat transfers 16-bits of data. Each burst is preceded and followed by a clock-cycle of extra activity. This means that a 16-byte instruction fetch burst takes 10 clock cycles, while a 32-bit load or store takes 4 clock cycles on the bus.
 
-Access rights and protection
-----------------------------
-
-For TASK mode, there is a `base` and a `limit` register. Memory references are relative to the `base` register and generate an access violation exception, if they reach beyond the `limit` register. This allows for some basic process isolation, but not for any detailed management of access rights. In fact, there is a different pair of registers for instruction fetches and load/store operations. This helps with shared library implementation, but still... simple.
-
-In SCHEDULER mode there's no protection: logical and physical address are one and the same.
-
-
-
-
-There is a TASK_BASE and TASK_LIMIT register in the processor. In TASK mode, logical addresses are compared against the TASK_LIMIT register. Accesses (instruction fetches or load/store operations) beyond the limit are not permitted and an access violation exception is thrown. The logical-to-physical mapping is achieved by adding TASK_BASE to the logical address. In fact both TASK_LIMIT and TASK_BASE registers can be quantized to 4kB page-boundaries, further simplifying operation.
-
-In SCHEDULER mode TASK_BASE and TASK_LIMIT registers are not consulted and SCHEDULER mode operates in physical addresses.
-
-There are some obvious limitations to this scheme:
-
-#. Tasks can have access to a single, contiguous section of the physical address space. This in practice means they can only have access to DRAM (as they *do* need access to that and we can only control one region), which in turn means that all I/O accesses will have to be marshalled to SCHEDULER mode. Alternatively, one can setup a single TASK with both BASE and LIMIT being set to 0 and use this task as a highly trusted, monolithic God-process with full access to all resources.
-#. Since the accessible physical address space for each task must be contiguous, memory fragmentation is a problem, something that can only be solved by de-fragmentation-by-copy.
-#. Shared memory between processes is practically not possible.
-#. Virtual memory (page files) and memory-mapped files are not practical.
-
-
-Access rights
--------------
-
-Now, on to access rights. The processor architecture doesn't really define any memory protection scheme, all it really does is to make sure that everything goes through whatever this external protection logic is. This includes CPU-specific CSR registers.
-
-While the canonical way of dealing with access rights and protections is through a paging MMU, the implementation of BREW for Anacron doesn't have enough silicon area (remember, we try to work with 1.5um silicon process) to implement that. Thus, a much simpler protection scheme is used:
-
-In TASK mode, every memory access is offset by a `base` register and checked against a `limit` register. This sets up a contiguous window in physical memory, that a the process can access. There is one such window for instructions and another for data. Anything below the `base` is inaccessible (no negative addresses are supported) and anything above the `limit` would generate an access violation exception.
-
-In SCHEDULER mode, these registers are simply assumed to be 0, giving access to the whole physical address space without translation.
-
-Such a simple scheme has limitations. It is sufficient to protect user-mode processes from one another and SCHEDULER mode from user-mode processes. However, drivers and OS components will need complete open access to every HW resource: there's no way to be more granular about permissions. This is a problem, but an acceptable compromise, I decided.
 
 DRAM access
 -----------

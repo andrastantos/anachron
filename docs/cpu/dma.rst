@@ -47,42 +47,40 @@ Register interface
 
 The DMA engine registers are mapped as CSRs. The layout of the registers is as follows:
 
-The base address for these registers is 0x4000_0c00.
-
-========== =========================== ============ ================================
-Offset     Name                        Access       Description
-========== =========================== ============ ================================
-0x00       :code:`DMA_CH_0_ADDR`       R/W          Channel 0 address register (first/current address of transfer)
-0x04       :code:`DMA_CH_0_LIMIT`      R/W          Channel 0 limit register (last address of transfer)
-0x08       :code:`DMA_CH_0_CONFIG`     R/W          Channel 0 configuration register
-0x0c       :code:`DMA_CH_0_STATUS`     R            Channel 0 status register
-0x10       :code:`DMA_CH_1_ADDR`       R/W          Channel 1 address register (first/current address of transfer)
-0x14       :code:`DMA_CH_1_LIMIT`      R/W          Channel 1 limit register (last address of transfer)
-0x18       :code:`DMA_CH_1_CONFIG`     R/W          Channel 1 configuration register
-0x1c       :code:`DMA_CH_1_STATUS`     R            Channel 1 status register
-0x20       :code:`DMA_CH_2_ADDR`       R/W          Channel 2 address register (first/current address of transfer)
-0x24       :code:`DMA_CH_2_LIMIT`      R/W          Channel 2 limit register (last address of transfer)
-0x28       :code:`DMA_CH_2_CONFIG`     R/W          Channel 2 configuration register
-0x2c       :code:`DMA_CH_2_STATUS`     R            Channel 2 status register
-0x30       :code:`DMA_CH_3_ADDR`       R/W          Channel 3 address register (first/current address of transfer)
-0x34       :code:`DMA_CH_3_LIMIT`      R/W          Channel 3 limit register (last address of transfer)
-0x38       :code:`DMA_CH_3_CONFIG`     R/W          Channel 3 configuration register
-0x3c       :code:`DMA_CH_3_STATUS`     R            Channel 3 status register
-0x40       :code:`DMA_INT_STAT`        R/W1C        Interrupt status register (for all channels)
-========== =========================== ============ ================================
+================= =========================== ============ ================================
+Offset            Name                        Access       Description
+================= =========================== ============ ================================
+0x4000_0c00       :code:`dma_cha_0_addr`       R/W          Channel 0 address register (first/current address of transfer)
+0x4000_0c04       :code:`dma_cha_0_limit`      R/W          Channel 0 limit register (last address of transfer)
+0x4000_0c08       :code:`dma_cha_0_config`     R/W          Channel 0 configuration register
+0x4000_0c0c       :code:`dma_cha_0_status`     R            Channel 0 status register
+0x4000_0c10       :code:`dma_cha_1_addr`       R/W          Channel 1 address register (first/current address of transfer)
+0x4000_0c14       :code:`dma_cha_1_limit`      R/W          Channel 1 limit register (last address of transfer)
+0x4000_0c18       :code:`dma_cha_1_config`     R/W          Channel 1 configuration register
+0x4000_0c1c       :code:`dma_cha_1_status`     R            Channel 1 status register
+0x4000_0c20       :code:`dma_cha_2_addr`       R/W          Channel 2 address register (first/current address of transfer)
+0x4000_0c24       :code:`dma_cha_2_limit`      R/W          Channel 2 limit register (last address of transfer)
+0x4000_0c28       :code:`dma_cha_2_config`     R/W          Channel 2 configuration register
+0x4000_0c2c       :code:`dma_cha_2_status`     R            Channel 2 status register
+0x4000_0c30       :code:`dma_cha_3_addr`       R/W          Channel 3 address register (first/current address of transfer)
+0x4000_0c34       :code:`dma_cha_3_limit`      R/W          Channel 3 limit register (last address of transfer)
+0x4000_0c38       :code:`dma_cha_3_config`     R/W          Channel 3 configuration register
+0x4000_0c3c       :code:`dma_cha_3_status`     R            Channel 3 status register
+0x4000_0c40       :code:`dma_int_stat`        R/W1C        Interrupt status register (for all channels)
+================= =========================== ============ ================================
 
 The configuration register layout is identical for all channels:
 
 ========== =================================== ================================
 Bit-field  Name                                Description
 ========== =================================== ================================
-0          :code:`DMA_CFG_BIT_SINGLE`          If set, the DMA channel operates in single request mode. If cleared, it operates in burst mode
-1          :code:`DMA_CFG_BIT_READ_NOT_WRITE`  If set, the DMA channel transfers from memory. If cleared, it transfers to memory
-2          :code:`DMA_CFG_BIT_INT_ENABLE`      If set, interrupts are enabled for the DMA channel. If cleared, no interrupts are generated
-2          :code:`DMA_CFG_BIT_IS_MASTER`       If set, the DMA channel is used as a bus-master requestor. If cleared, it is a normal DMA channel
-3          :code:`DMA_CFG_BIT_HIGH_PRIORITY`   If set, the DMA channel has high arbitration priority. If cleared, it has low priority
-4          :code:`DMA_CFG_BIT_REQ_ACTIVE_LOW`  If set, the DMA channel request pin is active low. If cleared, it is active high
-5          :code:`DMA_CFG_BIT_REQ_NO_CDC`      If set, the DMA channel assumes a synchronous requestor. If cleared, an asynchronous requestor is assumed
+0          :code:`dma_cfg_bit_single`          If set, the DMA channel operates in single request mode. If cleared, it operates in burst mode
+1          :code:`dma_cfg_bit_read_not_write`  If set, the DMA channel transfers from memory. If cleared, it transfers to memory
+2          :code:`dma_cfg_bit_int_enable`      If set, interrupts are enabled for the DMA channel. If cleared, no interrupts are generated
+2          :code:`dma_cfg_bit_is_master`       If set, the DMA channel is used as a bus-master requestor. If cleared, it is a normal DMA channel
+3          :code:`dma_cfg_bit_high_priority`   If set, the DMA channel has high arbitration priority. If cleared, it has low priority
+4          :code:`dma_cfg_bit_req_active_low`  If set, the DMA channel request pin is active low. If cleared, it is active high
+5          :code:`dma_cfg_bit_req_no_cdc`      If set, the DMA channel assumes a synchronous requestor. If cleared, an asynchronous requestor is assumed
 ========== =================================== ================================
 
 The status register layout is identical for all channels:
@@ -90,27 +88,27 @@ The status register layout is identical for all channels:
 ========== ==================================== ================================
 Bit-field  Name                                 Description
 ========== ==================================== ================================
-0          :code:`DMA_STAT_BIT_CH_ACTIVE`       If set, the DMA channel is active and will respond to requests. If cleared, it is inactive
-1          :code:`DMA_STAT_BIT_CH_REQ_PENDING`  If set, the DMA channel is actively requesting control of the bus. If cleared, it doesn't
-2          :code:`DMA_STAT_BIT_CH_INT_PENDING`  If set, the DMA channel is requesting an interrupt. This bit is a copy of the corresponding bit in the :code:`DMA_INT_STAT` register
+0          :code:`dma_stat_bit_ch_active`       If set, the DMA channel is active and will respond to requests. If cleared, it is inactive
+1          :code:`dma_stat_bit_ch_req_pending`  If set, the DMA channel is actively requesting control of the bus. If cleared, it doesn't
+2          :code:`dma_stat_bit_ch_int_pending`  If set, the DMA channel is requesting an interrupt. This bit is a copy of the corresponding bit in the :code:`dma_int_stat` register
 ========== ==================================== ================================
 
-The :code:`DMA_INT_STAT` register contains a single bit for each channel:
+The :code:`dma_int_stat` register contains a single bit for each channel:
 
 ========== ============================= ================================
 Bit-field  Name                          Description
 ========== ============================= ================================
-0          :code:`DMA_CH_0_INT_PENDING`  If set, DMA channel 0 is requesting an interrupt. Write 1 to clear pending interrupt.
-1          :code:`DMA_CH_1_INT_PENDING`  If set, DMA channel 1 is requesting an interrupt. Write 1 to clear pending interrupt.
-2          :code:`DMA_CH_2_INT_PENDING`  If set, DMA channel 2 is requesting an interrupt. Write 1 to clear pending interrupt.
-3          :code:`DMA_CH_3_INT_PENDING`  If set, DMA channel 3 is requesting an interrupt. Write 1 to clear pending interrupt.
+0          :code:`dma_ch_0_int_pending`  If set, DMA channel 0 is requesting an interrupt. Write 1 to clear pending interrupt.
+1          :code:`dma_ch_1_int_pending`  If set, DMA channel 1 is requesting an interrupt. Write 1 to clear pending interrupt.
+2          :code:`dma_ch_2_int_pending`  If set, DMA channel 2 is requesting an interrupt. Write 1 to clear pending interrupt.
+3          :code:`dma_ch_3_int_pending`  If set, DMA channel 3 is requesting an interrupt. Write 1 to clear pending interrupt.
 ========== ============================= ================================
 
-These bits are set whenever the corresponding DMA channel starts requesting an interrupt. The bits (and the corresponding interrupt request) can be cleared by writing a '1' into the proper bit in the `DMA_INT_STAT` register.
+These bits are set whenever the corresponding DMA channel starts requesting an interrupt. The bits (and the corresponding interrupt request) can be cleared by writing a '1' into the proper bit in the `dma_int_stat` register.
 
 A DMA transfer is programmed by setting the appropriate configuration register bits, the limit register and finally writing the address register. The act of writing the address register will activate the DMA channel.
 
-An active DMA channel is accepting requests as long its address register is less then or equal to its limit register. Upon the last transfer, the :code:`tc` output pin is asserted to signal the peripheral that the DMA transfer completed. At the same time, a CPU interrupt is raised (if interrupts are enabled). The interrupt pending bit reflects the fact that an interrupt is raised. This bit can be cleared by writing a '1' to the appropriate bit of the :code:`DMA_INT_STAT` register.
+An active DMA channel is accepting requests as long its address register is less then or equal to its limit register. Upon the last transfer, the :code:`tc` output pin is asserted to signal the peripheral that the DMA transfer completed. At the same time, a CPU interrupt is raised (if interrupts are enabled). The interrupt pending bit reflects the fact that an interrupt is raised. This bit can be cleared by writing a '1' to the appropriate bit of the :code:`dma_int_stat` register.
 
 
 

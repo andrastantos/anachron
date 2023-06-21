@@ -12,13 +12,17 @@ Brew Processor
 
    introduction
    dma
-   system
+   boot
    uarch
    todo
    software
    memory
    fpga_debug
    synthesis_results
+   address_translation
+   exceptions
+   event_counters
+   csr_summary
 
 Todos
 =====

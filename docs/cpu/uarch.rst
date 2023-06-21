@@ -150,17 +150,25 @@ The bus interface uses both clock edges to generate the proper transitions on th
 
 To ensure glitch-free drive of the control signals (mostly n_cas_0/1), control signals are registered on the appropriate clock edge and minimal post-flop muxing is utilized. Further logic tricks are used to ensure no more than one signal changes on any particular clock-edge on these output logic signals: this ensures that LUT outputs will not glitch during transitions.
 
-Event counters
----------------
+The bus interface needs some basic understanding of the attached memory devices. This is achieved through a single CSR:
 
+================ =================================== ============ =========== ============================================
+Offset           Name                                Access       Reset value Description
+================ =================================== ============ =========== ============================================
+0x4000_0800      :code:`bus_if_cfg_reg`              R/W          0x0000_0080 Bus interface configuration register
+================ =================================== ============ =========== ============================================
 
-CSRs
-----
+Various bit-fields in this register control the aspects of the operation of the bus interface:
 
+======== ================================ =========== =======================================
+Bits     Name                             Reset value Description
+======== ================================ =========== =======================================
+0..7     refresh_counter                  0x80        The divider counter to control the DRAM refresh period.
+8        refresh_disable                  0           Write '1' to disable DRAM refresh operation
+9..10    dram_bank_size                   0           Select DRAM bank size; 0: 128k, 1: 512k, 2: 2M, 3: 8M
+11       dram_bank_swap                   0           Write '1' to swap DRAM banks in the memory map
+======== ================================ =========== =======================================
 
-
-Memory protection
------------------
 
 
 
