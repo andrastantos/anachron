@@ -313,9 +313,9 @@ class top(Module):
     clk               = ClkPort()
     rst               = RstPort()
 
-    nram_base = 0x0000_0000
-    csr_base  = 0x4000_0000
-    dram_base = 0x8000_0000
+    nram_base = 0x000_0000
+    csr_base  = 0x400_0000
+    dram_base = 0x800_0000
 
     def construct(self):
         self.pc = 0
@@ -324,7 +324,7 @@ class top(Module):
         self.timeout = self.default_timeout
 
     def body(self):
-        self.cpu = BrewV1Top(csr_base=self.csr_base >> 30, nram_base=self.nram_base >> 30, has_multiply=True, has_shift=True, page_bits=7)
+        self.cpu = BrewV1Top(csr_base=self.csr_base >> 26, nram_base=self.nram_base >> 26, has_multiply=True, has_shift=True, page_bits=7)
         self.dram_l = Dram(name="l")
         self.dram_h = Dram(name="h")
         self.addr_decode = AddressDecode()
@@ -411,7 +411,7 @@ class top(Module):
         simulator.log("Done")
 
     def set_mem(self, addr: int, data: ByteString):
-        section = addr & 0xc000_0000
+        section = addr & 0xc00_0000
         if section == self.nram_base:
             self.rom.set_mem(addr & 0x03ff_ffff, data)
         elif section == self.dram_base:

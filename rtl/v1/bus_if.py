@@ -145,13 +145,13 @@ class BusIf(GenericModule):
     """
     Address map:
 
-        0x00000000 ... 0x03ffffff: NRAM space
-        0x40000000 ... 0x43ffffff: CSR space (not of concern for the bus interface)
-        0x80000000 ... 0x83ffffff: DRAM space 0
-        0xc0000000 ... 0xc3ffffff: DRAM space 1 (aliased to DRAM space 0)
+        0x0000000 ... 0x03fffff: NRAM space
+        0x4000000 ... 0x43fffff: CSR space (not of concern for the bus interface)
+        0x8000000 ... 0x83fffff: DRAM space 0
+        0xc000000 ... 0xc3fffff: DRAM space 1 (aliased to DRAM space 0)
 
-        In each space, bits 29:26 determine the number of wait-states.
-        In each space, bits 25:0 determine the location to address, leaving 64MB of addressable space.
+        In each space, bits 30:27 determine the number of wait-states.
+        In each space, bits 24:0 determine the location to address, leaving 64MB of addressable space.
 
         NOTE: wait-states are actually ignored by the bus-interface when interacting with non-DMA DRAM transfers.
               however, DMA transactions do need wait-state designation, so in reality no more than 64MB of DRAM
@@ -300,8 +300,8 @@ class BusIf(GenericModule):
         req_byte_en <<= Select(arb_port_select, self.fetch_request.byte_en, self.mem_request.byte_en, self.dma_request.byte_en)
         req_advance = req_valid & req_ready
 
-        req_dram = (req_addr[30:29] != self.nram_base) & ((arb_port_select == Ports.mem_port) | (arb_port_select == Ports.fetch_port))
-        req_nram = (req_addr[30:29] == self.nram_base) & ((arb_port_select == Ports.mem_port) | (arb_port_select == Ports.fetch_port))
+        req_dram = (req_addr[26:25] != self.nram_base) & ((arb_port_select == Ports.mem_port) | (arb_port_select == Ports.fetch_port))
+        req_nram = (req_addr[26:25] == self.nram_base) & ((arb_port_select == Ports.mem_port) | (arb_port_select == Ports.fetch_port))
         req_dma  = (arb_port_select == Ports.dma_port) & ~self.dma_request.is_master
         req_ext  = (arb_port_select == Ports.dma_port) &  self.dma_request.is_master
         req_rfsh = (arb_port_select == Ports.refresh_port)
@@ -310,7 +310,7 @@ class BusIf(GenericModule):
         dma_ch = Reg(self.dma_request.one_hot_channel, clock_en=start)
         tc = Reg(self.dma_request.terminal_count, clock_en=start)
 
-        req_wait_states = (req_addr[28:25]-1)[3:0]
+        req_wait_states = (req_addr[30:27]-1)[3:0]
         wait_states_store = Reg(req_wait_states, clock_en=start)
         wait_states = Wire(Unsigned(4))
         wait_states <<= Reg(
@@ -764,7 +764,7 @@ def sim():
                 self.request_port.valid <<= 1
                 self.request_port.read_not_write <<= not do_write
                 self.request_port.byte_en <<= byte_en
-                self.request_port.addr <<= self.burst_addr | ((self.dram_base if self.is_dram else self.nram_base) << 29) | ((self.wait_states + 1) << (29-4))
+                self.request_port.addr <<= self.burst_addr | ((self.dram_base if self.is_dram else self.nram_base) << (29-4)) | ((self.wait_states + 1) << (29))
                 self.request_port.data <<= data
 
             def start_read(addr, is_dram, burst_len, byte_en, wait_states):
@@ -875,7 +875,7 @@ def sim():
                 self.request_port.valid <<= 1
                 self.request_port.read_not_write <<= not do_write
                 self.request_port.byte_en <<= byte_en
-                self.request_port.addr <<= None if is_master else addr | ((self.dram_base if is_dram else self.nram_base) << 29) | ((wait_states + 1) << (29-4))
+                self.request_port.addr <<= None if is_master else addr | ((self.dram_base if is_dram else self.nram_base) << (29-4)) | ((wait_states + 1) << (29))
                 self.request_port.one_hot_channel <<= 1 << channel
                 self.request_port.terminal_count <<= terminal_count
                 self.request_port.is_master <<= is_master

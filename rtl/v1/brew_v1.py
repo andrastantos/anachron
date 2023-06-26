@@ -48,13 +48,13 @@ class BrewV1Top(GenericModule):
         self.page_bits = page_bits
 
         self.csr_top_level_ofs = 0
-        self.csr_cpu_ver_reg    = (self.csr_base << 30) + self.csr_top_level_ofs + 0*4
-        self.csr_pmem_base_reg  = (self.csr_base << 30) + self.csr_top_level_ofs + 1*4
-        self.csr_pmem_limit_reg = (self.csr_base << 30) + self.csr_top_level_ofs + 2*4
-        self.csr_dmem_base_reg  = (self.csr_base << 30) + self.csr_top_level_ofs + 3*4
-        self.csr_dmem_limit_reg = (self.csr_base << 30) + self.csr_top_level_ofs + 4*4
-        self.csr_ecause_reg     = (self.csr_base << 30) + self.csr_top_level_ofs + 5*4
-        self.csr_eaddr_reg      = (self.csr_base << 30) + self.csr_top_level_ofs + 6*4
+        self.csr_cpu_ver_reg    = (self.csr_base << 26) + self.csr_top_level_ofs + 0*4
+        self.csr_pmem_base_reg  = (self.csr_base << 26) + self.csr_top_level_ofs + 1*4
+        self.csr_pmem_limit_reg = (self.csr_base << 26) + self.csr_top_level_ofs + 2*4
+        self.csr_dmem_base_reg  = (self.csr_base << 26) + self.csr_top_level_ofs + 3*4
+        self.csr_dmem_limit_reg = (self.csr_base << 26) + self.csr_top_level_ofs + 4*4
+        self.csr_ecause_reg     = (self.csr_base << 26) + self.csr_top_level_ofs + 5*4
+        self.csr_eaddr_reg      = (self.csr_base << 26) + self.csr_top_level_ofs + 6*4
 
     def body(self):
         bus_if = BusIf(nram_base=self.nram_base)

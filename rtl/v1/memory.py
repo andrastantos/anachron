@@ -176,7 +176,7 @@ class MemoryStage(GenericModule):
                 1
             )
         )
-        csr_select = self.input_port.addr[31:30] == self.csr_base
+        csr_select = self.input_port.addr[27:26] == self.csr_base
         is_csr <<= Select(
             input_advance,
             Reg(
@@ -500,7 +500,7 @@ def sim():
             self.csr_base = csr_base
 
         def is_csr(self, addr):
-            return (addr >> (32-2)) == self.csr_base
+            return ((addr >> (32-6)) & 3) == self.csr_base
 
         def simulate(self) -> TSimEvent:
             def wait_clk():
@@ -595,10 +595,10 @@ def sim():
             yield from do_store(addr=0x0005001, data=0x456789ab, access_len=access_len_8)
             for i in range(4):
                 yield from wait_clk()
-            yield from do_load(addr=0x140+(self.csr_base<<30), access_len=access_len_32)
+            yield from do_load(addr=0x140+(self.csr_base<<26), access_len=access_len_32)
             for i in range(4):
                 yield from wait_clk()
-            yield from do_store(addr=0x240+(self.csr_base<<30), data=0xdeadbeef, access_len=access_len_32)
+            yield from do_store(addr=0x240+(self.csr_base<<26), data=0xdeadbeef, access_len=access_len_32)
 
 
 
