@@ -28,27 +28,25 @@ These events are counted by a number of event counters. The number of counters i
 
 For each event counter, there is a pair of registers: one for selecting the event to count and another to read the number of counted events.
 
-The base address for these CSRs is 0x4000_0404+8*event_counter_idx
-
 ================ =================================== ============ ============================================
 Offset           Name                                Access       Description
 ================ =================================== ============ ============================================
-0x4000_0404      :code:`event_select_reg_0`          R/W          Selects one of the event sources to count for event counter 0
-0x4000_0408      :code:`event_cnt_reg_0`             R            Returns the number of events counted for event counter 0
-0x4000_040c      :code:`event_select_reg_1`          R/W          Selects one of the event sources to count for event counter 1
-0x4000_0410      :code:`event_cnt_reg_1`             R            Returns the number of events counted for event counter 1
-0x4000_0414      :code:`event_select_reg_2`          R/W          Selects one of the event sources to count for event counter 2
-0x4000_0418      :code:`event_cnt_reg_2`             R            Returns the number of events counted for event counter 2
-0x4000_041c      :code:`event_select_reg_3`          R/W          Selects one of the event sources to count for event counter 3
-0x4000_0420      :code:`event_cnt_reg_3`             R            Returns the number of events counted for event counter 3
-0x4000_0424      :code:`event_select_reg_4`          R/W          Selects one of the event sources to count for event counter 4
-0x4000_0428      :code:`event_cnt_reg_4`             R            Returns the number of events counted for event counter 4
-0x4000_042c      :code:`event_select_reg_5`          R/W          Selects one of the event sources to count for event counter 5
-0x4000_0430      :code:`event_cnt_reg_5`             R            Returns the number of events counted for event counter 5
-0x4000_0434      :code:`event_select_reg_6`          R/W          Selects one of the event sources to count for event counter 6
-0x4000_0438      :code:`event_cnt_reg_6`             R            Returns the number of events counted for event counter 6
-0x4000_043c      :code:`event_select_reg_7`          R/W          Selects one of the event sources to count for event counter 7
-0x4000_0440      :code:`event_cnt_reg_7`             R            Returns the number of events counted for event counter 7
+0x400_0404       :code:`event_select_reg_0`          R/W          Selects one of the event sources to count for event counter 0
+0x400_0408       :code:`event_cnt_reg_0`             R            Returns the number of events counted for event counter 0
+0x400_040c       :code:`event_select_reg_1`          R/W          Selects one of the event sources to count for event counter 1
+0x400_0410       :code:`event_cnt_reg_1`             R            Returns the number of events counted for event counter 1
+0x400_0414       :code:`event_select_reg_2`          R/W          Selects one of the event sources to count for event counter 2
+0x400_0418       :code:`event_cnt_reg_2`             R            Returns the number of events counted for event counter 2
+0x400_041c       :code:`event_select_reg_3`          R/W          Selects one of the event sources to count for event counter 3
+0x400_0420       :code:`event_cnt_reg_3`             R            Returns the number of events counted for event counter 3
+0x400_0424       :code:`event_select_reg_4`          R/W          Selects one of the event sources to count for event counter 4
+0x400_0428       :code:`event_cnt_reg_4`             R            Returns the number of events counted for event counter 4
+0x400_042c       :code:`event_select_reg_5`          R/W          Selects one of the event sources to count for event counter 5
+0x400_0430       :code:`event_cnt_reg_5`             R            Returns the number of events counted for event counter 5
+0x400_0434       :code:`event_select_reg_6`          R/W          Selects one of the event sources to count for event counter 6
+0x400_0438       :code:`event_cnt_reg_6`             R            Returns the number of events counted for event counter 6
+0x400_043c       :code:`event_select_reg_7`          R/W          Selects one of the event sources to count for event counter 7
+0x400_0440       :code:`event_cnt_reg_7`             R            Returns the number of events counted for event counter 7
 ================ =================================== ============ ============================================
 
 There is no way to reset the counter. Instead, the counter value should be read at the beginning of the measurement, then again at the end and subtracted from one another to attain the number of events counted. For frequent events, or long measurements care should be taken for counter overflows. The counters themselves have 20 bits so can count a little over 1 million events before rolling over.
@@ -60,5 +58,5 @@ To allow for precise measurement of code sections, a global event counter enable
 ================ ===================== ============ ============================================
 Offset           Name                  Access       Description
 ================ ===================== ============ ============================================
-0x4000_0400      :code:`event_enable`  R/W          Writing a '1' enables event counters; a '0' disables counting of events
+0x400_0400       :code:`event_enable`  R/W          Writing a '1' enables event counters; a '0' disables counting of events
 ================ ===================== ============ ============================================

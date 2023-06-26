@@ -26,6 +26,7 @@ Anachronistic Computer
    competitors
    pinouts
    build-notes
+   memory_configs
 
 Todos
 =====

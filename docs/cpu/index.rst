@@ -17,12 +17,15 @@ Brew Processor
    todo
    software
    memory
+   pinout
    fpga_debug
    synthesis_results
    address_translation
    exceptions
    event_counters
    csr_summary
+   memory_history
+   todo
 
 Todos
 =====

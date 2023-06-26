@@ -23,12 +23,12 @@ Name                Direction  Description
 :code:`n_dack_2`    Output     Active low polarity DMA acknowledge output for channel 2
 :code:`drq_3`       Input      Programmable polarity DMA request input for channel 3
 :code:`n_dack_3`    Output     Active low polarity DMA acknowledge output for channel 3
-:code:`tc`          Output     Active high terminal count signal
+:code:`dma_tc`      Output     Active high terminal count signal
 =================== ========== ===============================================
 
 The DMA controller supports single- and burst requests: in single request mode, each assertion of a :code:`drq_x` signal will generate a single transaction. In burst mode, subsequent transactions are generated as long as `drq` is kept asserted.
 
-The DMA controller generates and interrupt (if enabled) and asserts the :code:`tc` (terminal-count) output on the last transfer for a DMA channel. After the transfer is complete, the DMA channel becomes inactive and software needs to re-active the channel if further transfers are needed.
+The DMA controller generates and interrupt (if enabled) and asserts the :code:`dma_tc` (terminal-count) output on the last transfer for a DMA channel. After the transfer is complete, the DMA channel becomes inactive and software needs to re-active the channel if further transfers are needed.
 
 The DMA controller supports programmable polarity on the `drq` lines and allows for lower latency by disabling the CDC crossing on them as well. It is important to note that if no CDC circuitry is used, setup and hold times on the `drq` lines must be observed relative to the clock of Espresso: in this case the DMA requestor must be a synchronous peripheral.
 
@@ -50,23 +50,23 @@ The DMA engine registers are mapped as CSRs. The layout of the registers is as f
 ================= =========================== ============ ================================
 Offset            Name                        Access       Description
 ================= =========================== ============ ================================
-0x4000_0c00       :code:`dma_cha_0_addr`       R/W          Channel 0 address register (first/current address of transfer)
-0x4000_0c04       :code:`dma_cha_0_limit`      R/W          Channel 0 limit register (last address of transfer)
-0x4000_0c08       :code:`dma_cha_0_config`     R/W          Channel 0 configuration register
-0x4000_0c0c       :code:`dma_cha_0_status`     R            Channel 0 status register
-0x4000_0c10       :code:`dma_cha_1_addr`       R/W          Channel 1 address register (first/current address of transfer)
-0x4000_0c14       :code:`dma_cha_1_limit`      R/W          Channel 1 limit register (last address of transfer)
-0x4000_0c18       :code:`dma_cha_1_config`     R/W          Channel 1 configuration register
-0x4000_0c1c       :code:`dma_cha_1_status`     R            Channel 1 status register
-0x4000_0c20       :code:`dma_cha_2_addr`       R/W          Channel 2 address register (first/current address of transfer)
-0x4000_0c24       :code:`dma_cha_2_limit`      R/W          Channel 2 limit register (last address of transfer)
-0x4000_0c28       :code:`dma_cha_2_config`     R/W          Channel 2 configuration register
-0x4000_0c2c       :code:`dma_cha_2_status`     R            Channel 2 status register
-0x4000_0c30       :code:`dma_cha_3_addr`       R/W          Channel 3 address register (first/current address of transfer)
-0x4000_0c34       :code:`dma_cha_3_limit`      R/W          Channel 3 limit register (last address of transfer)
-0x4000_0c38       :code:`dma_cha_3_config`     R/W          Channel 3 configuration register
-0x4000_0c3c       :code:`dma_cha_3_status`     R            Channel 3 status register
-0x4000_0c40       :code:`dma_int_stat`        R/W1C        Interrupt status register (for all channels)
+0x400_0c00        :code:`dma_cha_0_addr`       R/W          Channel 0 address register (first/current address of transfer)
+0x400_0c04        :code:`dma_cha_0_limit`      R/W          Channel 0 limit register (last address of transfer)
+0x400_0c08        :code:`dma_cha_0_config`     R/W          Channel 0 configuration register
+0x400_0c0c        :code:`dma_cha_0_status`     R            Channel 0 status register
+0x400_0c10        :code:`dma_cha_1_addr`       R/W          Channel 1 address register (first/current address of transfer)
+0x400_0c14        :code:`dma_cha_1_limit`      R/W          Channel 1 limit register (last address of transfer)
+0x400_0c18        :code:`dma_cha_1_config`     R/W          Channel 1 configuration register
+0x400_0c1c        :code:`dma_cha_1_status`     R            Channel 1 status register
+0x400_0c20        :code:`dma_cha_2_addr`       R/W          Channel 2 address register (first/current address of transfer)
+0x400_0c24        :code:`dma_cha_2_limit`      R/W          Channel 2 limit register (last address of transfer)
+0x400_0c28        :code:`dma_cha_2_config`     R/W          Channel 2 configuration register
+0x400_0c2c        :code:`dma_cha_2_status`     R            Channel 2 status register
+0x400_0c30        :code:`dma_cha_3_addr`       R/W          Channel 3 address register (first/current address of transfer)
+0x400_0c34        :code:`dma_cha_3_limit`      R/W          Channel 3 limit register (last address of transfer)
+0x400_0c38        :code:`dma_cha_3_config`     R/W          Channel 3 configuration register
+0x400_0c3c        :code:`dma_cha_3_status`     R            Channel 3 status register
+0x400_0c40        :code:`dma_int_stat`        R/W1C        Interrupt status register (for all channels)
 ================= =========================== ============ ================================
 
 The configuration register layout is identical for all channels:
@@ -108,7 +108,27 @@ These bits are set whenever the corresponding DMA channel starts requesting an i
 
 A DMA transfer is programmed by setting the appropriate configuration register bits, the limit register and finally writing the address register. The act of writing the address register will activate the DMA channel.
 
-An active DMA channel is accepting requests as long its address register is less then or equal to its limit register. Upon the last transfer, the :code:`tc` output pin is asserted to signal the peripheral that the DMA transfer completed. At the same time, a CPU interrupt is raised (if interrupts are enabled). The interrupt pending bit reflects the fact that an interrupt is raised. This bit can be cleared by writing a '1' to the appropriate bit of the :code:`dma_int_stat` register.
+An active DMA channel is accepting requests as long its address register is less then or equal to its limit register. Upon the last transfer, the :code:`dma_tc` output pin is asserted to signal the peripheral that the DMA transfer completed. At the same time, a CPU interrupt is raised (if interrupts are enabled). The interrupt pending bit reflects the fact that an interrupt is raised. This bit can be cleared by writing a '1' to the appropriate bit of the :code:`dma_int_stat` register.
 
+Data transfer during DMA cycles
+-------------------------------
 
+The integrated DMA controller is responsible for generating the appropriate bus control signals and addresses. It doesn't generate any data. For an I/O to memory transfer, this means that the DMA controller will generate a write cycle for DRAM while asserting :code:`n_dack_X`. It is dependent on the peripheral to put the data on the data bus and the DRAM to latch that data from the bus.
 
+Conversely, for memory to I/O transfers a DRAM read cycle will be generated, but the addressed DMA peripheral is expected to latch the data presented on the data bus by the DRAM.
+
+Wait states and DMA access
+--------------------------
+
+The timing and the number of wait-states for an I/O device to respond and complete the transfer is determined by the wait-states set in the top four bits of the transfer address. The programmed wait-states are always used, even for DRAM transfer targets. The transfer can be further extended by asserting the :code:`n_wait` signal.
+
+Bus-master support
+------------------
+
+Any channel fo the DMA controller can be configured to support an external bus-master. In this setup, the external master request control of the bus by asserting
+the :code:`drq_X` signal. Espresso - after completing any active burst and internal arbitration - tri-states all external bus interface pins and acknowledges the request by asserting the associated :code:`n_dack_X` signal as the bus-grant handshake. The external master is in full control of the bus at this point. The :code:`drq_X` signal needs to remain asserted as long as the external master requires control of the bus. Once the external master is ready to relinquish the bus, it de-asserts :code:`drq_X`
+
+DMA transfer cycles
+-------------------
+
+.. todo:: TBD

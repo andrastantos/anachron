@@ -46,13 +46,13 @@ CSRs
 ================= =========================== ============ ================================
 Offset            Name                        Access       Description
 ================= =========================== ============ ================================
-0x4000_0004       :code:`csr_pmem_base_reg`   R/W          The base address for the code (instruction fetches).
-0x4000_0008       :code:`csr_pmem_limit_reg`  R/W          The limit address for the code (instruction fetches).
-0x4000_000c       :code:`csr_dmem_base_reg`   R/W          The base address for the data (loads and stores).
-0x4000_0010       :code:`csr_dmem_limit_reg`  R/W          The limit address for the data (loads and stores).
+0x400_0004        :code:`csr_pmem_base_reg`   R/W          The base address for the code (instruction fetches).
+0x400_0008        :code:`csr_pmem_limit_reg`  R/W          The limit address for the code (instruction fetches).
+0x400_000c        :code:`csr_dmem_base_reg`   R/W          The base address for the data (loads and stores).
+0x400_0010        :code:`csr_dmem_limit_reg`  R/W          The limit address for the data (loads and stores).
 ================= =========================== ============ ================================
 
-For all these registres, the lower 10 bits are ignored and return constant 0. In other words, the base register is 1kByte aligned.
+For all these registers, the lower 10 bits are ignored and return constant 0. In other words, the base register is 1kByte aligned.
 
 .. todo::
     Should we use 4k aligned limit and base registers to make it easier for future MMU-based re-enactment of the address map of as TASK-mode process?

@@ -70,7 +70,7 @@ CSRs
 ================= =========================== ============ ================================
 Offset            Name                        Access       Description
 ================= =========================== ============ ================================
-0x4000_0014       :code:`csr_ecause_reg`      R/W1C        Contains the reason for the last exception.
-0x4000_0018       :code:`csr_eaddr_reg`       R            The effective address that caused the latest exception
+0x400_0014        :code:`csr_ecause_reg`      R/W1C        Contains the reason for the last exception.
+0x400_0018        :code:`csr_eaddr_reg`       R            The effective address that caused the latest exception
 ================= =========================== ============ ================================
 

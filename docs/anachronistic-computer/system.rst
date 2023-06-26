@@ -62,13 +62,13 @@ Memory map
 =============  ===========  ===========
 Start address  End address  Description
 =============  ===========  ===========
-0x0000_0000    0x001f_ffff  EEPROM space 1 (and boot code from address 0)
-0x0020_0000    0x003f_ffff  EEPROM space 2
-0x0040_0000    0x005f_ffff  internal I/O space
-0x0060_0000    0x006f_ffff  ISA extension bus I/O address space
-0x0070_0000    0x007f_ffff  ISA extension bus memory address space
-0x4000_0000    0x43ff_ffff  CSR space: not decoded externally, but handled by the processor internally
-0x8000_0000    0x80ff_ffff  DRAM space (up to 16MByte)
+0x000_0000     0x01f_ffff   EEPROM space 1 (and boot code from address 0)
+0x020_0000     0x03f_ffff   EEPROM space 2
+0x040_0000     0x05f_ffff   internal I/O space
+0x060_0000     0x06f_ffff   ISA extension bus I/O address space
+0x070_0000     0x07f_ffff   ISA extension bus memory address space
+0x400_0000     0x3ff_ffff   CSR space: not decoded externally, but handled by the processor internally
+0x800_0000     0x8ff_ffff   DRAM space (up to 16MByte)
 =============  ===========  ===========
 
 .. note::

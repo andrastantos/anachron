@@ -150,58 +150,6 @@ Pin Number Pin Name      IO std.    Description
 40         GND           GND        Ground input
 ========== ============= ========== ===========
 
-CPU
----
-
-========== =========== ========== ===========
-Pin Number Pin Name    IO std.    Description
-========== =========== ========== ===========
-1          A8_0        3.3V out   Multiplexed address bus
-2          A9_1        3.3V out   Multiplexed address bus
-3          A10_2       3.3V out   Multiplexed address bus
-4          A11_3       3.3V out   Multiplexed address bus
-5          A12_4       3.3V out   Multiplexed address bus
-6          A13_5       3.3V out   Multiplexed address bus
-7          A14_6       3.3V out   Multiplexed address bus
-8          A15_7       3.3V out   Multiplexed address bus
-9          A17_16      3.3V out   Multiplexed address bus
-10         A19_18      3.3V out   Multiplexed address bus
-11         A20_21      3.3V out   Multiplexed address bus
-12         D0          3.3V io    Data bus
-13         D1          3.3V io    Data bus
-14         D2          3.3V io    Data bus
-15         D3          3.3V io    Data bus
-16         D4          3.3V io    Data bus
-17         D5          3.3V io    Data bus
-18         D6          3.3V io    Data bus
-19         D7          3.3V io    Data bus
-20         nRAS_A      3.3V out   Active low row-select, bank A
-21         nRAS_B      3.3V out   Active low row-select, bank B
-22         nCAS_0      3.3V out   Active low column select, byte 0
-23         nCAS_1      3.3V out   Active low column select, byte 1
-24         nNREN       3.3V out   Active low non-DRAM bus cycle qualifier
-25         nWE         3.3V out   Active low write-enable
-26         nWAIT       3.3V in    Active low wait-state input
-27         SYS_CLK     3.3V in    Clock input
-28         nRST        3.3V in    Active low reset input
-29         nINT        3.3V in    Active low interrupt input
-30         DRQ_A       3.3V in    Active high DMA channel A request input
-31         nDACK_A     3.3V out   Active low DMA channel A grant output
-32         DRQ_B       3.3V in    Active high DMA channel B request input
-33         nDACK_B     3.3V out   Active low DMA channel B grant output
-34         DRQ_C       3.3V in    Active high DMA channel C request input
-35         nDACK_C     3.3V out   Active low DMA channel C grant output
-36         DRQ_D       3.3V in    Active high DMA channel D request input
-37         nDACK_D     3.3V out   Active low DMA channel D grant output
-38         DMA_TC      3.3V out   Active high DMA terminal count output
-39         VCC         3.3V PWR   Power input
-40         GND         GND        Ground input
-========== =========== ========== ===========
-
-New additions:
-
-* Built-in DMA controller for external peripherals
-* Changed bus-request/grant protocol to use DMA channels (programmable in the DMA controller)
 
 Bus extender
 ------------
