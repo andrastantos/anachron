@@ -17,6 +17,12 @@ To double-check our assumptions, the article: '`Dependence on Feature Size <http
 
   Technology node vs. ring oscillator speed
 
+It doesn't quite go back in time enough, but `another study <https://www.semanticscholar.org/paper/HMOS-III-technology-Liu-Fu/898e1109886793a09fcdef2c4133be6acb902e67>`_ shows speeds for HMOS 1/2/3:
+
+.. figure:: hmos.png
+
+  Basic HMOS node comparison
+
 A 130nm process should have an inverter delay of about 35ps. Roughly the same for the other (180nm) node that's available through OpenSilicon.
 
 HMOS 1 is a 3um process and the minimum gate-delay (I'm going to say that's an inverter) is 1ns.

@@ -186,14 +186,105 @@ Remote library calls (RLC)
 
 These are a simplified version of RPC, where the caller and the callee are within the same process. They *do not*
 
+Exception handling
+------------------
 
+Interrupts and exceptions are handled the same way by HW when i TASK mode: a switch to SCHEDULER mode. When in SCHEDULER mode, interrupts are ignored while exceptions cause a jump to address 0 (the reset vector).
 
+The :code:`ECAUSE` CSR contains the (1-hot encoded) exception cause, while the :code:`EADDR` CSR contains the logical address associated with the exception. :code:`$tpc` points to the instruction causing the exception.
 
+.. admonition:: Why?
 
+  Since we have conditional branch instructions for testing the first 12 bits of any register, we can rather quickly check for the interrupt/exception source and jump to their associated handler as long as they are one-hot encoded. This also allows for multiple (pending) exceptions, such as a pending interrupt while handing an access violation or both an access and alignment violation. This setup allows for 'write-one-to-clear' semantics and finally, it allows for SW-defined priority control: all exception sources are flagged to SW in parallel and the order of handling them depends on the implementation.
 
+A simple exception handler code could follow the following structure::
 
+	except_handler:
+        $r5 <- CSR_ECAUSE
+        if $r5 == 0 $pc <- except_done
+  		  $r4 <- $r5
+	      if $r5[0] != 0 $pc <- SW0_handler
+	h0:   if $r5[1] != 0 $pc <- SW1_handler
+	h1:   if $r5[2] != 0 $pc <- SW2_handler
+	h2:   if $r5[3] != 0 $pc <- SW3_handler
+	h3:   if $r5[4] != 0 $pc <- SW4_handler
+	h4:   if $r5[5] != 0 $pc <- SW5_handler
+	h5:   if $r5[6] != 0 $pc <- SW6_handler
+	h6:   if $r5[7] != 0 $pc <- SW7_handler
+	h7:   if $r5[8] != 0 $pc <- CUA_handler
+	h8:   if $r5[9] != 0 $pc <- MDP_handler
+        $r5 <- $r5 >> 10
+  h9:   if $r5[0] != 0 $pc <- MIP_handler
+  h10:  if $r5[1] != 0 $pc <- HWI_handler
+	      # Clear handled exceptions, check for more
+	      CSR_ECAUSE <- $r4
+	      $pc <- except_handler
+  except_done:
+        # Decide what to do next
+        ...
+        # Return to TASK mode
+        stm
+        $pc <- except_handler
 
+	# handler code
+	SW0_handler:
+        ...
+        # jump back to test for next handler
+        $pc <- h0
 
+.. todo:: I'm actually not sure about the wisdom of this setup. Yes, the branches are fast, but there's a ton of them and most will not jump in any iteration. So we have a ton of instructions we go through just to find the one that *will* branch. A jump table would probably be more performant, even with the slowness of the load/store interface. The code for something like that would look like::
+
+	except_handler:
+        $r5 <- CSR_ECAUSE # Assume lower 2 bits is always 0, which can be done by simply aligning ecause appropriately
+        $r5 <- $r5 & 16 # If we're paranoid, mask for the right number of bits. This way guaranteed not to index out of the handler table
+        $pc <- mem[handler_table+$r5] # Jump to handler
+  except_done:
+        # Decide what to do next
+        ...
+        # Return to TASK mode
+        stm
+        $pc <- except_handler
+
+	# handler code
+	SW0_handler:
+        ...
+        # jump back to test for next handler
+        $pc <- except_handler
+
+	HWI_handler:
+        ...
+        # clear interrupt source
+        # jump back to test for next handler
+        $pc <- except_handler
+
+  .data
+  handler_table:
+        .dw  except_done # No exception
+        .dw  SW0_handler
+	      .dw  SW1_handler
+	      .dw  SW2_handler
+
+	      .dw  SW3_handler
+	      .dw  SW4_handler
+	      .dw  SW5_handler
+	      .dw  SW6_handler
+
+	      .dw  SW7_handler
+	      .dw  CUA_handler
+	      .dw  MDP_handler
+        .dw  MIP_handler
+
+        .dw  HWI_handler
+        .dw  0 # Invalid exception code: jump to reset vector
+        .dw  0 # Invalid exception code: jump to reset vector
+        .dw  0 # Invalid exception code: jump to reset vector
+
+In this model, we would need to do a few things:
+
+#. Interrupts and exceptions are not of the same priority. The priority doesn't matter all that much, but only one of them can be signalled at a time
+#. SCHEDULER-mode interrupts are not signalled, unless CSR_ECAUSE is 0
+#. CSR_ECAUSE clears on read.
+#. A single instruction can only signal a single exception. There is only one instance where that's not the case at the moment: a load/store with both a bounds check and alignment check violations. HW simply needs to decide which one to signal, the right choice is the bounds check exception.
 
 
 

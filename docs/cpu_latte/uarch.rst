@@ -1,167 +1,123 @@
 Micro-architecture of Latte
 ===========================
 
-The implementation is going to follow a relatively simple pipeline implementation with the following stages:
+Major improvements of the Micro-architecture of Latte over Espresso are the following:
 
-- FETCH unit with BRANCH PREDICTION
-- DECODE
-- EXECUTE (target computation for memory/branch)
-- MEMORY (bypassed if not used)
-- WRITE-BACK
+#. Introduction of a 1kB instruction cache
+#. Introduction of an MMU
+#. Introduction of a simple branch-predictor
+#. Introduction of a write-buffer
 
-The following units around the main pipeline support the efficient execution of the instruction stream:
+ICache
+------
 
-- ICACHE
-- DCACHE
-- MMU
+A proper ICache is added to Espresso to de-couple (and off-load) instruction fetches from the ever over-subscribed DRAM bus. This cache is targeting an 80+% hit-rate (TODO: this needs verification through simulation).
 
-Front-end
----------
+The cache organization is the following:
 
-The goal of the front-end is to keep the decode logic fed with (potentially speculative) instructions.
+#. Cache line size: 16 bytes
+#. Cache way size: 256 bytes (16 lines)
+#. Cache way count: 4
+#. Replacement strategy: round-robin
 
-The front-end *doesn't* think in terms of a program counter. It thinks in terms of a FETCH COUNTER, or FC and INSTRUCTION ADDRESS or IA.
+The instruction cache performs 16-byte aligned, wrap-around bursts, but doesn't support critical-word-first fetching (I think).
 
-The front-end is de-coupled from the back-end of the processor through a queue. This queue contains the following info:
-
-1. up to 64-bit instruction code.
-2. Instruction length
-3. 31-bit IA of the *next* instruction
-4. TASK/SCHEDULER bit
-
-.. note:: If a branch mis-predict is detected, *all* instructions in the pipeline, *including* the queue between the FE and the decoder needs to be cleared.
-
-.. note::
-  the problem is the following: if a branch is predicted taken, we'll need to also check that it was predicted to jump to the right address. That's only possible if we've passed the predicted branch target address to the BE. If SWI is predicted, we might also want to pass the TASK/SCHEDULER bit too, though it could be gleaned form the fact that it is an SWI instruction inside the BE. Since the we pass IA along, the 'taken' bit can be inferred, and the comparator can't really be optimized out anyway, since we have to check that the IA actually matches PC.
-
-.. todo::
-  There's a good question here: should we pass the IA of the *current* instruction or the IA of the *next* instruction. Right now I'm of the opinion that next IA is better because it allows to detect a mis-predict one cycle earlier and clear the pipeline quicker.
-
-The front-end deals with three caches:
-1. Instruction cache read to get the instruction bit-stream.
-2. TLB lookups
-3. Brach-prediction
-
-Instruction Cache
-~~~~~~~~~~~~~~~~~
-
-The instruction cache uses logical addresses to get the cache lines, but the tag contains physical addresses. That means that in order to test for a hit, we'll need to wait for the TLB results.
-
-The ICache can provide 32-bits at a time. This is not the granularity of instructions, so the FE uses an FC pointer to get the next 32-bits from the ICache.
+The ICache provides (aligned) 32-bit entries per clock cycle to instruction fetch.
 
 ICache invalidation
 ~~~~~~~~~~~~~~~~~~~
 
-This is a tricky subject that needs to span the whole front-end of the processor: the ICache, the branch predictor and the instruction fetch. It even has implications on the FE-BE FIFO.
-
-When the ICACHE gets flushed, the most likely reason for it is self-modifying code. That is, when someone put data in main memory and we want to execute it. In some cases (trampolines) we might be able to invalidate just a cache-line, but in more complex JIT scenarios we want to blow the whole cache away.
-
-Whole cache invalidation is initiated through an I/O write. After the write, there must be a tight loop, checking for the invalidation to be completed. That is an I/O read, followed by a jump if invalidation is still in progress. Why? Because of the de-coupled FE behavior. Quite likely a number of instructions are already in the decode queue by the time the write finally reaches the cache controller and the invalidation starts. The act of invalidating will stall any further instruction fetches, but whatever is already in the FE pipeline will go through uninterrupted. So, the loop might execute a few times (if the branch-predictor was right) before the processor finally stalls. NOTE: in this design reads flush the write-queue so it's guaranteed that the first read will see the side-effect of the write. Since the read is not cached, it'll take quite a bit to wind its way through the interconnect to the cache-controller. It's possible that by the time the read reaches the controller, the invalidation has been completed.
+Whole cache invalidation is initiated through a CSR write. After the write, there must be a tight loop, checking for the invalidation to be completed. That is a CSR read, followed by a jump if invalidation is still in progress. Why? Because of the prefetch queue. Quite likely a number of instructions are already in the queue by the time the write finally reaches the cache controller and the invalidation starts. The act of invalidating will stall any further instruction fetches, but whatever is already in the FE pipeline will go through uninterrupted. So, the loop might execute a few times (if the branch-predictor was right) before the processor finally stalls. NOTE: in this design reads flush the write-queue so it's guaranteed that the first read will see the side-effect of the write. Since the read is not cached, it'll take quite a bit to wind its way through the interconnect to the cache-controller. It's possible that by the time the read reaches the controller, the invalidation has been completed.
 
 Why can't this loop be done in HW? Why can't the cache-controller flush the FE-BE queue? It sure can. However the problem is that there are several instructions executed (or at least partially pushed into the pipeline) by the time the cache controller even realizes that there's an invalidation request.
 
-Branch prediction
-~~~~~~~~~~~~~~~~~
+Cache invalidation happens whenever logical-to-physical address mapping changes. This happens when processes are shuffled around in physical memory or more memory is added to a processes logical address space. Or when an allocate-on-write exception is handled. However the most likely reason still is simply a context change.
 
-Potential branches are identified by the a rather complex :ref:`expression <branch_id_expression>`.
+I think we can remove the need of flushing the cache for every MMU change by:
+
+#. Tagging using both logical and physical addresses
+#. Use logical addresses for look-up, but don't declare victory just yet if there's a hit
+#. Comparing physical address to MMU translation results, cancelling the hit if there's a mismatch
+
+
+Branch prediction
+-----------------
+
+Potential branches are identified by checking for branch instruction patterns in fetched instruction.
+
+.. important::
+
+  Even though it would be really enticing to just check every 16-bit word for branches, the branch predictor will have to be instruction-length aware. Let's say, we predict a branch to be taken. We alter the instruction stream, but we should make sure that the immediate field of the branch is correctly fetched from the original location. Because of this, we might as well make sure that we won't predict on words that are not actual instructions. We have the knowledge anyway.
 
 We will have a branch target buffer (BTB), containing:
 
 #. 31-bit target address (16-bit aligned)
-#. 1-bit TASK v. SCHEDULER
+#. 1-bit target mode (TASK vs. SCHEDULER)
 #. 1-bit match.
 
-The BTB is addressed by the (low-order N-bits) of $pc.
+The BTB is addressed by the (low-order N-bits) of $pc, that is: it's working on logical addresses.
 
 .. todo::
+
   should we use logical or physical address for BTB address? Right now it's logical, though with the right sizing, it might not matter: If the BTB is the size of a page or smaller, the bits used to select the BTB entry are the same between the logical and the physical address.
 
-.. todo:: should the target address be logical or physical? Right now it's logical.
+.. todo::
 
-The back-end, when executing a branch, it stores the target address and check it against the already stored value. If the values match, we set the match bit. If don't we clear it.
+  should the target address be logical or physical? Right now it's logical.
 
-In the front-end, if a branch is encountered, we look up it's BTB entry. If the match bit is set, we predict the branch taken to the address in the BTB, otherwise we predict not taken.
+The back-end, when executing a branch, it stores the target address and check it against the already stored value. If the target address matches, we set the match bit. If don't we clear it.
+
+In the front-end, if a branch is encountered, we look up it's BTB entry, based on the logical address for the fetched word. If the match bit is set, we predict the branch taken to the address in the BTB, otherwise we predict not taken.
 
 This means that two consecutive branches to the same address will trigger prediction.
 
-We can modify the default behavior for conditional branches with negative offsets, where match == 0: we would predict the branch taken to the address that's coded in the instruction stream.
+.. admonition:: A bad idea
+
+  We could modify the default behavior for conditional branches with negative offsets, where match == 0: we would predict the branch taken to the address that's coded in the instruction stream. However, this would need us to *understand* the concept of immediate fields in the instruction stream, the fact that there are 32-bit instructions, be able to calculate brach targets, etc. This is too much work, for very little gain, so let's not do it!
 
 The memory for the BTB needs two read ports *and* a write port:
 - 1 read port to get the values in the predictor during fetch
 - 1 read port to read the stored target address for branches during execute
 - 1 write port to write back the target address and the match bit during execute
 
-This would still give us 2 cycle update latency, but at least we could update on every cycle.
+.. note::
 
-.. todo::
-   If we think that back-to-back branches are rare, we could take the hit of a two-cycle update and cut the BRAM usage in half. I think I won't take this approach initially.
+  Due to the 2-cycle write latency (read-modify-write) in case of back-to-back branches that collide on the BTB entry, we will have to be a bit careful, though I think any implementation will be OK-ish. There is actually almost no chance for this to happen. Adjacent addresses never collide on the BTB entry, so back-to-back branches in the code-stream would never collide. If there is branch, that's predicted properly, jumping to a next branch, which could be gotten from the cache without a hick-up, *and* that branch target happens to alias the first branch in the BTB, we get into this situation. Very unlikely. And even if it happens, the end result of the confusion of the updates is that we might predict a further jump incorrectly. This is not worth the complexity, so simply ignoring the problem is the right avenue to take.
 
-In case of a 2-cycle write latency (read-modify-write) and back-to-back branches that collide on the BTB entry, we will have to be a bit careful, though I think any implementation will be OK-ish. It's probably best if the read gets the old value, and the corresponding write will stomp on the one preceding it.
+FPGA BRAM sizes are all over the map, but the largest (18kbit) gives us 512 entries. This gives us mapping for the lower 9 bits of the :code:`$pc`, or a total of 1kByte before aliasing, if a simple direct-mapped lookup is used.
 
 .. note::
-  back-to-back branches should almost never collide on the BTB entry: adjacent branches should never hash to the same entry. We would need one jump that is taken, predicted taken, was possible to fetch in a single cycle, and hash to the same BTB entry. And even then, the worst case is that we mis-set the match bit.
 
-2 BRAMs would give us 256 entries. The entries are direct-mapped, based on a hash of the PC and its type (that is the TASK/SCHEDULER bit). The simplest hash is the lower N bits of PC, which is probably good enough.
-
-.. note:: BTB implementations are rather forgiving for errors; they are harmless in terms of accuracy, they only cause stalls.
+  since we're predicting if the target is in SCHEDULER or TASK mode, we can correctly predict SWI instructions. STM will probably mis-predict, as we usually would not return to the same address in TASK mode, thus the match bit would never be set - *as such, it's probably not worth even decoding it as a branch*.
 
 .. note::
-  since we're predicting if the target is in SCHEDULER or TASK mode, we'll have to make sure that we truly don't ever leak SCHEDULER context into TASK mode. On the plus side, we can correctly predict SWI instructions. STM will probably mis-predict, as we usually would not return to the same address in TASK mode, thus the match bit would never be set - as such, it's probably not worth even decoding it as a branch.
 
-.. note::
   since target address is logical, it's important that we predict the TASK/SCHEDULER bit too. Otherwise the TLB lookup could be incorrect. The alternative is that we don't predict any of the SWI or STM instructions, but that slows down SYSCALLs quite a bit.
 
-.. note::
-  branch prediction will have to take instruction length into consideration and keep predicting the next address for a 48-bit instruction, even on a predicted taken branch.
+Every time a branch predictor makes a 'taken' prediction, it puts the target address (including TASk/SCHEDULER mode bit) into a queue. It also sets a :code:`predicted_taken` but in the instruction buffer. This bit gets carried through instruction assembly, decode and execute. In execute, if the bit is set, the target address is pulled from the queue, compared to the computed target and the proper action is taken (update of BTB, flush in case of a mis-predict, etc.).
+
+If the queue is full, the branch predictor continues to predict every branch not taken.
 
 .. note::
-  branch prediction will also have to work around the mismatch between the 32-bit ingest port from ICACHE and the 16/48-bit instruction length. It also has to take into account the fact that the PC is incremented in 16-bit quantities.
 
-.. todo::
-  OOPS!!!! HOW DO WE DO LOOKUP for branches for the 32-bit aligned FC? We will have to be careful: if the first instruction is predicted taken, the second 16-bit suddenly becomes invalid.
+  Unless the branch predictor is part of instruction assembly, it needs to deal with the fact, that 32-bits are returned by the ICache. We can't predict two instructions in parallel (we don't have enough BTB ports), but luckily, 16-bit instructions are not likely to be branches. Even if they are, back-to-back versions of them (:code:`swi` followed by :code:`swi`) are almost non-existent, and even if they are, the first one takes precedence. We either predict it taken, in which case the second is irrelevant, or we predict it not taken, in which case there will be a mis-predict later on; again, the prediction on the second one is irrelevant.
 
-  Branch prediction works on FA and not on PC. This means that it's 32-bit granular - can't differentiate between two 16-bit back-to-back branches (which I suspect is rare, but who knows?)
+  Because of this, the branch predictor only looks at the first instruction in the 32-bit fetch (which could be either the low- or the high-order word, depending on the size and alignment of the previous instruction)
 
-Instruction Fetch
------------------
-
-The ICache (and the TLB and the BP module) can provide up to 32-bits of instruction bytes. This could be broken up in many ways, depending on what the previous bytes were, since our instruction length varies between 16- and 64 bits. So, it's possible that the full 32 bits is part of the previous instruction. It's possible that one or the other 16-bit part is (the start of) an instruction. It's also possible that both are (potentially full) instructions.
-
-We need to decode the instruction length and the branch-check in parallel on both halves and properly gate them with previous knowledge to generate the two result sets. For each half we have:
-
-1. Instruction start bit
-2. Instruction length (maybe co-encoded with 'start')
-3. Branch bit
-4. IA
-5. Target address from prediction.
-
-We also need the ability to push up to two instructions per clock cycle into the decode queue; that's because 48- 64-bit instructions take more than one cycle to fetch, so we want to be able to catch up: our average instruction size is less then 32-bits, but we can only take advantage of this fact if we can push up to two instructions into the queue.
-
-The target address from the predictor applies to both halves. It almost never happens that both halves are actually branches (the only exception would be two consecutive SWIs), so that's fine.
-
-.. important::
-  If there are two instructions ready to be pushed into the queue and the first is a predicted-taken branch, the second instruction should not be pushed into the queue.
-
-.. todo::
-  There are two separate ideas mixed here: one where the predictor works on 32-bit quantized addresses and one that works on precise instruction addresses. I should make up my mind about that.
-
-.. important::
-  We can save a lot of headache if we simply didn't predict 16-bit branches, that is SWIs and STMs. Maybe we should do that...
-
-.. important::
-  if we have a branch to an odd 16-bit address, the FE will fetch the corresponding bottom 16-bits as well, which *should not* be put into the decode queue - indeed should not even be decoded as an instruction as it could be the tail-end of a longer one. This only happen on the first fetch after a taken branch, but could happen both due to predication or actual jump, even due to exceptions.
 
 MMU
 ---
 
-We would need a traditional two-level MMU, nothing really fancy. The page table address would need to be selected based on SCHEDULER v. TASK mode; unless of course we decided that there's no translation in SCHEDULER mode.
+The MMU follows a rather traditional design, except it has a three-level structure with 1kB leaf pages and a 34-bit physical address space, where the top 2 bits are ignored.
 
-There are two kinds of pages: 4MB super pages and 4kb (regular) pages. All pages are naturally aligned, that is super pages are 4MB aligned while regular pages are 4kb aligned.
+The MMU is bypassed for SCHEDULER-mode code, logical and physical addresses are identical in that case.
 
-Page table entries are 32 bits long with only 24 bits used by the HW::
+Each page table is 1kB large. The page entries describe either 1kB (S), 256kB (M) or 64MB (L) pages.
+
+Page table entries are 32 bits long with the following layout::
 
   +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
-  |                                   P_PA_ADDR                                   | C |   MODE    |               .               |
+  |                                       P_PA_ADDR                                       | C |   MODE    |               .       |
   +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
 
 =====  ================= ================
@@ -173,112 +129,183 @@ MODE   MNEMONIC          EXPLANATION
 3      :code:`RW`        entry is readable and writeable
 4      :code:`  X`       entry is executable
 5      :code:`R X`       entry is read/executable
-6      :code:`LINK`      entry is link to 2nd level page table, if appears in the 1st level page table
-6      :code:` WX`       entry is writable and executable, if appears in the 2nd level page table
+6      :code:`LINK`      entry is link to next-level page table
 7      :code:`RWX`       entry has all access rights
 =====  ================= ================
 
-:code:`somehing`
-.. note:: every MODE other than 6 (LINK) is considered a super page in the 1st level TLB table. This includes mode 0 (INV) as well.
-
-The C bit is set to 1 for cacheable entries, set to 0 for non-cacheable ones.
+The :code:`C` bit is set to 1 for cacheable entries, set to 0 for non-cacheable ones.
 
 P_PA_ADDR:
-  top 20 bits of 4kB aligned physical address. Either for 2nd level page tables or for physical memory. For super-pages the bottom 10 bits of this field are ignored.
-
-.. todo::
-  Not that any MMU implementation I know of do this, but do we want sub-page access rights? That would allow us to do more granular access control that would create better page-heaps, where all allocations have HW-enforced bounds (ish). Think AppVerifier, but with less overhead. If we want to have - say - 256 byte sub-pages, that would mean 16 sets of mode bits, that is 48 bits total. Adding the 20 address and the cache-able bit, that adds up to 69. Too many! Maybe we can have a common 'execute' bit, but individual R and W bits. That would make for 20+1+1+32 = 54 bits. It would mean 64-bit page table entries, but a trivial encoding for the LINK pages by the use of yet another bit.
+  top 22 bits of 1kB aligned physical address. Either for a next-level page table or for physical memory. For M pages, the bottom 8 bits are expected to be 0. For L pages the bottom 16-bits are expected to be 0.
 
 .. note::
-  Most MMU implementations have D (dirty) and A (accessed) bits. These are redundant: one could start with a page being invalid. Any access would raise an exception, at which point, the OS can set the page to read-only. If a write is attempted, another exception is fired, at which point the page can be set with permissions. All the time, the exception handler can keep track of accessed and dirty pages. The D and A bits are only useful if the HW sets them automatically, but I don't intend to do that: that makes the MMU implementation super complicated.
+  Most MMU implementations have D (dirty) and A (accessed) bits. These are redundant: one could start with a page being invalid. Any access would raise an exception, at which point, the OS can set the page to read-only. If a write is attempted, another exception is fired, at which point the page can be set with write permissions. All the time, the exception handler can keep track of accessed and dirty pages. The D and A bits are only useful if the HW sets them automatically, but I don't intend to do that: that makes the MMU implementation super complicated.
 
 .. note::
   Most MMU implementations have a 'G' (global) bit. With this MMU, we almost never globally invalidate the TLBs, so the global bit on a page is not really useful. In fact it's also rather dangerous as any mistake in setting the global bit on a page will potentially cause a TLB corruption and result in hard to find crashes and vulnerabilities.
 
-The MMU can be programmed through the following (memory-mapped) registers:
+Page-table-walk
+~~~~~~~~~~~~~~~
 
-SBASE/TBASE
-~~~~~~~~~~~
+The MMU has a CSR that points it to the start of the page-table walk and determines the level of this entry as well. This allows for very compact page tables for small applications. If an application needs only 256kB of memory, only a 3rd level page table needs to be created and 1kB of memory used. If the application uses less than 64MB of memory, a 2nd level page table (and it's potentially linked 3rd level tables) are needed.
 
-The physical page where the 1st level page tables are found for SCHEDULER and TASK modes respectively
+The logical address to be looked up is broken into the following sections::
+
+  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
+  |   1st level index     |        2nd level index        |        3rd level index        |                offset                 |
+  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
+
+If the walk starts on a 2nd or 3rd level page table, unused indices are checked to be 0. If not, an AV exception is raised.
+
+After that, the walk starts at the appropriate level. The page table entry address is computed from the page table address and the N-th level index. This entry (32-bits) is read from memory (or the TLB in case of a hit). The entry is then analyzed:
+
+If the entry links to a sub-page (:code:`MODE` == :code:`LINK`), the walk is continued by updating the page table address and incrementing the level by 1.
+
+If the entry is not a link, the walk terminates. The physical address is calculated by masking the logical address with the looked-up levels (top 6, 14, 22 bits) and OR-ing it with the :code:`P_PA_ADDR` field from the page table entry.
+
+Access rights are checked against the request and the appropriate exceptions are raised in case of a violation.
+
+.. note::
+  1st level page tables only contain 64 valid entries. The remaining 192 entries are never accessed by HW and can be used for administrative purposes by the operating system.
+
+
+CSR registers
+~~~~~~~~~~~~~
+
+There are several CSRs controlling the operation of the MMU.
+
+CSR_MMU_TABLE_ROOT
+``````````````````
+
+The physical page where the page walk starts
 
 ::
 
   +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
-  |                                   ADDR                                        |                     .                         |
+  |                                    P_TABLE_ROOT                                       |            unused             | LEVEL |
   +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
 
-They default to 0 upon reset. See notes about how to boot the system.
+Possible values for LEVEL:
 
-TLB_LA1
-~~~~~~~
+======= ========== ============================================================
+Value   Mnemonic   Description
+======= ========== ============================================================
+0       LVL_INV    MMU is disabled, logical and physical addresses are the same
+1       LVL_1      Page walk starts on a 1st level page table
+2       LVL_2      Page walk starts on a 2nd level page table
+3       LVL_3      Page walk starts on a 3rd level page table
+======= ========== ============================================================
 
-Logical address for 1st level TLB updates
+The register default to 0 upon reset.
+
+
+TLB_LA
+``````
+
+Logical address for TLB updates
 
 ::
 
   +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
-  |                ADDR                   |                                     .                                                 |
-  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
-
-The bottom 22 bits are ignored on write and read 0.
-
-TLB_LA2
-~~~~~~~
-
-Logical address for 2st level TLB updates
-
-::
-
-  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
-  |                                     ADDR                                      |                       .                       |
+  |                                     LA_ADDR                                           |            TID                | LEVEL |
   +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
 
 The bottom 12 bits are ignored on write and read 0.
 
 
-TLB_DATA1/TLB_DATA2:
-~~~~~~~~~~~~~~~~~~~~
+TLB_DATA
+````````
 
-Associated TLB entry for the given logical address in TLB_LA1/TLB_LA2 respectively. The layout follows the page table entry format.
+Associated TLB entry for the given logical address in TLB_LA. The layout follows the page table entry format::
+
+  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
+  |                                            P_PA                                       | C |   MODE    |    not implemented    |
+  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
 
 These are *write only* registers. Upon write, the value is entered to the TLB entry for the associated logical address stored
 in TLB_LA1/TLB_LA2.
 
-.. important::
-  since the TLB is a cache of the page tables and since page table updates are not snooped by the MMU, the OS is required to either copy any page updates into the TLB or invalidate the TLB.
-
-.. note::
-  if the 1st level page entry is updated (such that it changes where the 2nd level page is pointed to) that operations potentially invalidates a whole lot of 2nd level TLB entries. It's impossible to know how many of those 2nd level entries were in deed cached in the TLB, and individually updating them (all 1024 of them) would certainly completely trash the TLB, the recommended action is that if a 1st level page entry is changed in such a way that the 2nd level page address is changed, the whole 2nd level TLB is invalidated. !!!!!!!!!!!!!!! I DONT THINK THIS IS TRUE ANYMORE !!!!!!!!!!!!!!!
-
-TLB_INV:
-~~~~~~~~
+TLB_INV
+```````
 
 Write only register to invalidate the entire TLB.
 
-EX_ADDR:
-~~~~~~~~
 
-Contains the LA of the last excepting operation
 
-::
+TLB organization
+~~~~~~~~~~~~~~~~
 
-  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-  |                                                       ADDR                                                                    |
-  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+TLB tag::
 
-.. note:: this is not the :code:`$pc` for the excepting instruction. This is the address of the access that caused the exception.
+  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+
+  |                                      TAG_L_PA                                         |
+  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+
 
-EX_OP:
-~~~~~~
+  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+
+  |                        TAG_TABLE_ROOT[17:0]                           |
+  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+
 
-Contains the operation attempted for the last excepting operation
+  +---+---+
+  |TAG_LVL|
+  +---+---+
 
-::
+The tag is 42 bits long.
 
-  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
-  |                                                                                   | X | W | R |                               |
-  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+.. note:: The top 4 bits of the P_TABLE_ROOT entry is not stores as they only decode wait-state information.
+
+The TLB entries are looked up by a hash of the logical page address (L_PA) and the current P_TABLE_ROOT value: the two are XOR-ed, and the low-order N bits are used as the address for the way lookup.
+
+For a hit-check, the the top 6/14/22-bits of L_PA is matched to TAG_L_PA based on TAG_LVL, while the appropriate bits of P_TABLE_ROOT is matched against TAG_TABLE_ROOT.
+
+Each TLB entry contains the following data:
+
+  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
+  |                                       P_PA_LVL1                                       | C |   MODE    |VERSION|
+  +---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---#---+---+---+---+
+
+The VERSION field is used for quick whole-TLB invalidation.
+
+Latte uses a small number of TLB entries, on the order of 8. These form a direct-mapped cache, based on the aforementioned has of L_PA and P_TABLE_ROOT. Because of this, only leaf pages are stored in the TLB: all other pages would alias to it anyway.
+
+The total storage needed for the TLB is 70 bits per entry, a total of 364 bits, or 70 bytes. This roughly matches the size of the register file.
+
+TLBs and the access ports
+`````````````````````````
+
+Both the fetch and the load/store port optimizes TLB lookups: they store the last-looked-up page and only issue a new TLB request if the page changes. This allows a great reduction in TLB requests from fetch (essentially only ~one per branch) and even from load/store (most loads/stores happen to the stack-frame which is mostly within one page). This reduction in turn enables a single TLB implementation to serve both load/store and fetch: conflicts should be rather rare.
+
+The last-looked-up page entry should be invalidated every time the P_TABLE_ROOT value is written (not changed necessarily!) or when any entry in the TLB is invalidated.
+
+
+FPGA implementation notes
+`````````````````````````
+
+The TLB is implemented using 2 BRAMs (total of 72 bits per entry). The VERSION field is increased to 4 bits. Since only single-port lookup is needed, no duplication is needed as on the register file. The independent write port is used by the table walker and invalidation logic (to simply things, not necessarily as speedup).
+
+Since this BRAM can store 512 entries on a GoWin FPGA, 256 entries on a Max10, it's questionable if we should just simply let the core take advantage of it. Maybe it could be a configuration (or CSR) option to trim the address bits both on lookup and update.
+
+TLB management
+~~~~~~~~~~~~~~
+
+Since the TLB is a cache of the page table entries and since page table updates are not snooped by the MMU, the OS is required to either copy any page updates into the TLB or invalidate the TLB.
+
+A facility is provided through a pair of CSRs where such updates can be propagated into the TLB. An update will perform a TLB lookup and if a match is found, the entry is updated. In case of a miss, no action is taken.
+
+This technique allows the OS to perform relatively cheap MMU updates: no complete TLB invalidation is needed when a page table is updated.
+
+Complete TLB invalidation is also necessary. This can be achieved by writing to the TLB root register. Even if the same value that is contained there is written back, the whole TLB is invalidated.
+
+.. note::
+  Since scheduler mode bypasses the MMU - and the TLB - this flushing doesn't adversely impact that. However, the idea was that most Kernel and OS functions are *not* in scheduler mode, but are spread around in various TASK mode processes. Since a context-switch involves re-writing the TLB root register, this effectively invalidates the whole of TLB for every switch. Bad design!
+
+
+.. note::
+  if a 1st or 2nd level page entry is updated (such that it changes where a next-level page is pointed to) that operation potentially invalidates a whole lot of next-level TLB entries. It's impossible to know how many of those 2nd level entries were indeed cached in the TLB, individually updating them (all 256 of them) would certainly be very time-consuming.
+
+TLB in i486
+~~~~~~~~~~~
+
+The `i486 <http://tnm.engin.umich.edu/wp-content/uploads/sites/353/2019/04/1997-A-Case-Study-of-a-Hardware-Managed-TLB-in-a-Multi-Tasking-Envionment-pdf-pages-4-6-8.pdf>`_ had 32 TLB entries, in a 8-entries by 4-way associative setup. The only way to deal with SW modifying the page tables was a complete flush of the TLB, which was accomplished by reloading the root address of the page table. The TLB also didn't deal with process IDs, so it could easily evict kernel pages.
 
 TLBs:
 ~~~~~
@@ -363,10 +390,11 @@ Since the MMU handles two lookups in parallel (one for the fetch unit and one fo
 
 .. note:: Fetch always runs ahead of execution, so the memory exception must be earlier in the instruction stream.
 
-Upon an MMU exception, the logical address for the excepting operation is stored in the EX_ADDR register. The bit-pattern associated with the attempted operation is stored in the EX_OP register. To simplify OS operation, the TLB_LAx registers are also updated with the appropriate sections of the failing LA.
+Upon an MMU exception, the logical address for the excepting operation is stored in the :code:`CSR_EADDR` register. To simplify OS operation, the TLB_LA registers are also updated with the appropriate sections of the failing LA.
 
-.. todo:: I'm not sure we want to update TLB_LAx: the reason is that if we cause an MMU exception during a TLB update, we would stomp over the value in the register, irrevocably altering process state. At the same time, an MMU exception during MMU updates (such as TLB updates) is arguably a rather edge-case. Maybe we should defer this question and allow both behavior through an MMU configuration bit.
+.. todo:: I'm not sure we want to update TLB_LA: the reason is that if we cause an MMU exception during a TLB update, we would stomp over the value in the register, irrevocably altering process state. At the same time, an MMU exception during MMU updates (such as TLB updates) is arguably a rather edge-case. Maybe we should defer this question and allow both behavior through an MMU configuration bit.
 
+.. note:: There must be a way to convey the type of operation (read/write/execute) that caused the exception. This is done through the exception type. In other words, there are three individual exceptions that the MMU can raise, up from two in Espresso.
 
 TLB invalidation
 ~~~~~~~~~~~~~~~~
@@ -405,121 +433,76 @@ that we encounter simultaneous writes to TLB entries from both ports, and into t
 .. note::
   the write collision due to concurrent fills is actually theoretical. Since both fills would come from main memory and main memory will not provide read responses (through the interconnect) to both fill requests in the same cycle, the corresponding TLB writes would never actually coincide. What *is* possible though is that a fetch TLB fill comes back at the same time as a TLB_DATA1/TLB_DATA2 write - if the interconnect is powerful enough - and it's certainly possible that a TLB fill coincides with an invalidation state-machine write. If we were to handle these situations fully, it's possible to simply disallow these two low-priority writes until the complete TLB fill on the fetch port is done. This setup would allow for burst-fills of the TLBs.
 
+Front-end
+---------
+
+The goal of the front-end is to keep the decode logic fed with (potentially speculative) instructions.
+
+The front-end *doesn't* think in terms of a program counter. It thinks in terms of a FETCH COUNTER, or FC and INSTRUCTION ADDRESS or IA.
+
+The front-end is de-coupled from the back-end of the processor through a queue. This queue contains the following info:
+
+1. up to 64-bit instruction code.
+2. Instruction length
+3. 31-bit IA of the *next* instruction
+4. TASK/SCHEDULER bit
+
+.. note:: If a branch mis-predict is detected, *all* instructions in the pipeline, *including* the queue between the FE and the decoder needs to be cleared.
+
+.. note::
+  the problem is the following: if a branch is predicted taken, we'll need to also check that it was predicted to jump to the right address. That's only possible if we've passed the predicted branch target address to the BE. If SWI is predicted, we might also want to pass the TASK/SCHEDULER bit too, though it could be gleaned form the fact that it is an SWI instruction inside the BE. Since the we pass IA along, the 'taken' bit can be inferred, and the comparator can't really be optimized out anyway, since we have to check that the IA actually matches PC.
+
+.. todo::
+  There's a good question here: should we pass the IA of the *current* instruction or the IA of the *next* instruction. Right now I'm of the opinion that next IA is better because it allows to detect a mis-predict one cycle earlier and clear the pipeline quicker.
+
+The front-end deals with three caches:
+1. Instruction cache read to get the instruction bit-stream.
+2. TLB lookups
+3. Brach-prediction
+
+
+Instruction Fetch
+-----------------
+
+The ICache (and the TLB and the BP module) can provide up to 32-bits of instruction bytes. This could be broken up in many ways, depending on what the previous bytes were, since our instruction length varies between 16- and 64 bits. So, it's possible that the full 32 bits is part of the previous instruction. It's possible that one or the other 16-bit part is (the start of) an instruction. It's also possible that both are (potentially full) instructions.
+
+We need to decode the instruction length and the branch-check in parallel on both halves and properly gate them with previous knowledge to generate the two result sets. For each half we have:
+
+1. Instruction start bit
+2. Instruction length (maybe co-encoded with 'start')
+3. Branch bit
+4. IA
+5. Target address from prediction.
+
+We also need the ability to push up to two instructions per clock cycle into the decode queue; that's because 48- 64-bit instructions take more than one cycle to fetch, so we want to be able to catch up: our average instruction size is less then 32-bits, but we can only take advantage of this fact if we can push up to two instructions into the queue.
+
+The target address from the predictor applies to both halves. It almost never happens that both halves are actually branches (the only exception would be two consecutive SWIs), so that's fine.
+
+.. important::
+  If there are two instructions ready to be pushed into the queue and the first is a predicted-taken branch, the second instruction should not be pushed into the queue.
+
+.. todo::
+  There are two separate ideas mixed here: one where the predictor works on 32-bit quantized addresses and one that works on precise instruction addresses. I should make up my mind about that.
+
+.. important::
+  We can save a lot of headache if we simply didn't predict 16-bit branches, that is SWIs and STMs. Maybe we should do that...
+
+.. important::
+  if we have a branch to an odd 16-bit address, the FE will fetch the corresponding bottom 16-bits as well, which *should not* be put into the decode queue - indeed should not even be decoded as an instruction as it could be the tail-end of a longer one. This only happen on the first fetch after a taken branch, but could happen both due to predication or actual jump, even due to exceptions.
 
 
 Exceptions and Interrupts
 -----------------------------
 
-Exception handling
-~~~~~~~~~~~~~~~~~~
-
-All CPU-originated exceptions are precise, which is to say that all the side-effects of all previous instructions have fully taken effect and none of the side-effects of the excepting instruction or anything following it did.
-
-Exception sources can only generate exceptions while the processor is in TASK mode.
-
-In TASK mode, the source of the exception is stored in the ECAUSE register and the address of the last executed instruction is in :code:`$tpc`. The write-queue is NOT flushed before the exception mechanism is invoked. The processor is switched to SCHEDULER mode and executing continues from the current :code:`$spc` address. The TLBs or the caches are not invalidated.
-
-.. important::
-  In SCHEDULER mode, exceptions are not possible. If one is raised, the source is stored in the RCAUSE register, while the address of the excepting instruction is stored in RADDR. After this, the processor is reset.
-
-The following exceptions are supported:
-
-- MIP: MMU Exception on the instruction port (details are in EX_ADDR_I/EX_OP_I)
-- MDP: MMU Exception on the data port (details are in EX_ADDR_D/EX_OP_D)
-- SWI: SWI instruction (details are in the ECAUSE/RCAUSE registers)
-- CUA: unaligned access
-- HWI: HW interrupt
-
-Since we do posted writes (or at least should supported it), we can't really do precise bus error exceptions. So, those are not precise:
-
-- IAV: interconnect access violation
-- IIA: interconnect invalid address (address decode failure)
-- ITF: interconnect target fault (target signaled failure)
-
-These - being imprecise - can't be retried, so if they occur in TASK mode, the only recourse is to terminate the app, and if they happen in SCHEDULER mode, they will reboot, after setting RCAUSE and, if possible, RADDR.
-
-All these sources are mapped into the ECAUSE and RCAUSE registers:
-
-+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-|IAV|IIA|ITF|HWI|MIP|MDP|CUA|SW7|SW6|SW5|SW4|SW3|SW2|SW1|SW0|
-+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-
-Interrupt handling
-~~~~~~~~~~~~~~~~~~
-
-There's only a single (level-sensitive) external interrupt source, which is equivalent to the execution of the HWI instruction. In fact, the preferred implementation is to inject a virtual HWI instruction into the instruction stream by instruction fetch.
-
-Interrupts trigger a transition from TASK to SCHEDULER mode, or gets ignored during SCHEDULER mode (if it's not cleared, it will trigger as soon as the CPU returns to TASK mode).
-
-The EADDR register contain the PC where the interrupt/exception occurred.
-
-Since we have single, conditional branch instructions for testing the first 12 bits of any register, we can rather quickly check for the interrupt/exception source and jump to their associated handler.
-
-.. note::
-  one can argue that SWx should be binary encoded instead of 1-hot encoded. Similarly IAV/IIA/ITF cannot happen at the same time. This could save us a few bits, but would reduce our ability to use the bit-test jumps to quickly get to the handlers. So, I think it's fine as is. If even more sources are needed in the future, we're still better off, as a single shift can get us to the next 12 bits, which we can continue to branch upon. Really, the interrupt router code is something like this::
-
-	except_handler:
-	      $r5 <- ECAUSE
-		  if $r5 == 0 $pc <- except_done
-		  $r4 <- $r5
-	      if $r5[0]  $pc <- SW0_handler
-	h1:   if $r5[1]  $pc <- SW1_handler
-	h2:   if $r5[2]  $pc <- SW2_handler
-	      ...
-	h11:  if $r5[11] $pc <- IAA_handler
-	      $r5 <= $r5 >> 12
-	h12:  if $r5[0]  $pc <- IAV_handler
-	      ...
-	      // Clear handled exceptions, check for more
-	      ECAUSE <- $r4
-	      $pc <- except_handler
-
-
-	// handler code
-	SW0_handler:
-	// do the things we need to do
-	// ...
-	// jump back to test for next handler
-	$pc <- h1
-
-.. todo::
-  In the exception handler code, how do we clear exceptions? Probably by writing back into ECAUSE
-
-Performance Counters
---------------------
-
-We have 4 performance counters, but lots of events. For now, the following ones are defined:
-
-	ICACHE_MISS
-	DCACHE_MISS
-	ICACHE_INVALIDATE
-	DCACHE_INVALIDATE
-	TLB_MISS
-	TLB_MISS_1ST_LEVEL
-	TLB_MISS_2ND_LEVEL
-	INST_FETCH
-	PIPELINE_STALL_RAW_HAZARD
-	PIPELINE_STALL_WRITE_QUEUE_FLUSH
-	PIPELINE_STALL_READ
-	PIPELINE_STALL_BRANCH
-	PIPELINE_STALL_FETCH
-	PIPELINE_STALL_MMU
-	PIPELINE_STALL_DCACHE_MISS
-	PIPELINE_STALL_MEM_READ
-	BRANCH_MIS_PREDICT
-	BRANCH_TAKEN
-	BRANCH_NOT_TAKEN
+There are a few new exception causes due to the more complex access rights model. These checks still happen (just like in Espresso) before the memory unit get hold of the operation, so exceptions are still precise.
 
 Write Queue
 -----------
 
-There are fence instructions to explicitly flush the write queue. In this implementation, the write queue is also flushed by any read (because we don't want to be in the business of testing all WQ entries for a read-match). It's important to note that fences are important even though reads can't go around writes in the queue. The reason is the interconnect and the fact that reads and writes can reach different targets with different routing latencies. Consequently, side-effects can still happen out-of-order, even if the transactions themselves leave the core in-order. Fence instructions thus also wait for write-responses to come back, something that normal reads (that flush the write-queue) don't do.
+There are fence instructions to explicitly flush the write queue. In this implementation, the write queue is also flushed by any read (because we don't want to be in the business of testing all WQ entries for a read-match).
 
 .. todo::
   We also have to think about how the write queue and DCACHE (write-through or write-back) interact.
-
-Load-store unit and write-queue
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The load-store unit handles LA->PA translation. Thus, the write queue only stores PA and write-related exceptions are precise and happen during the execution phase of the instruction.
 

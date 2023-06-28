@@ -141,58 +141,10 @@ GALs had something like 8 registers in them, so they are just a very expensive r
 
 So, custom chip then!
 
-Pinout
-~~~~~~
-
-========== =========== ===========
-Pin Number Pin Name    Description
-========== =========== ===========
-1          D0          Data bus
-2          D1          Data bus
-3          D2          Data bus
-4          D3          Data bus
-5          D4          Data bus
-6          D5          Data bus
-7          D6          Data bus
-8          D7          Data bus
-9          A0          Register address bus
-10         A1          Register address bus
-11         A2          Register address bus
-12         nCS         Active low chip-select for register accesses
-13         nWE         Active low register write-enable input
-14         nRST        Active low reset input
-15         nINT        Open collector, active low interrupt output
-16         SYS_CLK     System clock input
-17         M1_X1       PORT A GPIO / Mouse/Joystick port 1, X direction encoder input 1
-18         M1_X2       PORT A GPIO / Mouse/Joystick port 1, X direction encoder input 2
-19         M1_Y1       PORT A GPIO / Mouse/Joystick port 1, Y direction encoder input 1
-20         M1_Y2       PORT A GPIO / Mouse/Joystick port 1, Y direction encoder input 2
-21         M1_BTN1     PORT A GPIO / Mouse/Joystick port 1, button 1 input
-22         M1_BTN2     PORT A GPIO / Mouse/Joystick port 1, button 2 input
-23         M1_TMR1     PORT A GPIO / Mouse/Joystick port 1, analog timer 1 input
-24         M1_TMR2     PORT A GPIO / Mouse/Joystick port 1, analog timer 2 input
-25         M2_X1       PORT B GPIO / Mouse/Joystick port 2, X direction encoder input 1
-26         M2_X2       PORT B GPIO / Mouse/Joystick port 2, X direction encoder input 2
-27         M2_Y1       PORT B GPIO / Mouse/Joystick port 2, Y direction encoder input 1
-28         M2_Y2       PORT B GPIO / Mouse/Joystick port 2, Y direction encoder input 2
-29         M2_BTN1     PORT B GPIO / Mouse/Joystick port 2, button 1 input
-30         M2_BTN2     PORT B GPIO / Mouse/Joystick port 2, button 2 input
-31         M2_TMR1     PORT B GPIO / Mouse/Joystick port 2, analog timer 1 input
-32         M2_TMR2     PORT B GPIO / Mouse/Joystick port 2, analog timer 2 input
-33         KBD_CLK     PS/2 keyboard port clock pin
-34         KBD_DATA    PS/2 keyboard port data pin
-35         GPIO_0      Gpio port 0; serial RX
-36         GPIO_1      Gpio port 1; serial TX
-37         GPIO_2      Gpio port 2; serial RST
-38         GPIO_3      Gpio port 3; serial DST
-39         VCC         Power input
-40         GND         Ground input
-========== =========== ===========
-
 But in reality, this is not the way I'm going to go. This is where I'm going to draw the line and use USB.
 
 Cores needed
-~~~~~~~~~~~~
+------------
 
 - UART (done)
 - PS/2 interface
@@ -204,8 +156,8 @@ Cores needed
 - USB host (high-speed)
 - Timers of various sorts
 
-Networking
-~~~~~~~~~~
+Custom networking
+-----------------
 
 I'm interested in this, so let's think a little more:
 
@@ -305,11 +257,7 @@ The WD1010 is a (mostly) single-chip implementation of the WD1000 board. It uses
 
 The WD9216-01 could be used as a CDR albeit only up to 0.5Mbps datarates. It uses an 8.3MHz clock input and a (nominally) 16x oversampled internal clock. (http://www.bitsavers.org/components/westernDigital/_dataBooks/wd1984storageProducts_01.pdf)
 
-
-
-
-
-Routing:
---------
+Routing
+~~~~~~~
 
 Beyond the MAC, maybe TCP-IP is the best thing, though the relatively limited packet length (compared to Ethernet) is limiting, especially since it was introduced in 1982, just in time for us to adopt it.

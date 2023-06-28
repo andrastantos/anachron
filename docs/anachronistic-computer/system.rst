@@ -22,6 +22,7 @@ Graphics:
 
 * Resolution:
    * 320x240, 8 bits per pixel, 60Hz frame rate, 6.25MHz pixel clock rate
+   * 320x240, 4 bits per pixel, 2 independent planes, 60Hz frame rate, 6.25MHz pixel clock rate
    * 640x240, 4 bits per pixel, 60Hz frame rate, 12.5MHz pixel clock rate
    * 640x480, 4 bits per pixel, 30Hz frame rate (interlaced), 12.5MHz pixel clock rate
 * Number of colors: 5-bit per channel; 32768 total colors
