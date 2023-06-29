@@ -1,5 +1,5 @@
-System Software considerations
-==============================
+Appendix D: System Software considerations
+==========================================
 
 Operating System
 ----------------
@@ -181,11 +181,6 @@ Share library swapping
 
 A shared library is a candidate for swapping if their `call_ref_cnt` is 0.
 
-Remote library calls (RLC)
---------------------------
-
-These are a simplified version of RPC, where the caller and the callee are within the same process. They *do not*
-
 Exception handling
 ------------------
 
@@ -199,26 +194,26 @@ The :code:`ECAUSE` CSR contains the (1-hot encoded) exception cause, while the :
 
 A simple exception handler code could follow the following structure::
 
-	except_handler:
+  except_handler:
         $r5 <- CSR_ECAUSE
         if $r5 == 0 $pc <- except_done
-  		  $r4 <- $r5
-	      if $r5[0] != 0 $pc <- SW0_handler
-	h0:   if $r5[1] != 0 $pc <- SW1_handler
-	h1:   if $r5[2] != 0 $pc <- SW2_handler
-	h2:   if $r5[3] != 0 $pc <- SW3_handler
-	h3:   if $r5[4] != 0 $pc <- SW4_handler
-	h4:   if $r5[5] != 0 $pc <- SW5_handler
-	h5:   if $r5[6] != 0 $pc <- SW6_handler
-	h6:   if $r5[7] != 0 $pc <- SW7_handler
-	h7:   if $r5[8] != 0 $pc <- CUA_handler
-	h8:   if $r5[9] != 0 $pc <- MDP_handler
+        $r4 <- $r5
+        if $r5[0] != 0 $pc <- SW0_handler
+  h0:   if $r5[1] != 0 $pc <- SW1_handler
+  h1:   if $r5[2] != 0 $pc <- SW2_handler
+  h2:   if $r5[3] != 0 $pc <- SW3_handler
+  h3:   if $r5[4] != 0 $pc <- SW4_handler
+  h4:   if $r5[5] != 0 $pc <- SW5_handler
+  h5:   if $r5[6] != 0 $pc <- SW6_handler
+  h6:   if $r5[7] != 0 $pc <- SW7_handler
+  h7:   if $r5[8] != 0 $pc <- CUA_handler
+  h8:   if $r5[9] != 0 $pc <- MDP_handler
         $r5 <- $r5 >> 10
   h9:   if $r5[0] != 0 $pc <- MIP_handler
   h10:  if $r5[1] != 0 $pc <- HWI_handler
-	      # Clear handled exceptions, check for more
-	      CSR_ECAUSE <- $r4
-	      $pc <- except_handler
+        # Clear handled exceptions, check for more
+        CSR_ECAUSE <- $r4
+        $pc <- except_handler
   except_done:
         # Decide what to do next
         ...
@@ -226,15 +221,17 @@ A simple exception handler code could follow the following structure::
         stm
         $pc <- except_handler
 
-	# handler code
-	SW0_handler:
+  # handler code
+  SW0_handler:
         ...
         # jump back to test for next handler
         $pc <- h0
 
-.. todo:: I'm actually not sure about the wisdom of this setup. Yes, the branches are fast, but there's a ton of them and most will not jump in any iteration. So we have a ton of instructions we go through just to find the one that *will* branch. A jump table would probably be more performant, even with the slowness of the load/store interface. The code for something like that would look like::
+.. todo:: I'm actually not sure about the wisdom of this setup. Yes, the branches are fast, but there's a ton of them and most will not jump in any iteration. So we have a ton of instructions we go through just to find the one that *will* branch. A jump table would probably be more performant, even with the slowness of the load/store interface.
 
-	except_handler:
+The code for something like that would look like::
+
+  except_handler:
         $r5 <- CSR_ECAUSE # Assume lower 2 bits is always 0, which can be done by simply aligning ecause appropriately
         $r5 <- $r5 & 16 # If we're paranoid, mask for the right number of bits. This way guaranteed not to index out of the handler table
         $pc <- mem[handler_table+$r5] # Jump to handler
@@ -245,13 +242,13 @@ A simple exception handler code could follow the following structure::
         stm
         $pc <- except_handler
 
-	# handler code
-	SW0_handler:
+  # handler code
+  SW0_handler:
         ...
         # jump back to test for next handler
         $pc <- except_handler
 
-	HWI_handler:
+  HWI_handler:
         ...
         # clear interrupt source
         # jump back to test for next handler
@@ -261,17 +258,17 @@ A simple exception handler code could follow the following structure::
   handler_table:
         .dw  except_done # No exception
         .dw  SW0_handler
-	      .dw  SW1_handler
-	      .dw  SW2_handler
+        .dw  SW1_handler
+        .dw  SW2_handler
 
-	      .dw  SW3_handler
-	      .dw  SW4_handler
-	      .dw  SW5_handler
-	      .dw  SW6_handler
+        .dw  SW3_handler
+        .dw  SW4_handler
+        .dw  SW5_handler
+        .dw  SW6_handler
 
-	      .dw  SW7_handler
-	      .dw  CUA_handler
-	      .dw  MDP_handler
+        .dw  SW7_handler
+        .dw  CUA_handler
+        .dw  MDP_handler
         .dw  MIP_handler
 
         .dw  HWI_handler
@@ -290,48 +287,47 @@ In this model, we would need to do a few things:
 
 
 
+..
+      Remote Procedure Calls (RPC)
+      ----------------------------
 
+      RPCs are achieved through the `swi 6` instruction with function code 0, where the library-specific function number is stored in the code segment, following the 16-bit instruction code.
 
+      $lr contains the OS-provided handle for the shared library.
 
-Remote Procedure Calls (RPC)
-----------------------------
+      The calling convention is extended to `$r3` containing the RPC call handle.
 
-RPCs are achieved through the `swi 6` instruction with function code 0, where the library-specific function number is stored in the code segment, following the 16-bit instruction code.
+      When an `swi 5` instruction is executed, SCHEDULER-mode executing takes over. It performs the following actions, once the fact of a shared library call is recognized:
 
-$lr contains the OS-provided handle for the shared library.
+      With async
 
-The calling convention is extended to `$r3` containing the RPC call handle.
+      #. The library handle is de-obfuscated, if needed (for example XOR-ed with a random key) to gain the control-block address for the task associated with the shared library.
+      #. The current task handle is placed in $lr.
+      #. The current task handle is also put in the RPC call stack
+      #. For synchronous RPCs, the caller is removed from the ready-to-run list
+      #. For async RPCs
+      #. A completion handle is allocated from the corresponding free list
+      #. The completion handle is set up as the return value for the caller (in the caller context)
+      #. The completion handle is a
+      #. The context from the task-control-block is restored
+      #. Execution is returned to the shared library, using the `stm` instruction.
 
-When an `swi 5` instruction is executed, SCHEDULER-mode executing takes over. It performs the following actions, once the fact of a shared library call is recognized:
+      The shared library can call further shared libraries in a similar manner. Return from an RPC is done through the `swi 6` instruction with function code 1. Upon gaining back execution, the SCHEDULER performs the following:
 
-With async
-#. The library handle is de-obfuscated, if needed (for example XOR-ed with a random key) to gain the control-block address for the task associated with the shared library.
-#. The current task handle is placed in $lr.
-#. The current task handle is also put in the RPC call stack
-#. For synchronous RPCs, the caller is removed from the ready-to-run list
-#. For async RPCs:
-  #. A completion handle is allocated from the corresponding free list
-  #. The completion handle is set up as the return value for the caller (in the caller context)
-  #. The completion handle is a
-#. The context from the task-control-block is restored
-#. Execution is returned to the shared library, using the `stm` instruction.
+      #. The caller task handle is retrieved from the RPC stack
+      #. For synchronous RPCs:
+      #. The caller is returned to the ready-to-run list
+      #. The caller context is restored
+      #. Execution is returned to the caller, using the `stm` instruction.
+      #. For asynchronous RPCs:
+      #. Don't know, actually.
 
-The shared library can call further shared libraries in a similar manner. Return from an RPC is done through the `swi 6` instruction with function code 1. Upon gaining back execution, the SCHEDULER performs the following:
+      In terms of function arguments and return values, RPC calls follow the convention for local function calls.
 
-#. The caller task handle is retrieved from the RPC stack
-#. For synchronous RPCs:
-  #. The caller is returned to the ready-to-run list
-  #. The caller context is restored
-  #. Execution is returned to the caller, using the `stm` instruction.
-#. For asynchronous RPCs:
-  #. Don't know, actually.
+      The bottom bit of the library handle is used to describe synchronous v.s. asynchronous RPCs. Synchronous RPCs will remove the caller task from the ready-to-run list until their associated RPC return is executed.
 
-In terms of function arguments and return values, RPC calls follow the convention for local function calls.
-
-The bottom bit of the library handle is used to describe synchronous v.s. asynchronous RPCs. Synchronous RPCs will remove the caller task from the ready-to-run list until their associated RPC return is executed.
-
-.. todo::
-  Here's the problem with async RPCs: we need to return a 'completion' handle of sorts, something that the caller can wait on. This handle will have to come from *somewhere*. That somewhere can be depleted. Also, how do we allocate from that *something*? This sounds like a fixed sized heap, i.e. a free-list.
+      .. todo::
+      Here's the problem with async RPCs: we need to return a 'completion' handle of sorts, something that the caller can wait on. This handle will have to come from *somewhere*. That somewhere can be depleted. Also, how do we allocate from that *something*? This sounds like a fixed sized heap, i.e. a free-list.
 
 Scheduler mode operations
 -------------------------
@@ -340,14 +336,14 @@ Scheduler handles
 ~~~~~~~~~~~~~~~~~
 Scheduler handles are essentially obfuscated pointers. Since these pointers are mostly to structs, they are DWORD aligned, which is to say that the bottom-most two bits are guaranteed to be 0. These bottom two bits can be used to convey additional information.
 
-Either way, the pointers are XOR-ed for obfuscation purposes with a random value (the bottom two of which is guaranteed to be 0). The obfuscation code could be either a per-process or per-boot random value.
+Either way, the pointers are XOR-ed for obfuscation purposes with a random value (the bottom two of which are guaranteed to be 0). The obfuscation code could be a per-process or per-boot random value.
 
 APIs
 ~~~~
 
 SCHEDULER-mode APIs are all accessed by the `swi 6` instruction, with various functions differentiated by the 16-bit function code, stored after the `swi 6` instruction. This is - in this regard - very similar to system calls.
 
-The main difference is that system calls may or may not be implemented directly in SCHEDULER mode. SCHEDULER-mode APIs (by definition) are implemented
+The main difference is that system calls may or may not be implemented directly in SCHEDULER mode. SCHEDULER-mode APIs (by definition) are implemented in the scheduler.
 
-CREATE_TASK
-GET_RPC_TARGET_HANDLE
+.. CREATE_TASK
+.. GET_RPC_TARGET_HANDLE

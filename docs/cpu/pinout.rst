@@ -5,7 +5,7 @@ Espresso is packaged in a 40-pin DIP package. All signals follow the 3.3V CMOS (
 
 Espresso uses a single 5V power supply.
 
-Espresso is implemented using the `UNIC`_ virtual chip technology
+Espresso is implemented using the UNiC virtual chip technology
 
 ========== =========== =============== ===========
 Pin Number Pin Name    Pin Direction   Description

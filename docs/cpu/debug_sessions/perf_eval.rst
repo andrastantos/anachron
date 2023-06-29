@@ -1,6 +1,6 @@
 
 Fetch performance evaluation
-============================
+----------------------------
 
 ==============    =================   ===============   ==============   =========
 Queue Length      Fetch Threshold     Total cycles      Instructions     IPC

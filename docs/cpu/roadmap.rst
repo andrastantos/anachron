@@ -1,11 +1,11 @@
-CPU generations
-===============
+Appendix C: CPU generations
+===========================
 
 I know, I know: I don't really even have Espresso running, but one can never start too early the planning for the future. More seriously though, it's striking how people (Intel mostly, but Zilog and and Motorola as well) kept getting surprised by the jeopardy of compatibility. Design compromises - sometimes even genuine bugs - were carried over from generation to generation simply because SW became reliant upon them. This is called backwards compatibility. There's another way of thinking about the problem though: forward compatibility. Think through where your product line will (or could) go and make sure you don't make decisions early on that would prevent you from getting there later.
 
 In my case, it would be very tempting to design a 16-bit variant of the BREW instruction set. Use that as the ISA for Espresso. It would be a smaller, cheaper processor. It would be slower too, but maybe not by that much. It would be possible and is a fun exercise to contemplate. However, that would hobble later, true 32-bit implementations with all the backwards compatibility 'stuff'.
 
-Moore's law teaches is that we shouldn't ever think about the past, or even the present. We should always think about the future: by the time you're ready with a product, it's already the future. This industry moves too fast for any other methodology. This should also already have been obvious in the early '80s. One might not have predicted the take-over of CMOS. The emergence of the IP industry . The fab-less design paradigm. But it was obvious that things *will* get faster, *will* get smaller, *will * get cheaper.
+Moore's law teaches is that we shouldn't ever think about the past, or even the present. We should always think about the future: by the time you're ready with a product, it's already the future. This industry moves too fast for any other methodology. This should also already have been obvious in the early '80s. One might not have predicted the take-over of CMOS. The emergence of the IP industry . The fab-less design paradigm. But it was obvious that things *will* get faster, *will* get smaller, *will* get cheaper.
 
 So, with that rambling out of the way, let's look at the generations:
 
@@ -31,8 +31,8 @@ Virtual market introduction ~'83.
 
 Comparative processors: i286
 
-Generation 2
-~~~~~~~~~~~~
+Generation 2: Latte
+~~~~~~~~~~~~~~~~~~~
 
 The most important improvement is going to be a very small iCache (maybe direct-mapped 1kB or something rather trivial) and some more capable branch-prediction.
 
@@ -68,7 +68,7 @@ Comparative processors: i486
 Generation 4
 ~~~~~~~~~~~~
 
-32-bit external bus. External bus is PCI-like, multiplexed 32-bit address-data. If possible, actual PCI.
+32-bit, synchronous, PCI-like external bus. If possible, actual PCI.
 
 Memory controller goes off-chip, but adds EDO support as a minor upgrade, when becomes available ('95).
 

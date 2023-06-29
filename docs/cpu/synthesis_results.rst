@@ -1,5 +1,5 @@
-Virtual process technology for Espresso
-=======================================
+Appendix E: Virtual process technology for Espresso
+===================================================
 
 Of course, Espresso is *actually* implemented in an FPGA. However, it is important to assess what would have been possible in its intended time-frame, the early '80s.
 

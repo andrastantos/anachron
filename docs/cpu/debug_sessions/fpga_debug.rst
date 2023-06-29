@@ -1,5 +1,5 @@
 Getting UART working
-====================
+--------------------
 
 This is going to be a slow slog. So, the synthesized FPGA design doesn't work. Loading it into the simulator (ModelSim) and running it shows that we reset after a few instructions from DRAM.
 

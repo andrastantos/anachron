@@ -1,7 +1,7 @@
 Appendix A: DRAM History
 ========================
 
-Various DRAM capacities were introduced in the following years :ref:`* <http://doctord.dyndns.org/Courses/UNH/CS216/Ram-Timeline.pdf>`_ :
+Various DRAM capacities were introduced in the following years `* <http://doctord.dyndns.org/Courses/UNH/CS216/Ram-Timeline.pdf>`_ :
 
 ======    ========
 Year      Capacity
@@ -39,6 +39,7 @@ There were two memory module formats: 30 pin and 72 pin.
 
 - `<https://en.wikipedia.org/wiki/SIMM>`_
 - `<https://www.pjrc.com/tech/mp3/simm/datasheet.html>`_
+- `Current source for both kinds of sockets <https://www.peconnectors.com/sockets-pga-cpu-and-memory/hws8182/>`_
 
 EDO datasheets:
 
@@ -46,14 +47,13 @@ EDO datasheets:
 - `JEDEC standard extract <https://www.ele.uri.edu/iced/protosys/hardware/datasheets/simm/Jedec-Clearpoint-8MB.pdf>`_
 - `16/32MB module <https://www.digchip.com/datasheets/download_datasheet.php?id=987285&part-number=TM893GBK32S>`_
 - `Another 16/32MB Module <https://docs.rs-online.com/1faa/0900766b80027c7f.pdf>`_
-- `Socket ($0.88 apiece) <https://www.peconnectors.com/sockets-pga-cpu-and-memory/hws8182/>`_
 
 DRAM speeds
 ~~~~~~~~~~~
 
 There are four important timing parameters for DRAM timing:
 
-.. figure:: dram-timing.png
+.. figure:: images/dram-timing.png
    :alt: DRAM timing
 
 256kbit devices (and more modern 64-kbit variants as well) came in the following speed-grades:
@@ -96,29 +96,3 @@ t_rp         35ns   40ns   30ns   40ns
 =========== ====== ====== ====== ======
 
 EDO, when introduced in '95 was even faster. For Espresso, we are focusing on page-mode devices and their timing characteristics. Newer devices will work with those timings as well, but you can't take advantage of their new, improved timing.
-
-Appendix B: EPROM History
-========================
-
-Timeline :ref:`* <https://en.wikipedia.org/wiki/EPROM>`_:
-
-======    ========
-Year      Capacity
-======    ========
-1975      2704
-1975      2708
-1977      2716
-1979      2732
-1981      2764 :ref:`* https://timeline.intel.com/1981/a-new-era-for-eprom`_
-1982      27128 :ref:`* https://timeline.intel.com/1982/the-eprom-evolution-continues`_
-?         27256
-?         27512
-1986      27010 :ref:`* https://timeline.intel.com/1986/one-megabit-eprom`_
-======    ========
-
-Timing
-~~~~~~
-
-According to a typical :ref:`datasheet https://datasheet.octopart.com/D27256-2-Intel-datasheet-17852618.pdf`_ access times are 250ns, though there are several speed-grades available. By '91, CMOS EPROMs were available with access times roughly half of that: 120ns was available.
-
-At that time same-capacity (and speed) FLASH parts started to appear too - not 5V programmable parts though. They required ~10ns hold-times on data (relative to the rising edge of nWE), which is something that DRAMs didn't have.

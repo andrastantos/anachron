@@ -117,6 +117,9 @@ The integrated DMA controller is responsible for generating the appropriate bus 
 
 Conversely, for memory to I/O transfers a DRAM read cycle will be generated, but the addressed DMA peripheral is expected to latch the data presented on the data bus by the DRAM.
 
+.. _wait_states_and_dma_access:
+
+
 Wait states and DMA access
 --------------------------
 
@@ -128,7 +131,3 @@ Bus-master support
 Any channel fo the DMA controller can be configured to support an external bus-master. In this setup, the external master request control of the bus by asserting
 the :code:`drq_X` signal. Espresso - after completing any active burst and internal arbitration - tri-states all external bus interface pins and acknowledges the request by asserting the associated :code:`n_dack_X` signal as the bus-grant handshake. The external master is in full control of the bus at this point. The :code:`drq_X` signal needs to remain asserted as long as the external master requires control of the bus. Once the external master is ready to relinquish the bus, it de-asserts :code:`drq_X`
 
-DMA transfer cycles
--------------------
-
-.. todo:: TBD
