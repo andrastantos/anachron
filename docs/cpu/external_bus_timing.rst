@@ -18,14 +18,14 @@ The bus support DDR accesses to DRAM. The first half of a clock-cycle, lower byt
             {name: 'n_nren',    wave: '1.............'},
             {name: 'n_cas_0',   wave: '1..01010101...'},
             {name: 'n_cas_1',   wave: '1...01010101..'},
-            {name: 'a[10:0]',   wave: 'x.==.=.=.=..x.', data: ['row', 'col0', 'col1', 'col2', 'col3']},
+            {name: 'a[10:0]',   wave: 'x.==.=.=.=.x..', data: ['row', 'col0', 'col1', 'col2', 'col3']},
             ["read",
-            {name: 'n_we',      wave: '1.............'},
+            {name: 'n_we',      wave: 'x.1.........x.'},
             {name: 'd[7:0]',    wave: 'x...23456789x.', phase: 0.3, data: ['r0', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7']},
             ],
             ["write",
-            {name: 'n_we',      wave: '1.0.........1.'},
-            {name: 'd[7:0]',    wave: 'x..23456789.x.', data: ['w0', 'w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7']},
+            {name: 'n_we',      wave: 'x.0.........x.'},
+            {name: 'd[7:0]',    wave: 'x..23456789x..', data: ['w0', 'w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7']},
             ],
         ],
     }
@@ -42,14 +42,14 @@ The bus support DDR accesses to DRAM. The first half of a clock-cycle, lower byt
             {name: 'n_nren',    wave: '1.............'},
             {name: 'n_cas_0',   wave: '1..01....01...'},
             {name: 'n_cas_1',   wave: '1...01....01..'},
-            {name: 'a[10:0]',   wave: 'x.==..x.==..x.', data: ['row0', 'col0', 'row1', 'col1']},
+            {name: 'a[10:0]',   wave: 'x.==.x..==.x..', data: ['row0', 'col0', 'row1', 'col1']},
             ["read",
-            {name: 'n_we',      wave: '1.............'},
+            {name: 'n_we',      wave: 'x.1...x.1...x.'},
             {name: 'd[7:0]',    wave: 'x...23x...45x.', phase: 0.3, data: ['r0', 'r1', 'r2', 'r3']},
             ],
             ["write",
-            {name: 'n_we',      wave: '1.0...1.0...1.'},
-            {name: 'd[7:0]',    wave: 'x..23.x..45.x.', data: ['w0', 'w1', 'w2', 'w3']},
+            {name: 'n_we',      wave: 'x.0...x.0...x.'},
+            {name: 'd[7:0]',    wave: 'x..23x...45x..', data: ['w0', 'w1', 'w2', 'w3']},
             ],
         ],
     }
@@ -68,7 +68,7 @@ The bus support DDR accesses to DRAM. The first half of a clock-cycle, lower byt
             {name: 'n_cas_0',   wave: '1.....'},
             {name: 'n_cas_1',   wave: '1.....'},
             {name: 'a[10:0]',   wave: 'x.=.x.', data: ['row']},
-            {name: 'n_we',      wave: '1.....'},
+            {name: 'n_we',      wave: 'x.1.x.'},
             {name: 'd[7:0]',    wave: 'x.....'},
         ]
     }
@@ -98,14 +98,14 @@ For non-DRAM accesses, the waveforms are different in several ways:
             {name: 'n_nren',    wave: '1.0...1.0...1.'},
             {name: 'n_cas_0',   wave: '1...0.1.......'},
             {name: 'n_cas_1',   wave: '1.........0.1.'},
-            {name: 'a[10:0]',   wave: 'x.==..x.==..x.', data: ['row0', 'col0', 'row1', 'col1']},
+            {name: 'a[10:0]',   wave: 'x.==...x==...x', data: ['row0', 'col0', 'row1', 'col1']},
             ["read",
-            {name: 'n_we',      wave: '1.............'},
+            {name: 'n_we',      wave: 'x.1....x1....x'},
             {name: 'd[7:0]',    wave: 'x.....2x....3x', phase: 0.3, data: ['r0', 'r1']},
             ],
             ["write",
-            {name: 'n_we',      wave: '1.0...1.0...1.'},
-            {name: 'd[7:0]',    wave: 'x..2..x..3..x.', data: ['w0', 'w1']},
+            {name: 'n_we',      wave: 'x.0....x0....x'},
+            {name: 'd[7:0]',    wave: 'x..2...x.3...x', data: ['w0', 'w1']},
             ],
             {name: 'n_wait',    wave: 'x...1.x...1.x.'}
         ],
@@ -122,14 +122,14 @@ For non-DRAM accesses, the waveforms are different in several ways:
             {name: 'n_ras_a/b', wave: '1...........'},
             {name: 'n_nren',    wave: '1.0.......1.'},
             {name: 'n_cas_0/1', wave: '1...0.....1.'},
-            {name: 'a[10:0]',   wave: 'x.==......x.', data: ['row', 'col']},
+            {name: 'a[10:0]',   wave: 'x.==.......x', data: ['row', 'col']},
             ["read",
-            {name: 'n_we',      wave: '1...........'},
+            {name: 'n_we',      wave: 'x.1........x'},
             {name: 'd[7:0]',    wave: 'x.........2x', phase: 0.3, data: ['r']},
             ],
             ["write",
-            {name: 'n_we',      wave: '1.0.......1.'},
-            {name: 'd[7:0]',    wave: 'x..2......x.', data: ['w']},
+            {name: 'n_we',      wave: 'x.0........x'},
+            {name: 'd[7:0]',    wave: 'x..2.......x', data: ['w']},
             ],
             {name: 'n_wait',    wave: 'x.......1.x.'}
         ],
@@ -146,14 +146,14 @@ For non-DRAM accesses, the waveforms are different in several ways:
             {name: 'n_ras_a/b', wave: '1...........'},
             {name: 'n_nren',    wave: '1.0.......1.'},
             {name: 'n_cas_0/1', wave: '1...0.....1.'},
-            {name: 'a[10:0]',   wave: 'x.==......x.', data: ['row', 'col']},
+            {name: 'a[10:0]',   wave: 'x.==.......x', data: ['row', 'col']},
             ["read",
-            {name: 'n_we',      wave: '1...........'},
+            {name: 'n_we',      wave: 'x.1........x'},
             {name: 'd[7:0]',    wave: 'x.........2x', phase: 0.3, data: ['r']},
             ],
             ["write",
-            {name: 'n_we',      wave: '1.0.......1.'},
-            {name: 'd[7:0]',    wave: 'x..2......x.', data: ['w']},
+            {name: 'n_we',      wave: 'x.0........x'},
+            {name: 'd[7:0]',    wave: 'x..2.......x', data: ['w']},
             ],
             {name: 'n_wait',    wave: 'x.....0.1.x.'}
         ],
@@ -164,7 +164,7 @@ For non-DRAM accesses, the waveforms are different in several ways:
 DMA access timing
 -----------------
 
-DMA accesses follow the timing of non-DRAM accesses, but select DRAM instead of non-DRAM devices as their targets:
+DMA accesses follow the timing of non-DRAM accesses, but select DRAM instead of non-DRAM devices as their targets. Just like non-DRAM accesses, only non-burst, 8-bit accesses are supported.
 
 .. wavedrom::
 
@@ -173,24 +173,18 @@ DMA accesses follow the timing of non-DRAM accesses, but select DRAM instead of 
             text:'DMA cycle; 1 internal, 1 external wait states, active high request',
         },
         signal: [
-            {name: 'clk',       wave: 'p......', period: 2},
-            {name: 'n_ras_a/b', wave: '1.|.0.......1.'},
-            {name: 'n_nren',    wave: '1.|...........'},
-            {name: 'n_cas_0/1', wave: '1.|...0.....1.'},
-            {name: 'a[10:0]',   wave: 'x.|.==......x.', data: ['row', 'col']},
-            ["read",
-            {name: 'n_we',      wave: '1.|...........'},
-            {name: 'd[7:0]',    wave: 'x.|.........2x', phase: 0.3, data: ['r']},
-            ],
-            ["write",
-            {name: 'n_we',      wave: '1.|.0.......1.'},
-            {name: 'd[7:0]',    wave: 'x.|..2......x.', data: ['w']},
-            ],
-            {name: 'n_wait',    wave: 'x.|.....0.1.x.'},
+            {name: 'clk',       wave: 'p.......', period: 2},
+            {name: 'n_ras_a/b', wave: 'x..|1.0.......1.'},
+            {name: 'n_nren',    wave: 'x..|1...........'},
+            {name: 'n_cas_0/1', wave: 'x..|1...0.....1.'},
+            {name: 'a[10:0]',   wave: 'x..|..==.......x', data: ['row', 'col']},
+            {name: 'n_we',      wave: 'x..|..=........x'},
+            {name: 'd[7:0]',    wave: 'x..|..z........x'},
+            {name: 'n_wait',    wave: 'x..|......0.1.x.'},
             ["DMA signals",
-            {name: 'dreq_X',    wave: 'x1|.=.........'},
-            {name: 'n_dack_X',  wave: '1.|.0.......1.'},
-            {name: 'tc',        wave: 'x.|.=.......x.'},
+            {name: 'dreq_X',    wave: 'x.1|..=.........'},
+            {name: 'n_dack_X',  wave: '1..|..0.......1.'},
+            {name: 'tc',        wave: 'x..|..=.......x.'},
             ]
         ],
     }
@@ -203,18 +197,12 @@ DMA accesses follow the timing of non-DRAM accesses, but select DRAM instead of 
         },
         signal: [
             {name: 'clk',       wave: 'p.....', period: 2},
-            {name: 'n_ras_a/b', wave: '1..|..0...1.'},
-            {name: 'n_nren',    wave: '1..|........'},
-            {name: 'n_cas_0/1', wave: '1..|....0.1.'},
-            {name: 'a[10:0]',   wave: 'x..|..==..x.', data: ['row', 'col']},
-            ["read",
-            {name: 'n_we',      wave: '1..|........'},
-            {name: 'd[7:0]',    wave: 'x..|......2x', phase: 0.3, data: ['r']},
-            ],
-            ["write",
-            {name: 'n_we',      wave: '1..|..0...1.'},
-            {name: 'd[7:0]',    wave: 'x..|...2..x.', data: ['w']},
-            ],
+            {name: 'n_ras_a/b', wave: 'x..|1.0...1.'},
+            {name: 'n_nren',    wave: 'x..|1.......'},
+            {name: 'n_cas_0/1', wave: 'x..|1...0.1.'},
+            {name: 'a[10:0]',   wave: 'x..|..==...x', data: ['row', 'col']},
+            {name: 'n_we',      wave: 'x..|..=....x'},
+            {name: 'd[7:0]',    wave: 'x..|..z....x'},
             {name: 'n_wait',    wave: 'x..|....1.x.'},
             ["DMA signals",
             {name: 'dreq_X',    wave: 'x1.|..=.....'},
@@ -224,4 +212,26 @@ DMA accesses follow the timing of non-DRAM accesses, but select DRAM instead of 
         ],
     }
 
-DMA operations only support 8-bit accesses.
+.. wavedrom::
+
+    {
+        head:{
+            text:'Bus master request-grant cycle, active high request',
+        },
+        signal: [
+            {name: 'clk',       wave: 'p......', period: 2},
+            {name: 'n_ras_a/b', wave: 'x..|1.z|..1.x.'},
+            {name: 'n_nren',    wave: 'x..|1.z|..1.x.'},
+            {name: 'n_cas_0/1', wave: 'x..|1.z|..1.x.'},
+            {name: 'a[10:0]',   wave: 'x..|..z|..x...'},
+            {name: 'n_we',      wave: 'x..|..z|..x...'},
+            {name: 'd[7:0]',    wave: 'x..|..z|..x...'},
+            {name: 'n_wait',    wave: 'x..|...|......'},
+            ["DMA signals",
+            {name: 'dreq_X',    wave: 'x1.|...|0.....'},
+            {name: 'n_dack_X',  wave: '1..|..0|..1...'},
+            {name: 'tc',        wave: 'x..|...|......'},
+            ]
+        ],
+    }
+
