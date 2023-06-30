@@ -93,3 +93,9 @@ PTH: $0.15/in^2
 
 According to https://www.youtube.com/watch?v=nNpuiJitKwk
 
+CPUs
+====
+
+https://worldradiohistory.com/Archive-Poptronics/80s/1982/Poptronics-1982-01.pdf: 8088 - $40, 8086 - $100, Z80 - $9, 6502 - $7
+https://worldradiohistory.com/Archive-Poptronics/80s/1985/CE-1985-01.pdf:         8088 - $30,              Z80 - $4, 6502 - $5
+https://worldradiohistory.com/Archive-Poptronics/80s/1989/PE-1989-02.pdf          8088 - $ 6, 8086 - $  7, Z80 - $1, 6502 - $2
