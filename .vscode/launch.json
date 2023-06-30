@@ -14,6 +14,15 @@
             "justMyCode": false
         },
         {
+            "name": "Python: Espresso BCT",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/rtl/v1/test/test_cpu_bct.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/rtl/v1/test",
+            "justMyCode": false
+        },
+        {
             "name": "Python: gen_anacron_fpga",
             "type": "python",
             "request": "launch",
