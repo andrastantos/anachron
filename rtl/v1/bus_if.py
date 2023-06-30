@@ -476,7 +476,8 @@ class BusIf(GenericModule):
             (next_state == BusIfStates.non_dram_dual_wait) |
             (next_state == BusIfStates.non_dram_last) |
             (next_state == BusIfStates.dma_first) |
-            (next_state == BusIfStates.dma_wait),
+            (next_state == BusIfStates.dma_wait) |
+            (next_state == BusIfStates.refresh),
             reset_value_port = 1
         ) # We re-register the state to remove all glitches
         cas_n_window_a_1 = Wire()
@@ -491,7 +492,8 @@ class BusIf(GenericModule):
             (next_state == BusIfStates.non_dram_dual_wait) |
             (next_state == BusIfStates.non_dram_last) |
             (next_state == BusIfStates.dma_first) |
-            (next_state == BusIfStates.dma_wait),
+            (next_state == BusIfStates.dma_wait) |
+            (next_state == BusIfStates.refresh),
             reset_value_port = 1
         ) # We re-register the state to remove all glitches
         #cas_n_window_c_0 = Wire()
@@ -526,12 +528,18 @@ class BusIf(GenericModule):
         self.dram.n_we        <<= read_not_write
         self.dram.data_out_en <<= data_out_en
         data_out_low = Wire()
+        nr_cas_logic_1_reg = Wire(logic)
+        nr_cas_logic_1_reg <<= Reg(Select(
+            n_nren,
+            nr_cas_logic_1_reg | nr_cas_logic_1,
+            0
+        ))
         data_out_low <<= NegReg(
             Select(
                 nram_access,
                 data_out[7:0],
                 Select(
-                    two_cycle_nram_access & (nr_cas_logic_1 | ~nr_n_cas_1),
+                    two_cycle_nram_access & (nr_cas_logic_1_reg | nr_cas_logic_1 | ~nr_n_cas_1),
                     data_out[7:0],
                     data_out[15:8]
                 )
@@ -543,7 +551,7 @@ class BusIf(GenericModule):
                 nram_access,
                 data_out[15:8],
                 Select(
-                    two_cycle_nram_access & nr_cas_logic_1,
+                    two_cycle_nram_access & (nr_cas_logic_1_reg | nr_cas_logic_1),
                     data_out[7:0],
                     data_out[15:8]
                 )
