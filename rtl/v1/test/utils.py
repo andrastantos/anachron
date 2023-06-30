@@ -89,7 +89,7 @@ def startup(call_init_regs = True):
     global r
 
     create_segment("code", 0)
-    create_segment("code_dram", 0x8000_0000)
+    create_segment("code_dram", 0x0800_0000)
     set_active_segment("code_dram")
     place_symbol("_start")
     set_active_segment("code")

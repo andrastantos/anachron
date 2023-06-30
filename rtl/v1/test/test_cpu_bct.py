@@ -27,7 +27,7 @@ def test_1(top):
     """
 
     create_segment("code", 0)
-    create_segment("code0", 0x0400_0000)
+    create_segment("code0", 0x1000_0000)
     set_active_segment("code0")
     place_symbol("code0_start")
     set_active_segment("code")
@@ -40,7 +40,7 @@ def test_1(top):
     r_eq_r_plus_t("$r5","$r0",5)
     r_eq_r_plus_r("$r6","$r5","$r1")
     r_eq_r_plus_r("$r7","$r5","$r2")
-    pc_eq_I(get_dot().offset+0x0400_0000+6) # Setting internal wait-states to 0, but otherwise continue execution
+    pc_eq_I(get_dot().offset+0x1000_0000+6) # Setting internal wait-states to 0, but otherwise continue execution
     r_eq_r_plus_r("$r8","$r5","$r3")
     r_eq_r_plus_r("$r9","$r5","$r4")
     r_eq_r_plus_r("$r10","$r5","$r5")
@@ -48,6 +48,11 @@ def test_1(top):
     r_eq_I("$r12",12)
     r_eq_r_plus_r("$r13","$r7","$r6")
     r_eq_r_plus_r("$r14","$r7","$r7")
+    # Some loads and stores to test timing
+    r_eq_I("$r4", 0x1234_5678)
+    mem8_I_eq_r(0x1000_0100, "$r4")
+    mem16_I_eq_r(0x1000_0200, "$r4")
+    mem32_I_eq_r(0x1000_0300, "$r4")
     terminate()
 
 
@@ -60,7 +65,7 @@ def test_2(top):
     top.set_timeout(3000)
 
     create_segment("code", 0)
-    create_segment("code_dram", 0x8000_0000)
+    create_segment("code_dram", 0x800_0000)
     set_active_segment("code_dram")
     place_symbol("_start")
     set_active_segment("code")
@@ -95,7 +100,7 @@ def test_3(top):
     """
 
     create_segment("code", 0)
-    create_segment("code_dram", 0x8000_0000)
+    create_segment("code_dram", 0x800_0000)
     set_active_segment("code_dram")
     place_symbol("_start")
     set_active_segment("code")
@@ -105,9 +110,9 @@ def test_3(top):
     set_active_segment("code_dram")
     r_eq_I("$r13",0xdeadbeef)
     r_eq_I("$r14",0x12345678)
-    mem32_I_eq_r(0x8000_1000,"$r14")
+    mem32_I_eq_r(0x0800_1000,"$r14")
     r_eq_r_plus_t("$r14","$r14",5)
-    r_eq_mem32_I("$r13",0x8000_1000)
+    r_eq_mem32_I("$r13",0x0800_1000)
 
     check_reg("$r13", 0x12345678)
     check_reg("$r14", 0x12345678+5)
@@ -123,8 +128,8 @@ def test_4(top):
     top.set_timeout(3000)
 
     create_segment("code", 0)
-    create_segment("code_dram", 0x8000_0000)
-    create_segment("code_task", 0x8000_1000)
+    create_segment("code_dram", 0x800_0000)
+    create_segment("code_task", 0x800_1000)
     set_active_segment("code_dram")
     place_symbol("_start")
     set_active_segment("code_task")
@@ -188,8 +193,8 @@ def test_5(top):
     top.set_timeout(3000)
 
     create_segment("code", 0)
-    create_segment("code_dram", 0x8000_0000)
-    create_segment("code_task", 0x8000_1000)
+    create_segment("code_dram", 0x800_0000)
+    create_segment("code_task", 0x800_1000)
     set_active_segment("code_dram")
     place_symbol("_start")
     set_active_segment("code_task")
@@ -268,8 +273,8 @@ def test_5(top):
 #    #nonlocal top_inst
 #    pc = 0
 #    task_start = 0x8000_1000
-#    prog(a.pc_eq_I(0x8000_0000)) # Jumping to DRAM
-#    pc = 0x8000_0000
+#    prog(a.pc_eq_I(0x800_0000)) # Jumping to DRAM
+#    pc = 0x800_0000
 #    prog(a.r_eq_t(0,0))
 #    prog(a.r_eq_r_plus_t(1,0,1))
 #    prog(a.r_eq_r_plus_t(2,0,2))
@@ -288,8 +293,8 @@ def test_5(top):
 #    prog(a.r_eq_r_plus_r(13,7,6))
 #    prog(a.r_eq_r_plus_r(14,7,7))
 #    check_reg(10,10)
-#    prog(a.r_eq_mem32_I(0,0x8000_0000))
-#    prog(a.mem32_I_eq_r(0x8000_0800,14))
+#    prog(a.r_eq_mem32_I(0,0x800_0000))
+#    prog(a.mem32_I_eq_r(0x800_0800,14))
 #    loop = pc
 #    prog(a.r_eq_r_minus_r(4,4,1))
 #    prog(a.if_r_ne_z(4,pc_rel(loop)))
@@ -729,7 +734,7 @@ def test_ldst(top):
 
     top.set_timeout(10000)
 
-    data_base = 0x80002000
+    data_base = 0x08002000
 
     startup()
     load_reg("$r3", 0x01020304)
@@ -949,7 +954,7 @@ def test_ldst(top):
 
 if __name__ == "__main__":
     prep_test(top)
-    #test_1()
+    test_1()
     #test_2()
     #test_3()
     #test_4()
@@ -962,7 +967,7 @@ if __name__ == "__main__":
     #test_branch_zc()
     #test_branch_rc()
     #test_branch_bit()
-    test_ldst()
+    #test_ldst()
 
 if "pytest" in sys.modules:
     prep_test(top)
