@@ -4,7 +4,8 @@ Exception Handling
 Espresso has several exception sources. Exceptions are precise, meaning that when the exception handling mechanism is invoked:
 
 #. All the side-effects of instructions preceding the excepting one have fully taken effect
-#. None of the side-effects of the excepting or any subsequent instructions have taken effect
+#. None of the side-effects of any instructions, subsequent to the excepting one have taken effect
+#. The excepting instruction can be retried, if their side-effects only involve memory locations.
 
 Exceptions in TASK mode cause the processor to enter SCHEDULER mode. Interrupts are considered one of the possible exceptions.
 

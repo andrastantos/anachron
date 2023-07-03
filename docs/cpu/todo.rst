@@ -4,11 +4,8 @@ Appendix F: Todo
 Espresso
 --------
 
-For these two items, the documentation is updated, RTL and C/ASM is (but intested), BCT is not.
-- Wait states should be the top 3/4 bits. Then, non-DRAM/CSR/DRAM should decode the next 2 bits
-
 These are not implemented at the moment:
-- Wait-state coding should be XOR-ed by 4'b1111, instead of 15-
+- Wait-state coding should be XOR-ed by 4'b1111, instead of x-1
 - CSR bus should come off of he bus-interface (but that means a 32-bit interface to memory unit)
 - Should really have registers on the input of the stages as opposed to on the outputs
 - we should hold the last address and data for an extra half clock-cycle (at least) after the termination of the cycle.
