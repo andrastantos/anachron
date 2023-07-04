@@ -11,6 +11,8 @@ These are not implemented at the moment:
 - we should hold the last address and data for an extra half clock-cycle (at least) after the termination of the cycle.
 - Exception signalling should become enumeration instead of one-hot encoded.
 
+.. todo:: MEMSC returns a value! I don't think GAS is properly doing this, but I'm sure Espresso doesn't.
+
 Toolchain
 ---------
 

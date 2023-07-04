@@ -1,18 +1,6 @@
 Exception Handling
 ==================
 
-Espresso has several exception sources. Exceptions are precise, meaning that when the exception handling mechanism is invoked:
-
-#. All the side-effects of instructions preceding the excepting one have fully taken effect
-#. None of the side-effects of any instructions, subsequent to the excepting one have taken effect
-#. The excepting instruction can be retried, if their side-effects only involve memory locations.
-
-Exceptions in TASK mode cause the processor to enter SCHEDULER mode. Interrupts are considered one of the possible exceptions.
-
-When a TASK mode exception occurs, Espresso starts execution in SCHEDULER mode. :code:`$tpc` points to the excepting instruction.
-
-Exceptions in SCHEDULER mode cause the processor to jump to address 0 (the reset vector). Interrupts in SCHEDULER mode are masked and don't take effect.
-
 Exception cause
 ---------------
 
@@ -51,10 +39,12 @@ Bit-field  Name                 Description
 
     Finally, clearing exception sources is easiest with a write-1-to-clear semantics: not only does it allow for each individual handler to simply clear it's own 'cause' bit, but it allows the collection of further exceptions (interrupts) while in SCHEDULER mode.
 
+.. todo:: this is WRONG!!! We should change exceptions to an enumeration!!!! The ECAUSE register should be clear-on-read. Finally, we should follow-up with the new exception types for Brew.
+
 Interrupts
 ----------
 
-Interrupts can occur both in TASK or SCHEDULER mode. When Espresso is in TASK mode, it transfers execution into SCHEDULER mode. When an interrupt occurs in SCHEDULER mode, the execution flow is not modified, by the :code:`exc_hwi` bit in :code:`csr_ecause_reg` is set. This allows SCHEDULER-mode code to poll for interrupts.
+Interrupts can occur both in TASK or SCHEDULER mode. When Espresso is in TASK mode, it transfers execution into SCHEDULER mode. When an interrupt occurs in SCHEDULER mode, the execution flow is not modified, but the :code:`exc_hwi` bit in :code:`csr_ecause_reg` is set. This allows SCHEDULER-mode code to poll for interrupts.
 
 The external interrupt input of Espresso is level-sensitive, active low. This means that each interrupt source must have its own interrupt clear logic, and that interrupt handling SW must clear the pending interrupt both at the source as well as in :code:`csr_ecause_reg`.
 
