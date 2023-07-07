@@ -1,7 +1,7 @@
 Introduction
 ============
 
-Espresso is the main processor of the Anachronistic Computer (Anachron). It is a simple, low-end implementation of the `Brew <https://github.com/andrastantos/brew>`_ processor architecture.
+For the Anachronistic Computer, we need a properly anachronistic processor. As it turns out, I just have the design! I have been toying around with an instruction set design lately: the `Brew <https://github.com/andrastantos/brew>`_ architecture. Espresso, the main processor of the Anachronistic Computer is a simple, low-end implementation of this architecture.
 
 Espresso is a bit more than just a Brew implementation however. It contains a memory controller, a refresh generator and a DMA controller as well.
 
@@ -69,3 +69,4 @@ Intel 80486      1989                                    0.3
 ==============   ========   ==========================   =========
 
 .. [#note_cost] Cost estimation is based on silicon area ratio and package pin-count ratio of the Intel 80286.
+

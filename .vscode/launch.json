@@ -41,5 +41,24 @@
             "justMyCode": false,
             "args": ["-M", "html", ".", "_build", "-E", "-a"]
         },
+        {
+            "name": "BREW DOCUMENTATION",
+            "type": "python",
+            "request": "launch",
+            "module": "sphinx.cmd.build",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/../brew/docs/cpu",
+            "justMyCode": false,
+            "args": ["-M", "html", ".", "_build", "-E", "-a"]
+        },
+        {
+            "name": "BREW ISA check",
+            "type": "python",
+            "request": "launch",
+            "program": "check_isa.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/../brew/docs/cpu",
+            "justMyCode": false,
+        },
     ]
 }
