@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../brew"
+		}
+	],
+	"settings": {
+		"esbonio.sphinx.confDir": ""
+	}
+}
