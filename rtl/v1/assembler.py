@@ -221,7 +221,6 @@ def r_eq_r_shl_r(     rD, rB,  rA):  _prog(_asm.r_eq_r_shl_r(     _r(rD), _r(rB)
 def r_eq_r_shr_r(     rD, rB,  rA):  _prog(_asm.r_eq_r_shr_r(     _r(rD), _r(rB), _r(rA)))
 def r_eq_r_sar_r(     rD, rB,  rA):  _prog(_asm.r_eq_r_sar_r(     _r(rD), _r(rB), _r(rA)))
 def r_eq_r_mul_r(     rD, rB,  rA):  _prog(_asm.r_eq_r_mul_r(     _r(rD), _r(rB), _r(rA)))
-def r_eq_not_r_and_r( rD, rB,  rA):  _prog(_asm.r_eq_not_r_and_r( _r(rD), _r(rB), _r(rA)))
 def r_eq_r_plus_t(    rD, rB,  imm): _prog(_asm.r_eq_r_plus_t(    _r(rD), _r(rB), _t(imm)))
 
 def r_eq_I_xor_r(   rD, imm, rB): _prog(_asm.r_eq_I_xor_r(   _r(rD), _I(imm), _r(rB)))
@@ -314,3 +313,5 @@ def memsr32_I_eq_r( imm, rD): _prog(_asm.memsr32_I_eq_r(_I(imm), _r(rD)))
 def r_eq_smem8_I(   rD, imm): _prog(_asm.r_eq_smem8_I(  _r(rD), _I(imm)))
 def r_eq_smem16_I(  rD, imm): _prog(_asm.r_eq_smem16_I( _r(rD), _I(imm)))
 
+def r_eq_csr( rD, imm): _prog(_asm.r_eq_csr(_r(rD), _I(imm)))
+def csr_eq_r(   imm, rD): _prog(_asm.csr_eq_r(  _I(imm), _r(rD)))

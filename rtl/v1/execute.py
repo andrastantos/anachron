@@ -89,7 +89,7 @@ class AluUnit(Module):
             c_in = Wire(logic)
             c_in <<= (self.input_port.opcode == alu_ops.a_minus_b)
             xor_b = Wire(BrewData)
-            xor_b <<= Select((self.input_port.opcode == alu_ops.a_minus_b) | (self.input_port.opcode == alu_ops.n_b_and_a), 0, 0xffffffff)
+            xor_b <<= Select((self.input_port.opcode == alu_ops.a_minus_b), 0, 0xffffffff)
             b = xor_b ^ self.input_port.op_b
             a = Select((self.input_port.opcode == alu_ops.pc_plus_b), self.input_port.op_a, concat(self.input_port.pc, "1'b0"))
             sum = a + b + c_in
@@ -97,7 +97,7 @@ class AluUnit(Module):
             xor_result = self.input_port.op_a ^ self.input_port.op_b
 
             use_adder = (self.input_port.opcode == alu_ops.a_plus_b) | (self.input_port.opcode == alu_ops.a_minus_b)
-            use_and = (self.input_port.opcode == alu_ops.a_and_b) | (self.input_port.opcode == alu_ops.n_b_and_a)
+            use_and = (self.input_port.opcode == alu_ops.a_and_b)
             adder_result = Wire(Unsigned(33))
             adder_result <<= SelectOne(
                 use_adder,                                      sum,
@@ -123,7 +123,6 @@ class AluUnit(Module):
                 self.input_port.opcode == alu_ops.a_minus_b,    Unsigned(33)(self.input_port.op_a - self.input_port.op_b),
                 self.input_port.opcode == alu_ops.a_or_b,       self.input_port.op_a | self.input_port.op_b,
                 self.input_port.opcode == alu_ops.a_and_b,      self.input_port.op_a & self.input_port.op_b,
-                self.input_port.opcode == alu_ops.n_b_and_a,   ~self.input_port.op_b & self.input_port.op_a,
                 self.input_port.opcode == alu_ops.a_xor_b,      self.input_port.op_a ^ self.input_port.op_b,
                 self.input_port.opcode == alu_ops.tpc,          concat(self.input_port.tpc, "1'b0"),
                 self.input_port.opcode == alu_ops.pc_plus_b,    concat(self.input_port.pc, "1'b0") + self.input_port.op_b,
@@ -375,12 +374,15 @@ class LoadStoreInputIf(Interface):
     mem_limit = BrewMemBase
     task_mode = logic
     mem_access_len = Unsigned(2) # 0: 8-bit, 1: 16-bit, 2: 32-bit
+    is_csr = logic
 
 class LoadStoreOutputIf(Interface):
     phy_addr = BrewAddr
     eff_addr = BrewAddr
     mem_av = logic
     mem_unaligned = logic
+    is_csr = logic
+
 class LoadStoreUnit(Module):
     clk = ClkPort()
     rst = RstPort()
@@ -390,10 +392,14 @@ class LoadStoreUnit(Module):
 
     def body(self):
         eff_addr = TIMING_CLOSURE_REG((self.input_port.op_b + self.input_port.op_c)[31:0])
-        phy_addr = (eff_addr + Select(self.input_port.task_mode, 0, (self.input_port.mem_base << BrewMemShift)))[31:0]
+        phy_addr = Select(
+            self.input_port.is_csr,
+            (eff_addr + Select(self.input_port.task_mode, 0, (self.input_port.mem_base << BrewMemShift)))[31:0],
+            concat(self.input_port.op_c[15:0], "2'b00") | Select(self.input_port.task_mode, 0, 0x20000),
+        )
 
-        mem_av = self.input_port.task_mode & self.input_port.is_ldst & (eff_addr[31:BrewMemShift] > self.input_port.mem_limit)
-        mem_unaligned = self.input_port.is_ldst & Select(self.input_port.mem_access_len,
+        mem_av = self.input_port.task_mode & self.input_port.is_ldst & (eff_addr[31:BrewMemShift] > self.input_port.mem_limit) & ~self.input_port.is_csr
+        mem_unaligned = ~self.input_port.is_csr & self.input_port.is_ldst & Select(self.input_port.mem_access_len,
             0, # 8-bit access is always aligned
             eff_addr[0], # 16-bit access is unaligned if LSB is non-0
             eff_addr[0] | eff_addr[1], # 32-bit access is unaligned if lower two bits are non-0
@@ -404,6 +410,7 @@ class LoadStoreUnit(Module):
         self.output_port.eff_addr <<= eff_addr
         self.output_port.mem_av <<= mem_av
         self.output_port.mem_unaligned <<= mem_unaligned
+        self.output_port.is_csr <<= self.input_port.is_csr
 
 class ExecuteStage(GenericModule):
     clk = ClkPort()
@@ -439,8 +446,7 @@ class ExecuteStage(GenericModule):
 
     complete = Output(logic) # goes high for 1 cycle when an instruction completes. Used for verification
 
-    def construct(self, csr_base: int, has_multiply: bool = True, has_shift: bool = True):
-        self.csr_base = csr_base
+    def construct(self, has_multiply: bool = True, has_shift: bool = True):
         self.has_multiply = has_multiply
         self.has_shift = has_shift
 
@@ -488,6 +494,7 @@ class ExecuteStage(GenericModule):
         ldst_output = Wire(LoadStoreOutputIf)
         ldst_unit = LoadStoreUnit()
         ldst_unit.input_port.is_ldst        <<= self.input_port.exec_unit == op_class.ld_st
+        ldst_unit.input_port.is_csr         <<= (self.input_port.ldst_op == ldst_ops.csr_load) | (self.input_port.ldst_op == ldst_ops.csr_store) 
         ldst_unit.input_port.op_b           <<= self.input_port.op_b
         ldst_unit.input_port.op_c           <<= self.input_port.op_c
         ldst_unit.input_port.mem_base       <<= self.mem_base
@@ -572,7 +579,7 @@ class ExecuteStage(GenericModule):
         mem_input.valid <<= stage_1_valid & ~block_mem & (s1_exec_unit == op_class.ld_st)
         stage_2_ready <<= Select((s1_exec_unit == op_class.ld_st) & ~block_mem, stage_2_fsm.input_ready,  mem_input.ready)
         stage_2_valid <<= Select((s2_exec_unit == op_class.ld_st) & ~block_mem, stage_2_fsm.output_valid, s2_mem_output.valid) & ~s2_was_branch
-        stage_2_fsm.output_ready <<= Select((s2_exec_unit == op_class.ld_st) & (s2_ldst_op == ldst_ops.load) & ~block_mem, 1, s2_mem_output.valid)
+        stage_2_fsm.output_ready <<= Select((s2_exec_unit == op_class.ld_st) & ((s2_ldst_op == ldst_ops.load) | (s2_ldst_op == ldst_ops.csr_load)) & ~block_mem, 1, s2_mem_output.valid)
 
         stage_2_reg_en = Wire(logic)
         stage_2_reg_en <<= stage_1_valid & stage_2_ready & ~Reg(self.do_branch)
@@ -620,12 +627,13 @@ class ExecuteStage(GenericModule):
         #do_branch
 
         # Memory unit
-        memory_unit = MemoryStage(csr_base=self.csr_base)
+        memory_unit = MemoryStage()
 
 
-        mem_input.read_not_write <<= (s1_exec_unit == op_class.ld_st) & (s1_ldst_op == ldst_ops.load)
+        mem_input.read_not_write <<= (s1_exec_unit == op_class.ld_st) & ((s1_ldst_op == ldst_ops.load) | (s1_ldst_op == ldst_ops.csr_load))
         mem_input.data <<= s1_op_a
         mem_input.addr <<= s1_ldst_output.phy_addr
+        mem_input.is_csr <<= s1_ldst_output.is_csr
         mem_input.access_len <<= s1_mem_access_len
         memory_unit.input_port <<= mem_input
         self.bus_req_if <<= memory_unit.bus_req_if
@@ -924,8 +932,6 @@ def sim():
                         result = (op_a - op_b) & mask
                     elif op == alu_ops.a_and_b:
                         result = op_a & op_b
-                    elif op == alu_ops.n_b_and_a:
-                        result = op_a & ~op_b
                     elif op == alu_ops.a_or_b:
                         result = op_a | op_b
                     elif op == alu_ops.a_xor_b:
@@ -1292,10 +1298,8 @@ def sim():
             yield from send_alu_op(alu_ops.a_and_b, 4, 3)
             yield from send_alu_op(alu_ops.a_or_b, 12, 43)
             yield from send_alu_op(alu_ops.a_xor_b, 23, 12)
-            yield from send_alu_op(alu_ops.n_b_and_a, 4, 3)
             set_side_band()
             yield from send_alu_op(alu_ops.a_plus_b, 4, 3, fetch_av=True)
-            yield from send_alu_op(alu_ops.n_b_and_a, 4, 3)
             yield from send_mult_op(41,43)
             yield from send_shifter_op(shifter_ops.shll,0xf0000001,2)
             yield from send_shifter_op(shifter_ops.shll,0xf0000001,31)
@@ -1367,7 +1371,6 @@ def sim():
                 yield from send_alu_op(alu_ops.a_and_b,     op_a, op_b)
                 yield from send_alu_op(alu_ops.a_or_b,      op_a, op_b)
                 yield from send_alu_op(alu_ops.a_xor_b,     op_a, op_b)
-                yield from send_alu_op(alu_ops.n_b_and_a,   op_a, op_b)
 
     class PCChecker(GenericModule):
         clk = ClkPort()
@@ -1661,7 +1664,6 @@ def sim():
             csr_queue = []
             result_queue = []
             pc_result_queue = []
-            csr_base=0x1
 
 
             class SidebandState(object): pass
@@ -1682,7 +1684,7 @@ def sim():
             result_checker = ResultChecker(result_queue)
             pc_checker = PCChecker(pc_result_queue)
 
-            dut = ExecuteStage(csr_base=csr_base)
+            dut = ExecuteStage()
 
             dut.input_port <<= decode_emulator.output_port
             result_checker.input_port <<= dut.output_port
@@ -1738,7 +1740,7 @@ def sim():
 
 def gen():
     def top():
-        return ScanWrapper(ExecuteStage, {"clk", "rst"}, csr_base=0x1, has_multiply=True, has_shift=True)
+        return ScanWrapper(ExecuteStage, {"clk", "rst"}, has_multiply=True, has_shift=True)
 
     back_end = SystemVerilog()
     back_end.yosys_fix = True

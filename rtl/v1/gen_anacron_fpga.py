@@ -80,7 +80,6 @@ def generate_system(
 def generate_brew(file_name: Union[str, Path]):
     def top():
         return BrewV1Top(
-            csr_base     = 0x1,
             nram_base    = 0x0,
             has_multiply = True,
             has_shift    = True,

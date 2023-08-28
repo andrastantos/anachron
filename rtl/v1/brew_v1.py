@@ -40,25 +40,24 @@ class BrewV1Top(GenericModule):
 
     n_int             = Input(logic)
 
-    def construct(self, csr_base: int = 0x1, nram_base: int = 0x0, has_multiply: bool = True, has_shift: bool = True, page_bits: int = 7):
-        self.csr_base = csr_base
+    def construct(self, nram_base: int = 0x0, has_multiply: bool = True, has_shift: bool = True, page_bits: int = 7):
         self.nram_base = nram_base
         self.has_multiply = has_multiply
         self.has_shift = has_shift
         self.page_bits = page_bits
 
         self.csr_top_level_ofs = 0
-        self.csr_cpu_ver_reg    = (self.csr_base << 26) + self.csr_top_level_ofs + 0*4
-        self.csr_pmem_base_reg  = (self.csr_base << 26) + self.csr_top_level_ofs + 1*4
-        self.csr_pmem_limit_reg = (self.csr_base << 26) + self.csr_top_level_ofs + 2*4
-        self.csr_dmem_base_reg  = (self.csr_base << 26) + self.csr_top_level_ofs + 3*4
-        self.csr_dmem_limit_reg = (self.csr_base << 26) + self.csr_top_level_ofs + 4*4
-        self.csr_ecause_reg     = (self.csr_base << 26) + self.csr_top_level_ofs + 5*4
-        self.csr_eaddr_reg      = (self.csr_base << 26) + self.csr_top_level_ofs + 6*4
+        self.csr_cpu_ver_reg    = self.csr_top_level_ofs + 0
+        self.csr_pmem_base_reg  = self.csr_top_level_ofs + 1
+        self.csr_pmem_limit_reg = self.csr_top_level_ofs + 2
+        self.csr_dmem_base_reg  = self.csr_top_level_ofs + 3
+        self.csr_dmem_limit_reg = self.csr_top_level_ofs + 4
+        self.csr_ecause_reg     = self.csr_top_level_ofs + 5
+        self.csr_eaddr_reg      = self.csr_top_level_ofs + 6
 
     def body(self):
         bus_if = BusIf(nram_base=self.nram_base)
-        pipeline = Pipeline(csr_base=self.csr_base, has_multiply=self.has_multiply, has_shift=self.has_shift, page_bits=self.page_bits)
+        pipeline = Pipeline(has_multiply=self.has_multiply, has_shift=self.has_shift, page_bits=self.page_bits)
         dma = CpuDma()
 
         # Things that need CSR access
@@ -281,7 +280,7 @@ class BrewV1Top(GenericModule):
 
 def gen():
     def top():
-        return BrewV1Top(csr_base=0x1, nram_base=0x0, has_multiply=True, has_shift=True, page_bits=7)
+        return BrewV1Top(nram_base=0x0, has_multiply=True, has_shift=True, page_bits=7)
 
     back_end = SystemVerilog()
     back_end.yosys_fix = True

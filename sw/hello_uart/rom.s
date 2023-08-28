@@ -1,10 +1,6 @@
 .set rom_base,          0x00000000
 .set gpio_base,         0x00010000
 .set dram_base,         0x08000000
-.set csr_base,          0x04000000
-.set csr_top_base,      csr_base + 0x00
-.set csr_bus_if_base,   csr_base + 0x10
-.set csr_dma_base,      csr_base + 0x20
 
 .set bus_if_cfg_reg,    csr_bus_if_base + 0x0
 # Register setup:

@@ -73,8 +73,7 @@ class Pipeline(GenericModule):
     event_fetch_drop        = Output()
     event_inst_word         = Output()
 
-    def construct(self, csr_base: int, has_multiply: bool = True, has_shift: bool = True, page_bits: int = 7):
-        self.csr_base = csr_base
+    def construct(self, has_multiply: bool = True, has_shift: bool = True, page_bits: int = 7):
         self.has_multiply = has_multiply
         self.has_shift = has_shift
         self.page_bits = page_bits
@@ -97,7 +96,7 @@ class Pipeline(GenericModule):
         # Stages
         fetch_stage = FetchStage(page_bits=self.page_bits)
         decode_stage = DecodeStage(has_multiply=self.has_multiply, has_shift=self.has_multiply)
-        execute_stage = ExecuteStage(csr_base=self.csr_base, has_multiply=self.has_multiply, has_shift=self.has_multiply)
+        execute_stage = ExecuteStage(has_multiply=self.has_multiply, has_shift=self.has_multiply)
         result_extend_stage = ResultExtendStage()
         reg_file = RegFile()
 
@@ -189,7 +188,7 @@ class Pipeline(GenericModule):
 
 def gen():
     def top():
-        return Pipeline(csr_base=0x1, has_multiply=False, has_shift=False)
+        return Pipeline(has_multiply=False, has_shift=False)
 
     back_end = SystemVerilog()
     back_end.yosys_fix = True

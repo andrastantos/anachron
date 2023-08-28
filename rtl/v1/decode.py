@@ -153,7 +153,7 @@ class DecodeStage(GenericModule):
         a16 = access_len_16
         a8  = access_len_8
         #      CODE                                  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B          OP_C        MEM_LEN BSE WSE BZE WZE
-        SII =                                       (oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      7,               None,         None,       None,   0,  0,  0,  0 )
+        invalid_instruction =                                       (oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      7,               None,         None,       None,   0,  0,  0,  0 )
         if self.has_shift:
             shift_ops = (
                 #  CODE                                  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B          OP_C        MEM_LEN BSE WSE BZE WZE
@@ -169,15 +169,15 @@ class DecodeStage(GenericModule):
             )
         else:
             shift_ops = (
-                ( "  .6..: $rD <- $rA << $rB",            *SII),
-                ( "  .7..: $rD <- $rA >> $rB",            *SII),
-                ( "  .8..: $rD <- $rA >>> $rB",           *SII),
-                ( "  .6.f: $rD <- FIELD_E << $rB",        *SII),
-                ( "  .7.f: $rD <- FIELD_E >> $rB",        *SII),
-                ( "  .8.f: $rD <- FIELD_E >>> $rB",       *SII),
-                ( "  .6f.: $rD <- FIELD_E << $rA",        *SII),
-                ( "  .7f.: $rD <- FIELD_E >> $rA",        *SII),
-                ( "  .8f.: $rD <- FIELD_E >>> $rA",       *SII),
+                ( "  .6..: $rD <- $rA << $rB",            *invalid_instruction),
+                ( "  .7..: $rD <- $rA >> $rB",            *invalid_instruction),
+                ( "  .8..: $rD <- $rA >>> $rB",           *invalid_instruction),
+                ( "  .6.f: $rD <- FIELD_E << $rB",        *invalid_instruction),
+                ( "  .7.f: $rD <- FIELD_E >> $rB",        *invalid_instruction),
+                ( "  .8.f: $rD <- FIELD_E >>> $rB",       *invalid_instruction),
+                ( "  .6f.: $rD <- FIELD_E << $rA",        *invalid_instruction),
+                ( "  .7f.: $rD <- FIELD_E >> $rA",        *invalid_instruction),
+                ( "  .8f.: $rD <- FIELD_E >>> $rA",       *invalid_instruction),
             )
         if self.has_multiply:
             mult_ops = (
@@ -188,9 +188,9 @@ class DecodeStage(GenericModule):
             )
         else:
             mult_ops = (
-                ( "  .9..: $rD <- $rA * $rB",             *SII),
-                ( "  .9.f: $rD <- FIELD_E * $rB",         *SII),
-                ( "  .9f.: $rD <- FIELD_E * $rA",         *SII),
+                ( "  .9..: $rD <- $rA * $rB",             *invalid_instruction),
+                ( "  .9.f: $rD <- FIELD_E * $rB",         *invalid_instruction),
+                ( "  .9f.: $rD <- FIELD_E * $rA",         *invalid_instruction),
             )
         full_inst_table = (
             *shift_ops,
@@ -199,14 +199,15 @@ class DecodeStage(GenericModule):
             ( "$<8000: SWI",                          oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      field_d,         None,            None,       None,   0,  0,  0,  0 ),
             ( "  8000: STM",                          oc.branch,   None,         None,        bo.stm,      None,      None,       None,           None,      None,            None,            None,       None,   0,  0,  0,  0 ),
             ( "  9000: WOI",                          oc.branch,   ao.a_minus_b, None,        bo.cb_eq,    None,      field_a,    field_b,        None,      "REG",           "REG",           0,          None,   0,  0,  0,  0 ), # Decoded as 'if $0 == $0 $pc <- $pc'
-            ( " >9000: SII",                          *SII),
+            ( "  a000: PFLUSH",                       oc.branch,   ao.a_minus_b, None,        bo.cb_ne,    None,      field_a,    field_b,        None,      "REG",           "REG",           0,          None,   0,  0,  0,  0 ), # Decoded as 'if $0 != $0 $pc <- $pc'
+            ( " >a000: invalid_instruction",          *invalid_instruction),
             #  PC manipulation group                 EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  .001: FENCE",                        oc.alu,      None,         None,        None,        None,      None,       None,           None,      None,            None,            None,       None,   0,  0,  0,  0 ), # Decoded as a kind of NOP
             ( "$ .002: $pc <- $rD",                   oc.branch,   None,         None,        bo.pc_w,     None,      field_d,    None,           None,      "REG",           None,            None,       None,   0,  0,  0,  0 ),
             ( "  .003: $tpc <- $rD",                  oc.branch,   None,         None,        bo.tpc_w,    None,      field_d,    None,           None,      "REG",           None,            None,       None,   0,  0,  0,  0 ),
             ( "$ .004: $rD <- $pc",                   oc.alu,      ao.pc_plus_b, None,        None,        None,      None,       None,           field_d,   None,            0,               None,       None,   0,  0,  0,  0 ),
             ( "  .005: $rD <- $tpc",                  oc.alu,      ao.tpc,       None,        None,        None,      None,       None,           field_d,   None,            None,            None,       None,   0,  0,  0,  0 ),
-            ( "  .00>5: SII",                         *SII),
+            ( "  .00>5: invalid_instruction",         *invalid_instruction),
             # Unary group                            EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "$ .01.: $rD <- tiny FIELD_A",          oc.alu,      ao.a_or_b,    None,        None,        None,      None,       None,           field_d,   0,               ones_field_a,    None,       None,   0,  0,  0,  0 ),
             ( "  .02.: $rD <- $pc + FIELD_A*2",       oc.alu,      ao.pc_plus_b, None,        None,        None,      None,       None,           field_d,   None,            ones_field_a_2x, None,       None,   0,  0,  0,  0 ),
@@ -214,29 +215,29 @@ class DecodeStage(GenericModule):
             ( "$ .04.: $rD <- ~$rA",                  oc.alu,      ao.a_xor_b,   None,        None,        None,      None,       field_a,        field_d,   0xffffffff,      "REG",           None,       None,   0,  0,  0,  0 ),
             ( "  .05.: $rD <- bse $rA",               oc.alu,      ao.a_or_b,    None,        None,        None,      None,       field_a,        field_d,   0,               "REG",           None,       None,   1,  0,  0,  0 ),
             ( "  .06.: $rD <- wse $rA",               oc.alu,      ao.a_or_b,    None,        None,        None,      None,       field_a,        field_d,   0,               "REG",           None,       None,   0,  1,  0,  0 ),
-            ( "  .0>6.: SII",                         *SII),
+            ( "  .0>6.: invalid_instruction",         *invalid_instruction),
             ## Binary ALU group                      EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  .1..: $rD <- $rA ^ $rB",             oc.alu,      ao.a_xor_b,   None,        None,        None,      field_a,    field_b,        field_d,   "REG",           "REG",           None,       None,   0,  0,  0,  0 ),
             ( "$ .2..: $rD <- $rA | $rB",             oc.alu,      ao.a_or_b,    None,        None,        None,      field_a,    field_b,        field_d,   "REG",           "REG",           None,       None,   0,  0,  0,  0 ),
             ( "  .3..: $rD <- $rA & $rB",             oc.alu,      ao.a_and_b,   None,        None,        None,      field_a,    field_b,        field_d,   "REG",           "REG",           None,       None,   0,  0,  0,  0 ),
             ( "  .4..: $rD <- $rA + $rB",             oc.alu,      ao.a_plus_b,  None,        None,        None,      field_a,    field_b,        field_d,   "REG",           "REG",           None,       None,   0,  0,  0,  0 ),
             ( "  .5..: $rD <- $rA - $rB",             oc.alu,      ao.a_minus_b, None,        None,        None,      field_a,    field_b,        field_d,   "REG",           "REG",           None,       None,   0,  0,  0,  0 ),
-            ( "  .a..: $rD <- ~$rA & $rB",            oc.alu,      ao.n_b_and_a, None,        None,        None,      field_a,    field_b,        field_d,   "REG",           "REG",           None,       None,   0,  0,  0,  0 ),
+            ( "  .a..: $rD <- TYPE_NAME $rB",         *invalid_instruction),
             ( "  .b..: $rD <- tiny $rB + FIELD_A",    oc.alu,      ao.a_plus_b,  None,        None,        None,      field_b,    None,           field_d,   "REG",           ones_field_a,    None,       None,   0,  0,  0,  0 ),
             # Load immediate group                   EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "$ .00f: $rD <- VALUE",                 oc.alu,      ao.a_or_b,    None,        None,        None,      None,       None,           field_d,   field_e,         0,               None,       None,   0,  0,  0,  0 ),
             ( "  20ef: $pc <- VALUE",                 oc.branch,   None,         None,        bo.pc_w,     None,      None,       None,           None,      field_e,         None,            None,       None,   0,  0,  0,  0 ),
             ( "  30ef: $tpc <- VALUE",                oc.branch,   None,         None,        bo.tpc_w,    None,      None,       None,           None,      field_e,         None,            None,       None,   0,  0,  0,  0 ),
-            ( "  80ef.: SII",                         *SII),
-            ( "  90ef.: SII",                         *SII),
+            ( "  80ef.: invalid_instruction",         *invalid_instruction),
+            ( "  90ef.: invalid_instruction",         *invalid_instruction),
             # Constant ALU group                     EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  .1.f: $rD <- FIELD_E ^ $rB",         oc.alu,      ao.a_xor_b,   None,        None,        None,      None,       field_b,        field_d,   field_e,         "REG",           None,       None,   0,  0,  0,  0 ),
             ( "  .2.f: $rD <- FIELD_E | $rB",         oc.alu,      ao.a_or_b,    None,        None,        None,      None,       field_b,        field_d,   field_e,         "REG",           None,       None,   0,  0,  0,  0 ),
             ( "$ .3.f: $rD <- FIELD_E & $rB",         oc.alu,      ao.a_and_b,   None,        None,        None,      None,       field_b,        field_d,   field_e,         "REG",           None,       None,   0,  0,  0,  0 ),
             ( "  .4.f: $rD <- FIELD_E + $rB",         oc.alu,      ao.a_plus_b,  None,        None,        None,      None,       field_b,        field_d,   field_e,         "REG",           None,       None,   0,  0,  0,  0 ),
             ( "  .5.f: $rD <- FIELD_E - $rB",         oc.alu,      ao.a_minus_b, None,        None,        None,      None,       field_b,        field_d,   field_e,         "REG",           None,       None,   0,  0,  0,  0 ),
-            ( "  .a.f: SII",                          *SII),
-            ( "  .b.f: SII",                          *SII),
+            ( "  .a.f: invalid_instruction",          *invalid_instruction),
+            ( "  .b.f: invalid_instruction",          *invalid_instruction),
             # Short load immediate group             EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "$ .0f0: $rD <- short VALUE",           oc.alu,      ao.a_or_b,    None,        None,        None,      None,       None,           field_d,   field_e,         0,               None,       None,   0,  0,  0,  0 ),
             ( "  20fe: $pc <- short VALUE",           oc.branch,   None,         None,        bo.pc_w,     None,      None,       None,           None,      field_e,         None,            None,       None,   0,  0,  0,  0 ),
@@ -247,8 +248,8 @@ class DecodeStage(GenericModule):
             ( "  .3f.: $rD <- FIELD_E & $rA",         oc.alu,      ao.a_and_b,   None,        None,        None,      None,       field_a,        field_d,   field_e,         "REG",           None,       None,   0,  0,  0,  0 ),
             ( "$ .4f.: $rD <- FIELD_E + $rA",         oc.alu,      ao.a_plus_b,  None,        None,        None,      None,       field_a,        field_d,   field_e,         "REG",           None,       None,   0,  0,  0,  0 ),
             ( "  .5f.: $rD <- FIELD_E - $rA",         oc.alu,      ao.a_minus_b, None,        None,        None,      None,       field_a,        field_d,   field_e,         "REG",           None,       None,   0,  0,  0,  0 ),
-            ( "  .af.: SII",                          *SII),
-            ( "  .bf.: SII",                          *SII),
+            ( "  .af.: invalid_instruction",          *invalid_instruction),
+            ( "  .bf.: invalid_instruction",          *invalid_instruction),
             # Zero-compare conditional branch group  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  f00.: if $rA == 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_eq,    None,      field_a,    None,           None,      "REG",           0,               field_e,    None,   0,  0,  0,  0 ),
             ( "  f01.: if $rA != 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_ne,    None,      field_a,    None,           None,      "REG",           0,               field_e,    None,   0,  0,  0,  0 ),
@@ -256,15 +257,15 @@ class DecodeStage(GenericModule):
             ( "  f03.: if $rA >= 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_ges,   None,      field_a,    None,           None,      "REG",           0,               field_e,    None,   0,  0,  0,  0 ),
             ( "  f04.: if $rA > 0",                   oc.branch,   ao.a_minus_b, None,        bo.cb_lts,   None,      None,       field_a,        None,      0,               "REG",           field_e,    None,   0,  0,  0,  0 ),
             ( "  f05.: if $rA <= 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_ges,   None,      None,       field_a,        None,      0,               "REG",           field_e,    None,   0,  0,  0,  0 ),
-            ( "  f06.: SII",                          *SII),
-            ( "  f07.: SII",                          *SII),
+            ( "  f06.: invalid_instruction",          *invalid_instruction),
+            ( "  f07.: invalid_instruction",          *invalid_instruction),
             ( "  f08.: if $rA == 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_eq,    None,      field_a,    None,           None,      "REG",           0,               field_e,    None,   0,  0,  0,  0 ),
             ( "  f09.: if $rA != 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_ne,    None,      field_a,    None,           None,      "REG",           0,               field_e,    None,   0,  0,  0,  0 ),
             ( "  f0a.: if $rA < 0",                   oc.branch,   ao.a_minus_b, None,        bo.cb_lts,   None,      field_a,    None,           None,      "REG",           0,               field_e,    None,   0,  0,  0,  0 ),
             ( "  f0b.: if $rA >= 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_ges,   None,      field_a,    None,           None,      "REG",           0,               field_e,    None,   0,  0,  0,  0 ),
             ( "  f0c.: if $rA > 0",                   oc.branch,   ao.a_minus_b, None,        bo.cb_lts,   None,      None,       field_a,        None,      0,               "REG",           field_e,    None,   0,  0,  0,  0 ),
             ( "  f0d.: if $rA <= 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_ges,   None,      None,       field_a,        None,      0,               "REG",           field_e,    None,   0,  0,  0,  0 ),
-            ( "  f0e.: SII",                          *SII),
+            ( "  f0e.: invalid_instruction",          *invalid_instruction),
             # Conditional branch group               EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  f1..: if $rB == $rA",                oc.branch,   ao.a_minus_b, None,        bo.cb_eq,    None,      field_b,    field_a,        None,      "REG",           "REG",           field_e,    None,   0,  0,  0,  0 ),
             ( "  f2..: if $rB != $rA",                oc.branch,   ao.a_minus_b, None,        bo.cb_ne,    None,      field_b,    field_a,        None,      "REG",           "REG",           field_e,    None,   0,  0,  0,  0 ),
@@ -272,8 +273,8 @@ class DecodeStage(GenericModule):
             ( "  f4..: if signed $rB >= $rA",         oc.branch,   ao.a_minus_b, None,        bo.cb_ges,   None,      field_b,    field_a,        None,      "REG",           "REG",           field_e,    None,   0,  0,  0,  0 ),
             ( "  f5..: if $rB < $rA",                 oc.branch,   ao.a_minus_b, None,        bo.cb_lt,    None,      field_b,    field_a,        None,      "REG",           "REG",           field_e,    None,   0,  0,  0,  0 ),
             ( "  f6..: if $rB >= $rA",                oc.branch,   ao.a_minus_b, None,        bo.cb_ge,    None,      field_b,    field_a,        None,      "REG",           "REG",           field_e,    None,   0,  0,  0,  0 ),
-            ( "  f7..: SII",                          *SII),
-            ( "  f8..: SII",                          *SII),
+            ( "  f7..: invalid_instruction",          *invalid_instruction),
+            ( "  f8..: invalid_instruction",          *invalid_instruction),
             ( "  f9..: if $rB == $rA",                oc.branch,   ao.a_minus_b, None,        bo.cb_eq,    None,      field_b,    field_a,        None,      "REG",           "REG",           field_e,    None,   0,  0,  0,  0 ),
             ( "  fa..: if $rB != $rA",                oc.branch,   ao.a_minus_b, None,        bo.cb_ne,    None,      field_b,    field_a,        None,      "REG",           "REG",           field_e,    None,   0,  0,  0,  0 ),
             ( "  fb..: if signed $rB < $rA",          oc.branch,   ao.a_minus_b, None,        bo.cb_lts,   None,      field_b,    field_a,        None,      "REG",           "REG",           field_e,    None,   0,  0,  0,  0 ),
@@ -287,10 +288,10 @@ class DecodeStage(GenericModule):
             ( "$ .c**: MEM[$rA+tiny OFS*4] <- $rD",   oc.ld_st,    None,         None,        None,        lo.store,  field_d,    tiny_field_a,   None,      "REG",           "REG",           tiny_ofs,   a32,    0,  0,  0,  0 ),
             ( "$ .d**: $rD <- MEM[$rA+tiny OFS*4]",   oc.ld_st,    None,         None,        None,        lo.load,   None,       tiny_field_a,   field_d,   None,            "REG",           tiny_ofs,   a32,    0,  0,  0,  0 ),
             # Type operations                        EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
-            ( "  .e0.: SII",                          *SII),
-            ( "  .e1.: SII",                          *SII),
-            ( "  .e2.: SII",                          *SII),
-            ( "  .e3.: SII",                          *SII),
+            ( "  .e0.: invalid_instruction",          *invalid_instruction),
+            ( "  .e1.: invalid_instruction",          *invalid_instruction),
+            ( "  .e2.: invalid_instruction",          *invalid_instruction),
+            ( "  .e3.: invalid_instruction",          *invalid_instruction),
             # Indirect load/store group              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "$ .e4.: $rD <- MEM8[$rA]",             oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           0,          a8,     0,  0,  1,  0 ),
             ( "  .e5.: $rD <- MEM16[$rA]",            oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           0,          a16,    0,  0,  0,  1 ),
@@ -303,13 +304,13 @@ class DecodeStage(GenericModule):
             ( "  .ec.: $rD <- SMEM8[$rA]",            oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           0,          a8,     1,  0,  0,  0 ),
             ( "  .ed.: $rD <- SMEM16[$rA]",           oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           0,          a16,    0,  1,  0,  0 ),
             # Indirect jump group                    EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
-            ( "  1ee.: SII",                          *SII),
-            ( "  2ee.: SII",                          *SII),
-            ( "  3ee.: SII",                          *SII),
+            ( "  1ee.: invalid_instruction",          *invalid_instruction),
+            ( "  2ee.: invalid_instruction",          *invalid_instruction),
+            ( "  3ee.: invalid_instruction",          *invalid_instruction),
             # Offset-indirect type operations        EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
-            ( "  1ee.: SII",                          *SII),
-            ( "  2ee.: SII",                          *SII),
-            ( "  3ee.: SII",                          *SII),
+            ( "  1ee.: invalid_instruction",          *invalid_instruction),
+            ( "  2ee.: invalid_instruction",          *invalid_instruction),
+            ( "  3ee.: invalid_instruction",          *invalid_instruction),
             # Offset-indirect load/store group       EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  .f4.: $rD <- MEM8[$rA+FIELD_E]",     oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           field_e,    a8,     0,  0,  1,  0 ),
             ( "  .f5.: $rD <- MEM16[$rA+FIELD_E]",    oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           field_e,    a16,    0,  0,  0,  1 ),
@@ -322,9 +323,12 @@ class DecodeStage(GenericModule):
             ( "  .fc.: $rD <- SMEM8[$rA+FIELD_E]",    oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           field_e,    a8,     1,  0,  0,  0 ),
             ( "  .fd.: $rD <- SMEM16[$rA+FIELD_E]",   oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           field_e,    a16,    0,  1,  0,  0 ),
             # Offset-indirect jump group             EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
-            ( "  1fe.: SII",                          *SII),
-            ( "  2fe.: SII",                          *SII),
-            ( "  3fe.: SII",                          *SII),
+            ( "  1fe.: invalid_instruction",          *invalid_instruction),
+            ( "  2fe.: invalid_instruction",          *invalid_instruction),
+            ( "  3fe.: invalid_instruction",          *invalid_instruction),
+            # CSR group                              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
+            ( "  .0f8: $rD <- CSR[FIELD_E]",          oc.ld_st,    None,         None,        None,        lo.csr_load,   None,    None,          field_d,   None,            0,               field_e,    a32,    0,  0,  0,  0 ),
+            ( "  .0f9: CSR[FIELD_E] <- $rD",          oc.ld_st,    None,         None,        None,        lo.csr_store,  field_d, None,          None,      "REG",           0,               field_e,    a32,    0,  0,  0,  0 ),
             # Absolute load/store group              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  .f4f: $rD <- MEM8[FIELD_E]",         oc.ld_st,    None,         None,        None,        lo.load,   None,       None,           field_d,   None,            0,               field_e,    a8,     0,  0,  1,  0 ),
             ( "  .f5f: $rD <- MEM16[FIELD_E]",        oc.ld_st,    None,         None,        None,        lo.load,   None,       None,           field_d,   None,            0,               field_e,    a16,    0,  0,  0,  1 ),
@@ -337,9 +341,9 @@ class DecodeStage(GenericModule):
             ( "  .fcf: $rD <- SMEM8[FIELD_E]",        oc.ld_st,    None,         None,        None,        lo.load,   None,       None,           field_d,   None,            0,               field_e,    a8,     1,  0,  0,  0 ),
             ( "  .fdf: $rD <- SMEM16[FIELD_E]",       oc.ld_st,    None,         None,        None,        lo.load,   None,       None,           field_d,   None,            0,               field_e,    a16,    0,  1,  0,  0 ),
             # Absolute jump group                    EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
-            ( "  1fef: SII",                          *SII),
-            ( "  2fef: SII",                          *SII),
-            ( "  3fef: SII",                          *SII),
+            ( "  1fef: invalid_instruction",          *invalid_instruction),
+            ( "  2fef: invalid_instruction",          *invalid_instruction),
+            ( "  3fef: invalid_instruction",          *invalid_instruction),
         )
 
         def is_mini_set(full_mask:str) -> bool:

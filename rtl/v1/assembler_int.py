@@ -111,7 +111,6 @@ class DecodeExpectations(object):
     def r_eq_r_shr_r(self,     rD = None, rA = None,  rB = None): return ExecExp(fn_name(), exec_unit=op_class.shift)
     def r_eq_r_sar_r(self,     rD = None, rA = None,  rB = None): return ExecExp(fn_name(), exec_unit=op_class.shift)
     def r_eq_r_mul_r(self,     rD = None, rA = None,  rB = None): return ExecExp(fn_name(), exec_unit=op_class.mult)
-    def r_eq_not_r_and_r(self, rD = None, rA = None,  rB = None): return ExecExp(fn_name(), exec_unit=op_class.alu)
     def r_eq_r_plus_t(self,    rD = None, rB = None,  imm = None): return ExecExp(fn_name(), exec_unit=op_class.alu)
 
     def r_eq_I_xor_r(self,   rD = None, imm = None, rB = None): return ExecExp(fn_name(), exec_unit=op_class.alu)
@@ -216,7 +215,6 @@ class BrewAssembler(object):
     def r_eq_r_shr_r(self,     rD = None, rA = None,  rB = None): return (_inst(_r(rD), 0x7, _r(rB), _r(rA)), )
     def r_eq_r_sar_r(self,     rD = None, rA = None,  rB = None): return (_inst(_r(rD), 0x8, _r(rB), _r(rA)), )
     def r_eq_r_mul_r(self,     rD = None, rA = None,  rB = None): return (_inst(_r(rD), 0x9, _r(rB), _r(rA)), )
-    def r_eq_not_r_and_r(self, rD = None, rA = None,  rB = None): return (_inst(_r(rD), 0xa, _r(rB), _r(rA)), )
     def r_eq_r_plus_t(self,    rD = None, rB = None,  imm = None): return (_inst(_r(rD), 0xb, _r(rB), _t(imm)), )
 
     def r_eq_I_xor_r(self,   rD = None, imm = None, rB = None): return (_inst(_r(rD), 0x1, _r(rB), 0xf), *_I(imm),)
@@ -316,7 +314,5 @@ class BrewAssembler(object):
     def r_eq_smem16_I(self, rD = None, imm = None): return (_inst(_r(rD), 0xf, 0xd, 0xf), *_I(imm))
 
 
-
-
-
-
+    def r_eq_csr(self, rD = None, imm = None): return (_inst(_r(rD), 0x0, 0xf, 0x8), *_i(imm))
+    def csr_eq_r(self, imm = None, rD = None): return (_inst(_r(rD), 0x0, 0xf, 0x9), *_i(imm))

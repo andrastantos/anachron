@@ -40,7 +40,7 @@ In other words, AV and unaligned exceptions are generated in a previous stage.
 
 """
 
-class MemoryStage(GenericModule):
+class MemoryStage(Module):
     clk = ClkPort()
     rst = RstPort()
 
@@ -56,9 +56,6 @@ class MemoryStage(GenericModule):
 
     # Interface to the CSR registers
     csr_if = Output(ApbIf)
-
-    def construct(self, csr_base: int):
-        self.csr_base = csr_base
 
     def body(self):
 
@@ -176,7 +173,7 @@ class MemoryStage(GenericModule):
                 1
             )
         )
-        csr_select = self.input_port.addr[27:26] == self.csr_base
+        csr_select = self.input_port.is_csr
         is_csr <<= Select(
             input_advance,
             Reg(
@@ -228,7 +225,8 @@ class MemoryStage(GenericModule):
         self.csr_if.psel <<= input_advance & is_csr | csr_pen
         self.csr_if.penable <<= csr_pen
         self.csr_if.pwrite <<= remember(self.input_port, ~self.input_port.read_not_write)
-        self.csr_if.paddr <<= remember(self.input_port, self.input_port.addr[BrewCsrAddrWidth+1:2])
+        # We maintain the LSB csr bit to retain the ability to define SCHEDULER-mode only CSRs
+        self.csr_if.paddr <<= remember(self.input_port, concat(self.input_port.addr[17], self.input_port.addr[BrewCsrAddrWidth:2]))
         self.csr_if.pwdata <<= remember(self.input_port, self.input_port.data)
 
 def sim():
@@ -493,14 +491,10 @@ def sim():
 
         output_port = Output(MemInputIf)
 
-        def construct(self, csr_base: int, req_queue: List[BusIfQueueItem], rsp_queue: List[ResponseQueueItem], csr_queue: List[CsrQueueItem]) -> None:
+        def construct(self, req_queue: List[BusIfQueueItem], rsp_queue: List[ResponseQueueItem], csr_queue: List[CsrQueueItem]) -> None:
             self.req_queue = req_queue
             self.rsp_queue = rsp_queue
             self.csr_queue = csr_queue
-            self.csr_base = csr_base
-
-        def is_csr(self, addr):
-            return ((addr >> (32-6)) & 3) == self.csr_base
 
         def simulate(self) -> TSimEvent:
             def wait_clk():
@@ -524,12 +518,12 @@ def sim():
                 addr = addr // 2 + offs
                 return addr
 
-            def do_load(addr: int, access_len: int):
+            def do_load(addr: int, access_len: int, is_csr: bool = False):
                 self.output_port.read_not_write <<= 1
                 self.output_port.data <<= None
                 self.output_port.addr <<= addr
                 self.output_port.access_len <<= access_len
-                if not self.is_csr(addr):
+                if not is_csr:
                     if access_len == access_len_32:
                         self.req_queue.append(BusIfQueueItem(read_not_write=1, byte_en=3, addr=munge_addr(addr,0), data=None))
                         self.req_queue.append(BusIfQueueItem(read_not_write=1, byte_en=3, addr=munge_addr(addr,1), data=None))
@@ -555,12 +549,12 @@ def sim():
 
                 yield from wait_transfer()
 
-            def do_store(addr: int, data: int, access_len: int):
+            def do_store(addr: int, data: int, access_len: int, is_csr: bool = False):
                 self.output_port.read_not_write <<= 0
                 self.output_port.data <<= data
                 self.output_port.addr <<= addr
                 self.output_port.access_len <<= access_len
-                if not self.is_csr(addr):
+                if not is_csr:
                     if access_len == access_len_32:
                         self.req_queue.append(BusIfQueueItem(read_not_write=0, byte_en=3, addr=munge_addr(addr,0), data=(data >>  0) & 0xffff))
                         self.req_queue.append(BusIfQueueItem(read_not_write=0, byte_en=3, addr=munge_addr(addr,1), data=(data >> 16) & 0xffff))
@@ -595,10 +589,10 @@ def sim():
             yield from do_store(addr=0x0005001, data=0x456789ab, access_len=access_len_8)
             for i in range(4):
                 yield from wait_clk()
-            yield from do_load(addr=0x140+(self.csr_base<<26), access_len=access_len_32)
+            yield from do_load(addr=0x140, access_len=access_len_32, is_csr=True)
             for i in range(4):
                 yield from wait_clk()
-            yield from do_store(addr=0x240+(self.csr_base<<26), data=0xdeadbeef, access_len=access_len_32)
+            yield from do_store(addr=0x240, data=0xdeadbeef, access_len=access_len_32, is_csr=True)
 
 
 
@@ -611,16 +605,15 @@ def sim():
             req_queue = []
             rsp_queue = []
             csr_queue = []
-            csr_base=0x1
 
             seed(0)
-            stimulator = Stimulator(csr_base=csr_base, req_queue=req_queue, rsp_queue=rsp_queue, csr_queue=csr_queue)
+            stimulator = Stimulator(req_queue=req_queue, rsp_queue=rsp_queue, csr_queue=csr_queue)
             csr_emulator = CsrEmulator(csr_queue)
             bus_req_emulator = BusIfReqEmulator(bus_queue, expect_queue=req_queue)
             bus_rsp_emulator = BusIfRspEmulator(bus_queue)
             response_checker = ResponseChecker(queue=rsp_queue)
 
-            dut = MemoryStage(csr_base=csr_base)
+            dut = MemoryStage()
 
             dut.input_port <<= stimulator.output_port
             response_checker.input_port <<= dut.output_port
@@ -655,7 +648,7 @@ def sim():
 
 def gen():
     def top():
-        return ScanWrapper(MemoryStage, {"clk", "rst"}, csr_base=0x1)
+        return ScanWrapper(MemoryStage, {"clk", "rst"})
 
     netlist = Build.generate_rtl(top, "memory.sv")
     top_level_name = netlist.get_module_class_name(netlist.top_level)

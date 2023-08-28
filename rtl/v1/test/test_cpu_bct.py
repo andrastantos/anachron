@@ -221,11 +221,11 @@ def test_5(top):
     r_eq_r_plus_r("$r14","$r7","$r7")
 
     r_eq_I("$r0",0xffffffff)
-    mem32_I_eq_r(top.cpu.csr_pmem_limit_reg,"$r0")
-    mem32_I_eq_r(top.cpu.csr_dmem_limit_reg,"$r0")
+    csr_eq_r(top.cpu.csr_pmem_limit_reg,"$r0")
+    csr_eq_r(top.cpu.csr_dmem_limit_reg,"$r0")
     r_eq_t("$r0",0)
-    mem32_I_eq_r(top.cpu.csr_pmem_base_reg,"$r0")
-    mem32_I_eq_r(top.cpu.csr_dmem_base_reg,"$r0")
+    csr_eq_r(top.cpu.csr_pmem_base_reg,"$r0")
+    csr_eq_r(top.cpu.csr_dmem_base_reg,"$r0")
     tpc_eq_I("_task_start")
 
     # Scheduler mode loop: decrementing $r5
@@ -339,7 +339,6 @@ def test_alu_rr(top):
     r[11] = shr(r[3], r[2])
     r[12] = sar(r[3], r[2])
     r[13] = (r[3] * r[4]) & 0xffffffff
-    r[14] = (r[3] & ~r[4]) & 0xffffffff
     r_eq_r_xor_r("$r5", "$r3", "$r4")
     r_eq_r_or_r("$r6", "$r3", "$r4")
     r_eq_r_and_r("$r7", "$r3", "$r4")
@@ -349,7 +348,6 @@ def test_alu_rr(top):
     r_eq_r_shr_r("$r11", "$r3", "$r2")
     r_eq_r_sar_r("$r12", "$r3", "$r2")
     r_eq_r_mul_r("$r13", "$r3", "$r4")
-    r_eq_not_r_and_r("$r14", "$r3", "$r4")
 
     check()
     terminate()
@@ -954,11 +952,11 @@ def test_ldst(top):
 
 if __name__ == "__main__":
     prep_test(top)
-    test_1()
+    #test_1()
     #test_2()
     #test_3()
     #test_4()
-    #test_5()
+    test_5()
     #test_framework()
     #test_alu_rr()
     #test_alu_Ir()

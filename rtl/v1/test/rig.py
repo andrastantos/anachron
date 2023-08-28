@@ -314,7 +314,6 @@ class top(Module):
     rst               = RstPort()
 
     nram_base = 0x000_0000
-    csr_base  = 0x400_0000
     dram_base = 0x800_0000
 
     def construct(self):
@@ -324,7 +323,7 @@ class top(Module):
         self.timeout = self.default_timeout
 
     def body(self):
-        self.cpu = BrewV1Top(csr_base=self.csr_base >> 26, nram_base=self.nram_base >> 26, has_multiply=True, has_shift=True, page_bits=7)
+        self.cpu = BrewV1Top(nram_base=self.nram_base >> 26, has_multiply=True, has_shift=True, page_bits=7)
         self.dram_l = Dram(name="l")
         self.dram_h = Dram(name="h")
         self.addr_decode = AddressDecode()

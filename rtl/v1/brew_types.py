@@ -37,11 +37,10 @@ class alu_ops(Enum):
     a_plus_b     = 0
     a_minus_b    = 1
     a_and_b      = 2
-    n_b_and_a    = 3
-    a_or_b       = 4
-    a_xor_b      = 5
-    tpc          = 6
-    pc_plus_b    = 7
+    a_or_b       = 3
+    a_xor_b      = 4
+    tpc          = 5
+    pc_plus_b    = 6
 
 class shifter_ops(Enum):
     shll     = 0
@@ -69,6 +68,8 @@ class branch_ops(Enum):
 class ldst_ops(Enum):
     store = 0
     load  = 1
+    csr_store = 2
+    csr_load =3
 
 class op_class(Enum):
     alu     = 0
@@ -148,6 +149,7 @@ class MemInputIf(ReadyValid):
     read_not_write = logic
     data = BrewData
     addr = BrewAddr
+    is_csr = logic
     access_len = Unsigned(2) # 0 for 8-bit, 1 for 16-bit, 2 for 32-bit
 
 class MemOutputIf(Interface):
