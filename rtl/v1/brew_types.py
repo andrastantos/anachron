@@ -62,8 +62,9 @@ class branch_ops(Enum):
 
     swi      = 9 # SWI index comes in op_a
     stm      = 10
-    pc_w   = 11
-    tpc_w  = 12
+    pc_w     = 11
+    tpc_w    = 12
+    unknown  = 13
 
 class ldst_ops(Enum):
     store = 0
@@ -255,19 +256,21 @@ All these sources are mapped into the ECAUSE and RCAUSE registers:
 +---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 '''
 
-exc_swi_0 = 0
-exc_swi_1 = 1
-exc_swi_2 = 2
-exc_swi_3 = 3
-exc_swi_4 = 4
-exc_swi_5 = 5
-exc_swi_6 = 6
-exc_swi_7 = 7
-exc_cua   = 8
-exc_mdp   = 9
-exc_mip   = 10
-exc_hwi   = 11
-exc_itf   = 12
-exc_iia   = 13
-exc_iav   = 14
+class exceptions(Enum):
+    exc_reset        = 0x0000 # Hardware reset
+    exc_hwi          = 0x0010 # Hardware interrupt (only in TASK mode)
+    exc_swi_0        = 0x0020 # SWI 0 instruction executed (FILL)
+    exc_swi_1        = 0x0021 # SWI 1 instruction executed (BREAK)
+    exc_swi_2        = 0x0022 # SWI 2 instruction executed (SYSCALL)
+    exc_swi_3        = 0x0023 # SWI 3 instruction executed
+    exc_swi_4        = 0x0024 # SWI 4 instruction executed
+    exc_swi_5        = 0x0025 # SWI 5 instruction executed
+    exc_swi_6        = 0x0026 # SWI 6 instruction executed
+    exc_swi_7        = 0x0027 # SWI 7 instruction executed
+    exc_unknown_inst = 0x0030 # Undefined instruction
+    exc_type         = 0x0031 # Type error in instruction operands
+    exc_unaligned    = 0x0032 # Unaligned memory access
+
+    exc_inst_av      = 0x0040 # Instruction fetch AV
+    exc_mem_av       = 0x0041
 

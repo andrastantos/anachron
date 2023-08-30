@@ -47,13 +47,22 @@ class BrewV1Top(GenericModule):
         self.page_bits = page_bits
 
         self.csr_top_level_ofs = 0
-        self.csr_cpu_ver_reg    = self.csr_top_level_ofs + 0
-        self.csr_pmem_base_reg  = self.csr_top_level_ofs + 1
-        self.csr_pmem_limit_reg = self.csr_top_level_ofs + 2
-        self.csr_dmem_base_reg  = self.csr_top_level_ofs + 3
-        self.csr_dmem_limit_reg = self.csr_top_level_ofs + 4
-        self.csr_ecause_reg     = self.csr_top_level_ofs + 5
-        self.csr_eaddr_reg      = self.csr_top_level_ofs + 6
+
+        self.csr_cpu_ver_ofs    = 0
+        self.csr_pmem_base_ofs  = 1
+        self.csr_pmem_limit_ofs = 2
+        self.csr_dmem_base_ofs  = 3
+        self.csr_dmem_limit_ofs = 4
+        self.csr_ecause_ofs     = 5
+        self.csr_eaddr_ofs      = 6
+
+        self.csr_cpu_ver_reg    = self.csr_top_level_ofs + self.csr_cpu_ver_ofs
+        self.csr_pmem_base_reg  = self.csr_top_level_ofs + self.csr_pmem_base_ofs
+        self.csr_pmem_limit_reg = self.csr_top_level_ofs + self.csr_pmem_limit_ofs
+        self.csr_dmem_base_reg  = self.csr_top_level_ofs + self.csr_dmem_base_ofs
+        self.csr_dmem_limit_reg = self.csr_top_level_ofs + self.csr_dmem_limit_ofs
+        self.csr_ecause_reg     = self.csr_top_level_ofs + self.csr_ecause_ofs
+        self.csr_eaddr_reg      = self.csr_top_level_ofs + self.csr_eaddr_ofs
 
     def body(self):
         bus_if = BusIf(nram_base=self.nram_base)
@@ -61,7 +70,7 @@ class BrewV1Top(GenericModule):
         dma = CpuDma()
 
         # Things that need CSR access
-        ecause     = Wire(Unsigned(12))
+        ecause     = Wire(EnumNet(exceptions))
         eaddr      = Wire(BrewAddr)
         pmem_base  = Wire(BrewMemBase)
         pmem_limit = Wire(BrewMemBase)
@@ -109,10 +118,9 @@ class BrewV1Top(GenericModule):
         csr_if <<= pipeline.csr_if
 
         ecause_write_pulse = Wire(logic)
-        ecause_write_data = Wire(Unsigned(12))
+        ecause_read_pulse = Wire(logic)
 
-        pipeline.ecause_write_pulse <<= ecause_write_pulse
-        pipeline.ecause_write_data <<= ecause_write_data
+        pipeline.ecause_clear_pulse <<= ecause_read_pulse
         ecause <<= pipeline.ecause
         eaddr  <<= pipeline.eaddr
         pipeline.pmem_base  <<= pmem_base
@@ -247,35 +255,39 @@ class BrewV1Top(GenericModule):
             csr_wr  ___________________________/^^^^^\______
         '''
 
-        #csr_read_strobe = csr_top_level_psel & ~csr_if.pwrite # we don't care about qualification: perform a ready every clock...
+        csr_read_strobe = csr_top_level_psel & ~csr_if.pwrite & csr_if.penable & csr_if.pready
         csr_write_strobe = csr_top_level_psel &  csr_if.pwrite & csr_if.penable
         top_level_pready <<= 1
 
         csr_addr = Wire(Unsigned(4))
+
+        csr_map = {
+            self.csr_cpu_ver_ofs:     0x00000000,
+            self.csr_pmem_base_ofs:   concat(pmem_base, "10'b0"),
+            self.csr_pmem_limit_ofs:  concat(pmem_limit, "10'b0"),
+            self.csr_dmem_base_ofs:   concat(dmem_base, "10'b0"),
+            self.csr_dmem_limit_ofs:  concat(dmem_limit, "10'b0"),
+            self.csr_ecause_ofs:      Unsigned(8)(ecause),
+            self.csr_eaddr_ofs:       eaddr,
+        }
         csr_addr <<= csr_if.paddr[3:0]
         top_level_prdata <<= Reg(Select(
             csr_addr,
-            ## CSR0: version and capabilities
-            0x00000000,
-            ## CSR1: pmem_base
-            concat(pmem_base, "10'b0"),
-            ## CSR2: pmem_limit
-            concat(pmem_limit, "10'b0"),
-            ## CSR3: dmem_base
-            concat(dmem_base, "10'b0"),
-            ## CSR4: dmem_limit
-            concat(dmem_limit, "10'b0"),
-            ## CSR5: ecause
-            ecause,
-            ## CSR6: eaddr
-            eaddr,
+            csr_map[0],
+            csr_map[1],
+            csr_map[2],
+            csr_map[3],
+            csr_map[4],
+            csr_map[5],
+            csr_map[6],
         ))
-        pmem_base  <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == 1) & csr_write_strobe)
-        pmem_limit <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == 2) & csr_write_strobe)
-        dmem_base  <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == 3) & csr_write_strobe)
-        dmem_limit <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == 4) & csr_write_strobe)
-        ecause_write_pulse <<= (csr_addr == 5) & csr_write_strobe
-        ecause_write_data <<= csr_if.pwdata[ecause_write_data.get_net_type().get_num_bits()-1:0]
+
+        pmem_base  <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == self.csr_pmem_base_ofs) & csr_write_strobe)
+        pmem_limit <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == self.csr_pmem_limit_ofs) & csr_write_strobe)
+        dmem_base  <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == self.csr_dmem_base_ofs) & csr_write_strobe)
+        dmem_limit <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == self.csr_dmem_limit_ofs) & csr_write_strobe)
+        ecause_write_pulse <<= (csr_addr == self.csr_ecause_ofs) & csr_write_strobe
+        ecause_read_pulse <<= (csr_addr == self.csr_ecause_ofs) & csr_read_strobe
 
 
 def gen():

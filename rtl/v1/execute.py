@@ -245,15 +245,16 @@ class BranchUnitInputIf(Interface):
     is_branch_insn  = logic
 
 class BranchUnitOutputIf(Interface):
-    spc               = BrewInstAddr
-    spc_changed       = logic
-    tpc               = BrewInstAddr
-    tpc_changed       = logic
-    task_mode         = logic
-    task_mode_changed = logic
-    ecause            = Unsigned(12)
-    is_exception      = logic
-    do_branch         = logic
+    spc                       = BrewInstAddr
+    spc_changed               = logic
+    tpc                       = BrewInstAddr
+    tpc_changed               = logic
+    task_mode                 = logic
+    task_mode_changed         = logic
+    ecause                    = EnumNet(exceptions)
+    is_exception              = logic
+    is_exception_or_interrupt = logic
+    do_branch                 = logic
 
 class BranchUnit(Module):
 
@@ -344,21 +345,21 @@ class BranchUnit(Module):
 
         self.output_port.do_branch  <<= in_mode_branch | self.output_port.task_mode_changed
 
-        exception_mask = Select(
-            self.input_port.fetch_av,
-            (
-                Select(self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.swi), 0, 1 << (self.input_port.op_a[2:0])) |
-                Select(self.input_port.mem_av, 0, 1 << exc_mdp) |
-                Select(self.input_port.mem_unaligned, 0, 1 << exc_cua)
-            ),
-            1 << exc_mip
-        )
+        swi_exception = self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.swi)
+        unknown_inst_exception = self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.unknown)
 
         # We set the ECAUSE bits even in scheduler mode: this allows for interrupt polling and,
         # after a reset, we can check it to determine the reason for the reset
-        interrupt_mask =  Select(self.input_port.interrupt, 0, 1 << exc_hwi)
-        self.output_port.ecause <<= exception_mask | interrupt_mask
+        self.output_port.ecause <<= SelectFirst(
+            unknown_inst_exception,         exceptions.exc_unknown_inst,
+            self.input_port.interrupt,      exceptions.exc_hwi,
+            self.input_port.fetch_av,       exceptions.exc_inst_av,
+            self.input_port.mem_unaligned,  exceptions.exc_unaligned,
+            self.input_port.mem_av,         exceptions.exc_mem_av,
+            swi_exception,                  EnumNet(exceptions)(0x20 | self.input_port.op_a[2:0]),
+        )
         self.output_port.is_exception <<= is_exception
+        self.output_port.is_exception_or_interrupt  <<= is_exception | (self.input_port.task_mode & self.input_port.interrupt)
 
 
 
@@ -438,8 +439,8 @@ class ExecuteStage(GenericModule):
     tpc_out = Output(BrewInstAddr)
     task_mode_in  = Input(logic)
     task_mode_out = Output(logic)
-    ecause_in = Input(Unsigned(12))
-    ecause_out = Output(Unsigned(12))
+    ecause_in = Input(EnumNet(exceptions))
+    ecause_out = Output(EnumNet(exceptions))
     eaddr_out = Output(BrewAddr)
     do_branch = Output(logic)
     interrupt = Input(logic)
@@ -705,7 +706,15 @@ class ExecuteStage(GenericModule):
             ),
             self.task_mode_in
         )
-        self.ecause_out <<= Select(stage_2_reg_en & ~s1_was_branch, self.ecause_in, self.ecause_in | branch_output.ecause)
+        self.ecause_out <<= Select(
+            stage_2_reg_en & ~s1_was_branch,
+            self.ecause_in,
+            Select(
+                branch_output.is_exception_or_interrupt,
+                self.ecause_in,
+                branch_output.ecause
+            )
+        )
         # We mask eaddr_out updates in the shadow of a branch: do_branch is one cycle delayed, so if that fires, the current instruction
         # should be cancelled and have no side-effects. That goes for eaddr_out as well.
         self.eaddr_out <<= Reg(Select(

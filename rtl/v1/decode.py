@@ -153,7 +153,7 @@ class DecodeStage(GenericModule):
         a16 = access_len_16
         a8  = access_len_8
         #      CODE                                  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B          OP_C        MEM_LEN BSE WSE BZE WZE
-        invalid_instruction =                                       (oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      7,               None,         None,       None,   0,  0,  0,  0 )
+        invalid_instruction =                        (oc.branch,   None,         None,        bo.unknown,  None,      None,       None,           None,      7,               None,         None,       None,   0,  0,  0,  0 )
         if self.has_shift:
             shift_ops = (
                 #  CODE                                  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B          OP_C        MEM_LEN BSE WSE BZE WZE
