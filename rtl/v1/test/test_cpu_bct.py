@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).parent / ".." / ".." / ".." / ".." / "silicon
 #sys.path.append(str(Path(__file__).parent / ".." / ".." / ".." / ".." ))
 sys.path.append(str(Path(__file__).parent / ".." ))
 
-from brew_v1 import BrewV1Top
+from brew_v1 import BrewV1Top, exceptions as brew_exceptions
 from brew_types import *
 from assembler import *
 from silicon import *
@@ -232,16 +232,29 @@ def test_5(top):
     place_symbol("spc_loop")
     r_eq_r_plus_t("$r5","$r5",-1)
     stm()
-    r_eq_tpc("$r10") # Adjust $tpc to be over the SWI instruction
+    # Check ecause
+    r_eq_csr("$r3", top.cpu.csr_ecause_reg)
+    check_reg("$r3", brew_exceptions.exc_swi_3.value)
+    r_eq_csr("$r3", top.cpu.csr_ecause_reg)
+    check_reg("$r3", 0)
+    # echeck eaddr
+    r_eq_csr("$r3", top.cpu.csr_eaddr_reg)
+    r_eq_tpc("$r10")
+    r_eq_r_xor_r("$r3", "$r3", "$r10")
+    check_reg("$r3", 0)
+
+    # Adjust $tpc to be over the SWI instruction
+    r_eq_tpc("$r10")
     r_eq_r_plus_t("$r10","$r10",2)
     tpc_eq_r("$r10")
+
     if_r_ne_z("$r5", "spc_loop")
     r_eq_r_plus_t("$r0","$r0",1)
 
     check_reg("$r0",   1)
     check_reg("$r1",   1)
     check_reg("$r2",   2)
-    check_reg("$r3",   3)
+    check_reg("$r3",   0)
     check_reg("$r4",   4)
     check_reg("$r5",   0)
     check_reg("$r6",   1)

@@ -555,6 +555,8 @@ class ExecuteStage(GenericModule):
         s1_spc = Reg(self.spc_in, clock_en = stage_1_reg_en)
         s1_task_mode = Reg(self.task_mode_in, clock_en = stage_1_reg_en)
         s1_mem_access_len = Reg(self.input_port.mem_access_len, clock_en = stage_1_reg_en)
+        s1_eff_addr = Reg(ldst_unit.output_port.eff_addr, clock_en = stage_1_reg_en)
+        s1_pc = Select(s1_task_mode, s1_spc, s1_tpc)
 
         # Stage 2
         ########################################
@@ -718,10 +720,10 @@ class ExecuteStage(GenericModule):
         # We mask eaddr_out updates in the shadow of a branch: do_branch is one cycle delayed, so if that fires, the current instruction
         # should be cancelled and have no side-effects. That goes for eaddr_out as well.
         self.eaddr_out <<= Reg(Select(
-            self.input_port.fetch_av | ((self.input_port.exec_unit == op_class.branch) & (self.input_port.branch_op == branch_ops.swi)),
-            pc,
-            ldst_unit.output_port.eff_addr
-        ), clock_en=branch_output.is_exception & ~self.do_branch)
+            s1_fetch_av | ((s1_exec_unit == op_class.branch) & (s1_branch_op == branch_ops.swi)),
+            s1_eff_addr,
+            concat(s1_pc, "1'b0"),
+        ), clock_en=branch_output.is_exception)
 
         #self.complete <<= stage_2_reg_en
         self.complete <<= stage_2_valid
