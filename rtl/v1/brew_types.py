@@ -20,7 +20,7 @@ BrewRegAddr = Number(min_val=0, max_val=BrewRegCnt-1)
 BrewMemBase = Unsigned(22)
 BrewMemShift = 10 # This is in bytes
 
-BrewCsrAddrWidth = 10 # We have 4kB of CSR space, in 1024 32-bit registers
+BrewCsrAddrWidth = 16
 BrewCsrAddr = Unsigned(BrewCsrAddrWidth)
 BrewCsrData = Unsigned(32)
 

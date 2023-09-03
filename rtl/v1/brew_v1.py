@@ -46,23 +46,26 @@ class BrewV1Top(GenericModule):
         self.has_shift = has_shift
         self.page_bits = page_bits
 
-        self.csr_top_level_ofs = 0
+        self.csr_cpu_task_mode_page      = 0x8000
+        self.csr_cpu_scheduler_mode_page = 0x0000
 
-        self.csr_cpu_ver_ofs    = 0
-        self.csr_pmem_base_ofs  = 1
-        self.csr_pmem_limit_ofs = 2
-        self.csr_dmem_base_ofs  = 3
-        self.csr_dmem_limit_ofs = 4
-        self.csr_ecause_ofs     = 5
-        self.csr_eaddr_ofs      = 6
+        self.csr_mach_arch      = 0x00
+        self.csr_capability     = 0x01
+        self.csr_pmem_base_ofs  = 0x80
+        self.csr_pmem_limit_ofs = 0x81
+        self.csr_dmem_base_ofs  = 0x82
+        self.csr_dmem_limit_ofs = 0x83
+        self.csr_ecause_ofs     = 0x00
+        self.csr_eaddr_ofs      = 0x01
 
-        self.csr_cpu_ver_reg    = self.csr_top_level_ofs + self.csr_cpu_ver_ofs
-        self.csr_pmem_base_reg  = self.csr_top_level_ofs + self.csr_pmem_base_ofs
-        self.csr_pmem_limit_reg = self.csr_top_level_ofs + self.csr_pmem_limit_ofs
-        self.csr_dmem_base_reg  = self.csr_top_level_ofs + self.csr_dmem_base_ofs
-        self.csr_dmem_limit_reg = self.csr_top_level_ofs + self.csr_dmem_limit_ofs
-        self.csr_ecause_reg     = self.csr_top_level_ofs + self.csr_ecause_ofs
-        self.csr_eaddr_reg      = self.csr_top_level_ofs + self.csr_eaddr_ofs
+        self.csr_mach_arch_reg  = self.csr_cpu_task_mode_page + self.csr_mach_arch
+        self.csr_capability_reg = self.csr_cpu_task_mode_page + self.csr_capability
+        self.csr_pmem_base_reg  = self.csr_cpu_scheduler_mode_page + self.csr_pmem_base_ofs
+        self.csr_pmem_limit_reg = self.csr_cpu_scheduler_mode_page + self.csr_pmem_limit_ofs
+        self.csr_dmem_base_reg  = self.csr_cpu_scheduler_mode_page + self.csr_dmem_base_ofs
+        self.csr_dmem_limit_reg = self.csr_cpu_scheduler_mode_page + self.csr_dmem_limit_ofs
+        self.csr_ecause_reg     = self.csr_cpu_scheduler_mode_page + self.csr_ecause_ofs
+        self.csr_eaddr_reg      = self.csr_cpu_scheduler_mode_page + self.csr_eaddr_ofs
 
     def body(self):
         bus_if = BusIf(nram_base=self.nram_base)
@@ -71,11 +74,28 @@ class BrewV1Top(GenericModule):
 
         # Things that need CSR access
         ecause     = Wire(EnumNet(exceptions))
+        ecause_clear_pulse = Wire()
         eaddr      = Wire(BrewAddr)
         pmem_base  = Wire(BrewMemBase)
         pmem_limit = Wire(BrewMemBase)
         dmem_base  = Wire(BrewMemBase)
         dmem_limit = Wire(BrewMemBase)
+
+        self.csrs_cpu_task_mode = {
+            self.csr_mach_arch:  RegMapEntry("csr_mach_arch",  (RegField("32'b0",access="R"),), "Machine architecture register"),
+            self.csr_capability: RegMapEntry("csr_capability", (RegField("32'b0",access="R"),), "Machine capability register")
+        }
+
+        self.csrs_cpu_scheduler_mode = {
+            self.csr_ecause_ofs:     RegMapEntry("csr_ecause",     (RegField(ecause,access="R"),), "Exception cause register", read_pulse=ecause_clear_pulse),
+            self.csr_eaddr_ofs:      RegMapEntry("csr_eaddr",      (RegField(eaddr,access="R"),), "Exception address register"),
+
+            self.csr_pmem_base_ofs:  RegMapEntry("csr_pmem_base",  (RegField(pmem_base,  start_bit=10),), "Program memory base register"),
+            self.csr_pmem_limit_ofs: RegMapEntry("csr_pmem_limit", (RegField(pmem_limit, start_bit=10),), "Program memory limit register"),
+            self.csr_dmem_base_ofs:  RegMapEntry("csr_dmem_base",  (RegField(dmem_base,  start_bit=10),), "Data memory base register"),
+            self.csr_dmem_limit_ofs: RegMapEntry("csr_dmem_limit", (RegField(dmem_limit, start_bit=10),), "Data memory limit register"),
+        }
+
 
         fetch_to_bus = Wire(BusIfRequestIf)
         bus_to_fetch = Wire(BusIfResponseIf)
@@ -84,6 +104,8 @@ class BrewV1Top(GenericModule):
         dma_to_bus = Wire(BusIfDmaRequestIf)
         bus_to_dma = Wire(BusIfDmaResponseIf)
         csr_if = Wire(CsrIf)
+        self.cpu_task_mode_csr_if = Wire(CsrIf)
+        self.cpu_scheduler_mode_csr_if = Wire(CsrIf)
         bus_if_reg_if = Wire(CsrIf)
         dma_reg_if = Wire(CsrIf)
 
@@ -117,10 +139,7 @@ class BrewV1Top(GenericModule):
         pipeline.bus_to_mem <<= bus_to_mem
         csr_if <<= pipeline.csr_if
 
-        ecause_write_pulse = Wire(logic)
-        ecause_read_pulse = Wire(logic)
-
-        pipeline.ecause_clear_pulse <<= ecause_read_pulse
+        pipeline.ecause_clear_pulse <<= ecause_clear_pulse
         ecause <<= pipeline.ecause
         eaddr  <<= pipeline.eaddr
         pipeline.pmem_base  <<= pmem_base
@@ -145,10 +164,11 @@ class BrewV1Top(GenericModule):
 
         # CSR address decode
         #############################
-        csr_top_level_psel = csr_if.psel & (csr_if.paddr[9:8] == 0)
-        csr_event_psel     = csr_if.psel & (csr_if.paddr[9:8] == 1)
-        csr_bus_if_psel    = csr_if.psel & (csr_if.paddr[9:8] == 2)
-        csr_dma_psel       = csr_if.psel & (csr_if.paddr[9:8] == 3)
+        csr_cpu_task_mode_psel      = csr_if.psel & (csr_if.paddr[15:8] == 0x80)
+        csr_cpu_scheduler_mode_psel = csr_if.psel & (csr_if.paddr[15:8] == 0x00)
+        csr_event_psel              = csr_if.psel & (csr_if.paddr[15:8] == 0x01)
+        csr_bus_if_psel             = csr_if.psel & (csr_if.paddr[15:8] == 0x02)
+        csr_dma_psel                = csr_if.psel & (csr_if.paddr[15:8] == 0x03)
 
         top_level_prdata = Wire(Unsigned(32))
         top_level_pready = Wire(logic)
@@ -167,19 +187,33 @@ class BrewV1Top(GenericModule):
         bus_if_reg_if.paddr   <<= csr_if.paddr[3:0]
         bus_if_reg_if.pwdata  <<= csr_if.pwdata
 
+        self.cpu_task_mode_csr_if.pwrite  <<= csr_if.pwrite
+        self.cpu_task_mode_csr_if.psel    <<= csr_cpu_task_mode_psel
+        self.cpu_task_mode_csr_if.penable <<= csr_if.penable
+        self.cpu_task_mode_csr_if.paddr   <<= csr_if.paddr[3:0]
+        self.cpu_task_mode_csr_if.pwdata  <<= csr_if.pwdata
+
+        self.cpu_scheduler_mode_csr_if.pwrite  <<= csr_if.pwrite
+        self.cpu_scheduler_mode_csr_if.psel    <<= csr_cpu_scheduler_mode_psel
+        self.cpu_scheduler_mode_csr_if.penable <<= csr_if.penable
+        self.cpu_scheduler_mode_csr_if.paddr   <<= csr_if.paddr[7:0]
+        self.cpu_scheduler_mode_csr_if.pwdata  <<= csr_if.pwdata
+
         event_prdata = Wire(BrewData)
 
         csr_if.prdata <<= SelectOne(
-            csr_dma_psel, dma_reg_if.prdata,
-            csr_bus_if_psel, bus_if_reg_if.prdata,
-            csr_event_psel, event_prdata,
-            default_port = top_level_prdata
+            csr_dma_psel,                dma_reg_if.prdata,
+            csr_bus_if_psel,             bus_if_reg_if.prdata,
+            csr_event_psel,              event_prdata,
+            csr_cpu_task_mode_psel,      self.cpu_task_mode_csr_if.prdata,
+            csr_cpu_scheduler_mode_psel, self.cpu_scheduler_mode_csr_if.prdata
         )
         csr_if.pready <<= SelectOne(
-            csr_dma_psel, dma_reg_if.pready,
-            csr_bus_if_psel, bus_if_reg_if.pready,
-            csr_event_psel, 1,
-            default_port = top_level_pready
+            csr_dma_psel,                dma_reg_if.pready,
+            csr_bus_if_psel,             bus_if_reg_if.pready,
+            csr_event_psel,              1,
+            csr_cpu_task_mode_psel,      self.cpu_task_mode_csr_if.pready,
+            csr_cpu_scheduler_mode_psel, self.cpu_scheduler_mode_csr_if.pready
         )
 
         # EVENT COUNTERS
@@ -255,39 +289,9 @@ class BrewV1Top(GenericModule):
             csr_wr  ___________________________/^^^^^\______
         '''
 
-        csr_read_strobe = csr_top_level_psel & ~csr_if.pwrite & csr_if.penable & csr_if.pready
-        csr_write_strobe = csr_top_level_psel &  csr_if.pwrite & csr_if.penable
-        top_level_pready <<= 1
+        create_apb_reg_map(self.csrs_cpu_task_mode,      self.cpu_task_mode_csr_if)
+        create_apb_reg_map(self.csrs_cpu_scheduler_mode, self.cpu_scheduler_mode_csr_if)
 
-        csr_addr = Wire(Unsigned(4))
-
-        csr_map = {
-            self.csr_cpu_ver_ofs:     0x00000000,
-            self.csr_pmem_base_ofs:   concat(pmem_base, "10'b0"),
-            self.csr_pmem_limit_ofs:  concat(pmem_limit, "10'b0"),
-            self.csr_dmem_base_ofs:   concat(dmem_base, "10'b0"),
-            self.csr_dmem_limit_ofs:  concat(dmem_limit, "10'b0"),
-            self.csr_ecause_ofs:      Unsigned(8)(ecause),
-            self.csr_eaddr_ofs:       eaddr,
-        }
-        csr_addr <<= csr_if.paddr[3:0]
-        top_level_prdata <<= Reg(Select(
-            csr_addr,
-            csr_map[0],
-            csr_map[1],
-            csr_map[2],
-            csr_map[3],
-            csr_map[4],
-            csr_map[5],
-            csr_map[6],
-        ))
-
-        pmem_base  <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == self.csr_pmem_base_ofs) & csr_write_strobe)
-        pmem_limit <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == self.csr_pmem_limit_ofs) & csr_write_strobe)
-        dmem_base  <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == self.csr_dmem_base_ofs) & csr_write_strobe)
-        dmem_limit <<= Reg(csr_if.pwdata[31:10], clock_en=(csr_addr == self.csr_dmem_limit_ofs) & csr_write_strobe)
-        ecause_write_pulse <<= (csr_addr == self.csr_ecause_ofs) & csr_write_strobe
-        ecause_read_pulse <<= (csr_addr == self.csr_ecause_ofs) & csr_read_strobe
 
 
 def gen():
@@ -297,7 +301,7 @@ def gen():
     back_end = SystemVerilog()
     back_end.yosys_fix = True
     back_end.support_cast = False
-    netlist = Build.generate_rtl(top, "brew_v1_top.sv", back_end)
+    netlist = Build.generate_rtl(top, "brew_v1_top.sv", back_end=back_end)
     top_level_name = netlist.get_module_class_name(netlist.top_level)
     cyclone_v_device = "5CEBA4U15C7"
     max_10_device = "10M04SAE144C7G"

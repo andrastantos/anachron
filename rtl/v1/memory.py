@@ -220,13 +220,13 @@ class MemoryStage(Module):
         self.output_port.data_l <<= Select(csr_pen, Select(multi_cycle, self.bus_rsp_if.data, data_store), self.csr_if.prdata[15: 0])
         self.output_port.data_h <<= Select(csr_pen, self.bus_rsp_if.data,                                  self.csr_if.prdata[31:16])
 
-        csr_pen <<= Reg(Select(input_advance, Select(self.csr_if.pready & is_csr, csr_pen, 0), is_csr))
+        csr_pen <<= Reg(Select(input_advance, Select(self.csr_if.pready & csr_pen, csr_pen, 0), is_csr))
         csr_active <<= Reg(self.csr_if.psel) # Active for an extra cycle, to allow the bus to return to idle
         self.csr_if.psel <<= input_advance & is_csr | csr_pen
         self.csr_if.penable <<= csr_pen
         self.csr_if.pwrite <<= remember(self.input_port, ~self.input_port.read_not_write)
         # We maintain the LSB csr bit to retain the ability to define SCHEDULER-mode only CSRs
-        self.csr_if.paddr <<= remember(self.input_port, concat(self.input_port.addr[17], self.input_port.addr[BrewCsrAddrWidth:2]))
+        self.csr_if.paddr <<= remember(self.input_port, self.input_port.addr[BrewCsrAddrWidth+1:2])
         self.csr_if.pwdata <<= remember(self.input_port, self.input_port.data)
 
 def sim():
