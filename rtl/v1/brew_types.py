@@ -187,50 +187,8 @@ class RegFileReadResponseIf(ReadyValid):
     read1_data = BrewData
     read2_data = BrewData
 
-
-class ApbIf(Interface):
-    pwrite = logic
-    psel = logic
-    penable = logic
-    pready = Reverse(logic)
-
-    paddr = GenericMember
-    pwdata = BrewCsrData
-    prdata = Reverse(BrewCsrData)
-
-class Apb8If(Interface):
-    pwrite = logic
-    psel = logic
-    penable = logic
-    pready = Reverse(logic)
-
-    paddr = GenericMember
-    pwdata = Unsigned(8)
-    prdata = Reverse(Unsigned(8))
-
-class Apb16If(Interface):
-    pwrite = logic
-    psel = logic
-    penable = logic
-    pready = Reverse(logic)
-
-    paddr = GenericMember
-    pwdata = Unsigned(16)
-    prdata = Reverse(BrewCsrData)
-
-'''
-APB signalling
-
-               <-- read -->      <-- write ->
-    CLK     \__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/
-    psel    ___/^^^^^^^^^^^\_____/^^^^^^^^^^^\______
-    penable _________/^^^^^\___________/^^^^^\______
-    pready  ---------/^^^^^\-----------/^^^^^\------
-    pwrite  ---/^^^^^^^^^^^\-----\___________/------
-    paddr   ---<===========>-----<===========>------
-    prdata  ---------<=====>------------------------
-    pwdata  ---------------------<===========>------
-'''
+CsrIf = ApbIf(BrewCsrData)
+Apb8If = ApbIf(Unsigned(8))
 
 # Exception types:
 '''

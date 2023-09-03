@@ -83,9 +83,9 @@ class BrewV1Top(GenericModule):
         bus_to_mem = Wire(BusIfResponseIf)
         dma_to_bus = Wire(BusIfDmaRequestIf)
         bus_to_dma = Wire(BusIfDmaResponseIf)
-        csr_if = Wire(ApbIf)
-        bus_if_reg_if = Wire(ApbIf)
-        dma_reg_if = Wire(ApbIf)
+        csr_if = Wire(CsrIf)
+        bus_if_reg_if = Wire(CsrIf)
+        dma_reg_if = Wire(CsrIf)
 
         # BUS INTERFACE
         ###########################

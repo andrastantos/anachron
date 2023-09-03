@@ -131,7 +131,7 @@ class BusIf(GenericModule):
     dma_response = Output(BusIfDmaResponseIf)
 
     # CRS interface for config registers
-    reg_if = Input(ApbIf)
+    reg_if = Input(CsrIf)
 
     # DRAM interface
     dram = Output(ExternalBusIf)
@@ -658,7 +658,7 @@ def sim():
         clk = ClkPort()
         rst = RstPort()
 
-        reg_if = Output(ApbIf)
+        reg_if = Output(CsrIf)
 
         def construct(self):
             self.reg_if.paddr.set_net_type(Unsigned(1))

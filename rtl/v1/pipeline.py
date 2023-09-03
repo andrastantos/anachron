@@ -46,7 +46,7 @@ class Pipeline(GenericModule):
     bus_to_fetch = Input(BusIfResponseIf)
     mem_to_bus = Output(BusIfRequestIf)
     bus_to_mem = Input(BusIfResponseIf)
-    csr_if = Output(ApbIf)
+    csr_if = Output(CsrIf)
 
     # Things that need CSR access
     ecause_clear_pulse = Input(logic)

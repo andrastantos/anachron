@@ -73,7 +73,7 @@ class CpuDma(Module):
 
     bus_req_if = Output(BusIfDmaRequestIf)
     bus_rsp_if = Input(BusIfDmaResponseIf)
-    reg_if = Input(ApbIf)
+    reg_if = Input(CsrIf)
 
     drq = Input()
 
@@ -345,7 +345,7 @@ def sim():
         drq = Output(Unsigned(4))
         dack = Input(Unsigned(4))
         tc = Input(logic)
-        reg_if = Output(ApbIf)
+        reg_if = Output(CsrIf)
 
         def construct(self):
             self.reg_if.paddr.set_net_type(Unsigned(4))

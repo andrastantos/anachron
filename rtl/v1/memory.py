@@ -55,7 +55,7 @@ class MemoryStage(Module):
     bus_rsp_if = Input(BusIfResponseIf)
 
     # Interface to the CSR registers
-    csr_if = Output(ApbIf)
+    csr_if = Output(CsrIf)
 
     def body(self):
 
@@ -232,7 +232,7 @@ class MemoryStage(Module):
 def sim():
 
     class CsrQueueItem(object):
-        def __init__(self, req: ApbIf = None, *, pwrite = None, paddr = None, pwdata = None):
+        def __init__(self, req: ApbBaseIf = None, *, pwrite = None, paddr = None, pwdata = None):
             if req is not None:
                 self.pwrite = req.pwrite
                 self.paddr  = req.paddr

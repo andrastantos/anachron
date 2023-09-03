@@ -428,7 +428,7 @@ class ExecuteStage(GenericModule):
     bus_rsp_if = Input(BusIfResponseIf)
 
     # Interface to the CSR registers
-    csr_if = Output(ApbIf)
+    csr_if = Output(CsrIf)
 
     # side-band interfaces
     mem_base = Input(BrewMemBase)
@@ -1457,7 +1457,7 @@ def sim():
                     assert expected.compare(self.input_port)
 
     class CsrQueueItem(object):
-        def __init__(self, req: ApbIf = None, *, pwrite = None, paddr = None, pwdata = None):
+        def __init__(self, req: ApbBaseIf = None, *, pwrite = None, paddr = None, pwdata = None):
             if req is not None:
                 self.pwrite = req.pwrite
                 self.paddr  = req.paddr
@@ -1482,7 +1482,7 @@ def sim():
         clk = ClkPort()
         rst = RstPort()
 
-        input_port = Input(ApbIf)
+        input_port = Input(ApbIf(BrewCsrAddr))
 
         def construct(self, queue: List[CsrQueueItem]):
             self.queue = queue
