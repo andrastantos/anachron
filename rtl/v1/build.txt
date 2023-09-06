@@ -1,0 +1,14 @@
+To build, first run 'gen_anachron_fpga.py'. This will create a bunch of .sv files under 'anachron_fpga'.
+
+Then, you have to create the ROM and more importantly the DRAM images.
+
+Go to ../../sw. Here there are a number of projects. For instance 'hello_world' will build a simple app to be run in simulation.
+This one has a make file, so it's easy.
+
+Under _bin, you will find the dram.0.mef and dram.1.mef files, you'll need.
+
+Copy them over to anachron_fpga.
+
+There, you'll find the 'run' script that will execute the simulator.
+
+Except of course things don't quite work... But why????

@@ -1,6 +1,6 @@
 /* linker script for code in DRAM with physical addressing */
-/* CODE starts at 0x80000000, that is at the beginning of DRAM */
-/* STACK starts at 0x80010000, that is 64kB into DRAM */
+/* CODE starts at 0x08000000, that is at the beginning of DRAM */
+/* STACK starts at 0x08010000, that is 64kB into DRAM */
 
 /* Copyright (C) 2014-2022 Free Software Foundation, Inc.
    Copying and distribution of this script, with or without modification,
@@ -14,7 +14,7 @@ SEARCH_DIR("/home/tantos/brew-toolset/brew-none-elf/lib");
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
-  PROVIDE (__executable_start = SEGMENT_START("text-segment", 0x80000000)); . = SEGMENT_START("text-segment", 0x80000000);
+  PROVIDE (__executable_start = SEGMENT_START("text-segment", 0x08000000)); . = SEGMENT_START("text-segment", 0x08000000);
   .interp         : { *(.interp) }
   .note.gnu.build-id  : { *(.note.gnu.build-id) }
   .hash           : { *(.hash) }
@@ -221,7 +221,7 @@ SECTIONS
   . = SEGMENT_START("ldata-segment", .);
   . = ALIGN(32 / 8);
   _end = .; PROVIDE (end = .);
-  .stack         0x80010000 :
+  .stack         0x08010000 :
   {
     _stack = .;
     *(.stack)
