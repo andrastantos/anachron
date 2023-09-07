@@ -166,7 +166,7 @@ class BrewV1Top(GenericModule):
         #############################
         csr_cpu_task_mode_psel      = csr_if.psel & (csr_if.paddr[15:8] == 0x80)
         csr_cpu_scheduler_mode_psel = csr_if.psel & (csr_if.paddr[15:8] == 0x00)
-        csr_event_psel              = csr_if.psel & (csr_if.paddr[15:8] == 0x01)
+        csr_event_psel              = csr_if.psel & (csr_if.paddr[15:8] == 0x81)
         csr_bus_if_psel             = csr_if.psel & (csr_if.paddr[15:8] == 0x02)
         csr_dma_psel                = csr_if.psel & (csr_if.paddr[15:8] == 0x03)
 

@@ -128,33 +128,68 @@ inline uint32_t next_power_of_2(uint32_t v) {
 // CSRs
 /////////////////////////////////////////////////////////////////////////////////////
 
-const size_t csr_event_base =  0x0100;
+const size_t csr_event_base =  0x8100;
 const size_t csr_bus_if_base = 0x0200;
 const size_t csr_dma_base =    0x0300;
 
-volatile uint32_t* const csr_ver_cap_reg = (volatile uint32_t *)(0x0000);
-volatile uint32_t* const csr_pmem_base   = (volatile uint32_t *)(0x0001);
-volatile uint32_t* const csr_pmem_limit  = (volatile uint32_t *)(0x0002);
-volatile uint32_t* const csr_dmem_base   = (volatile uint32_t *)(0x0003);
-volatile uint32_t* const csr_dmem_limit  = (volatile uint32_t *)(0x0004);
-volatile uint32_t* const csr_ecause      = (volatile uint32_t *)(0x0005);
-volatile uint32_t* const csr_eaddr       = (volatile uint32_t *)(0x0006);
+#define csr_rd(addr, value) \
+    asm volatile ( \
+        "%0 <- csr[%1]" \
+        : "=r" (value) \
+        : "i" (addr)\
+    );
 
-volatile uint32_t* const csr_event_regs    = (volatile uint32_t *)(csr_event_base + 0x0002);
+#define csr_wr(addr, value) \
+    asm volatile ( \
+        "csr[%1] <- %0" \
+        : \
+        : "r" (value), "i" (addr) \
+    );
 
-const size_t event_sel_ofs = 0;
-const size_t event_cnt_ofs = 1;
-const size_t event_reg_size = 2;
+template <uint16_t addr> inline uint32_t csr_read() {
+    int ret_val;
+    csr_rd(addr, ret_val);
+    return ret_val;
+}
 
-volatile uint32_t* const csr_event_enable  = (volatile uint32_t *)(csr_event_base + 0x0000);
-volatile uint32_t* const csr_event_sel0    = (volatile uint32_t *)(csr_event_base + 0x0002);
-volatile uint32_t* const csr_event_cnt0    = (volatile uint32_t *)(csr_event_base + 0x0003);
-volatile uint32_t* const csr_event_sel1    = (volatile uint32_t *)(csr_event_base + 0x0004);
-volatile uint32_t* const csr_event_cnt1    = (volatile uint32_t *)(csr_event_base + 0x0005);
-volatile uint32_t* const csr_event_sel2    = (volatile uint32_t *)(csr_event_base + 0x0006);
-volatile uint32_t* const csr_event_cnt2    = (volatile uint32_t *)(csr_event_base + 0x0007);
-volatile uint32_t* const csr_event_sel3    = (volatile uint32_t *)(csr_event_base + 0x0008);
-volatile uint32_t* const csr_event_cnt3    = (volatile uint32_t *)(csr_event_base + 0x0009);
+template <uint16_t addr> inline void csr_write(uint32_t value) {
+    csr_wr(addr, value);
+}
+
+
+#define CREATE_CSR(name, addr) inline uint32_t name() { return csr_read<addr>(); } inline void name(uint32_t val) { csr_write<addr>(val); }
+
+CREATE_CSR(csr_mach_arch,  0x8000)
+CREATE_CSR(csr_capability, 0x8001)
+CREATE_CSR(csr_pmem_base,  0x0080)
+CREATE_CSR(csr_pmem_limit, 0x0081)
+CREATE_CSR(csr_dmem_base,  0x0082)
+CREATE_CSR(csr_dmem_limit, 0x0083)
+CREATE_CSR(csr_ecause,     0x0000)
+CREATE_CSR(csr_eaddr,      0x0001)
+
+// THIS IS DIFFICULT IN THIS CONCEPT TO CREATE A VARIABLE NUMBER OF EVENT COUNTERS.
+// SO THIS HAS TO MATCH THE NUMBER OF COUNTERS DEFINED IN brew_v1.py:225 (event_counter_cnt variable)
+#define EVENT_SEL_REG(idx) (csr_event_base + (idx)*2 + 2)
+#define EVENT_CNT_REG(idx) (csr_event_base + (idx)*2 + 3)
+#define CREATE_EVENT_CSR(idx) \
+    CREATE_CSR(csr_event_sel##idx, EVENT_SEL_REG(idx)) \
+    CREATE_CSR(csr_event_cnt##idx, EVENT_CNT_REG(idx))
+
+CREATE_CSR(csr_event_enable, csr_event_base)
+CREATE_EVENT_CSR(0)
+CREATE_EVENT_CSR(1)
+CREATE_EVENT_CSR(2)
+CREATE_EVENT_CSR(3)
+CREATE_EVENT_CSR(4)
+CREATE_EVENT_CSR(5)
+CREATE_EVENT_CSR(6)
+CREATE_EVENT_CSR(7)
+
+template <size_t event> inline uint32_t csr_event_sel() { return csr_read<EVENT_SEL_REG(event)>(); }
+template <size_t event> inline void  csr_event_sel(uint32_t val) { csr_write<EVENT_SEL_REG(event)>(val); }
+template <size_t event> inline uint32_t csr_event_cnt() { return csr_read<EVENT_CNT_REG(event)>(); }
+template <size_t event> inline void  csr_event_cnt(uint32_t val) { csr_write<EVENT_CNT_REG(event)>(val); }
 
 const uint8_t event_clk_cycles        = 0;
 const uint8_t event_fetch_wait_on_bus = 1;
