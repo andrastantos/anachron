@@ -14,4 +14,19 @@
 .text
 
 _start:
+    $r0 <- tiny 0
+    $r1 <- tiny 0
+    $r2 <- tiny 0
+    $r3 <- tiny 0
+    $r4 <- tiny 0
+    $r5 <- tiny 0
+    $r6 <- tiny 0
+    $r7 <- tiny 0
+    $r8 <- tiny 0
+    $r9 <- tiny 0
+    $r10 <- tiny 0
+    $r11 <- tiny 0
+    $r12 <- tiny 0
+    $r13 <- tiny 0
+    $r14 <- tiny 0
     $pc <- dram_base
