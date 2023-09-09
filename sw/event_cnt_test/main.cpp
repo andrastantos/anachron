@@ -11,6 +11,8 @@ int main()
 {
 	sim_uart_init(115200);
 
+	sim_uart_write_str("Started...\n");
+
 	struct ev_t {size_t counter; const char *name;};
 	const ev_t events[] = {
 		{event_clk_cycles,        "event_clk_cycles"},
