@@ -1,28 +1,29 @@
 [*]
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Sat May 27 00:48:20 2023
+[*] Fri Sep  8 21:42:43 2023
 [*]
-[dumpfile] "./anacron_fpga.vcd"
-[dumpfile_mtime] "Sat May 27 00:48:20 2023"
-[dumpfile_size] 101601280
-[savefile] "./anacron_fpga.gtkw"
-[timestart] 0
+[dumpfile] "/home/tantos/anachron/rtl/v1/anacron_fpga/anacron_fpga.vcd"
+[dumpfile_mtime] "Fri Sep  8 01:30:39 2023"
+[dumpfile_size] 4503350
+[savefile] "/home/tantos/anachron/rtl/v1/anacron_fpga/anacron_fpga.gtkw"
+[timestart] 13810
 [size] 1920 990
 [pos] -1 -1
-*-20.979189 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-12.789678 26600 164844 26370 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
 [treeopen] top.dut.brew.
 [treeopen] top.dut.brew.bus_if.
 [treeopen] top.dut.brew.pipeline.
-[treeopen] top.dut.brew.pipeline.fetch_stage.
 [treeopen] top.dut.brew.pipeline.fetch_stage.inst_assemble.
 [treeopen] top.dut.brew.pipeline.fetch_stage.inst_buf.
 [treeopen] top.dut.brew.pipeline.fetch_stage.inst_buf.fsm.
 [treeopen] top.dut.brew.pipeline.fetch_stage.inst_queue.
 [treeopen] top.dut.brew.pipeline.fetch_stage.inst_queue.fifo.
 [treeopen] top.dut.brew.pipeline.reg_file.
+[treeopen] top.dut.system.
 [treeopen] top.dut.system.dram0.
+[treeopen] top.dut.system.dram1.
 [treeopen] top.dut.uart1.tx_phy.
 [treeopen] top.dut.uart1.tx_phy.fsm.
 [treeopen] top.dut.uart1.u.
@@ -30,7 +31,7 @@
 [sst_width] 301
 [signals_width] 374
 [sst_expanded] 1
-[sst_vpaned_height] 627
+[sst_vpaned_height] 386
 @28
 top.clk
 top.clk2
@@ -187,7 +188,46 @@ top.dut.ext_bus_n_wait
 top.dut.ext_bus_tc
 @1401200
 -EXT_BUS
-@800200
+@c00022
+top.dut.brew.bus_if.req_addr[30:0]
+@28
+(0)top.dut.brew.bus_if.req_addr[30:0]
+(1)top.dut.brew.bus_if.req_addr[30:0]
+(2)top.dut.brew.bus_if.req_addr[30:0]
+(3)top.dut.brew.bus_if.req_addr[30:0]
+(4)top.dut.brew.bus_if.req_addr[30:0]
+(5)top.dut.brew.bus_if.req_addr[30:0]
+(6)top.dut.brew.bus_if.req_addr[30:0]
+(7)top.dut.brew.bus_if.req_addr[30:0]
+(8)top.dut.brew.bus_if.req_addr[30:0]
+(9)top.dut.brew.bus_if.req_addr[30:0]
+(10)top.dut.brew.bus_if.req_addr[30:0]
+(11)top.dut.brew.bus_if.req_addr[30:0]
+(12)top.dut.brew.bus_if.req_addr[30:0]
+(13)top.dut.brew.bus_if.req_addr[30:0]
+(14)top.dut.brew.bus_if.req_addr[30:0]
+(15)top.dut.brew.bus_if.req_addr[30:0]
+(16)top.dut.brew.bus_if.req_addr[30:0]
+(17)top.dut.brew.bus_if.req_addr[30:0]
+(18)top.dut.brew.bus_if.req_addr[30:0]
+(19)top.dut.brew.bus_if.req_addr[30:0]
+(20)top.dut.brew.bus_if.req_addr[30:0]
+(21)top.dut.brew.bus_if.req_addr[30:0]
+(22)top.dut.brew.bus_if.req_addr[30:0]
+(23)top.dut.brew.bus_if.req_addr[30:0]
+(24)top.dut.brew.bus_if.req_addr[30:0]
+(25)top.dut.brew.bus_if.req_addr[30:0]
+(26)top.dut.brew.bus_if.req_addr[30:0]
+(27)top.dut.brew.bus_if.req_addr[30:0]
+(28)top.dut.brew.bus_if.req_addr[30:0]
+(29)top.dut.brew.bus_if.req_addr[30:0]
+(30)top.dut.brew.bus_if.req_addr[30:0]
+@1401200
+-group_end
+@28
+top.dut.brew.bus_if.req_dram
+top.dut.brew.bus_if.req_nram
+@c00200
 -MEM_REQ_RSP
 @22
 top.dut.brew.bus_if.mem_request_addr[30:0]
@@ -203,7 +243,7 @@ top.dut.brew.bus_if.mem_request_valid
 top.dut.brew.bus_if.mem_response_data[15:0]
 @28
 top.dut.brew.bus_if.mem_response_valid
-@1000200
+@1401200
 -MEM_REQ_RSP
 @28
 top.dut.brew.pipeline.fetch_stage.break_burst
@@ -250,7 +290,7 @@ top.dut.brew.pipeline.fetch_stage.inst_buf.queue_ready
 top.dut.brew.pipeline.fetch_stage.inst_buf.queue_valid
 @1000200
 -INST_QUEUE_IN
-@800200
+@c00200
 -INST_ASM_IN
 @28
 top.dut.brew.pipeline.fetch_stage.inst_queue.assemble_av
@@ -259,7 +299,7 @@ top.dut.brew.pipeline.fetch_stage.inst_queue.assemble_data[15:0]
 @28
 top.dut.brew.pipeline.fetch_stage.inst_queue.assemble_ready
 top.dut.brew.pipeline.fetch_stage.inst_queue.assemble_valid
-@1000200
+@1401200
 -INST_ASM_IN
 @24
 top.dut.brew.pipeline.fetch_stage.inst_assemble.fsm_state[1:0]
@@ -282,15 +322,6 @@ top.dut.brew.pipeline.decode_stage.fetch_inst_len[1:0]
 -DECODE_IN
 @28
 top.dut.brew.pipeline.event_decode_wait_on_rf
-@c00200
--EVENT_CNTRS
-@22
-top.dut.brew.event_cnt_0[19:0]
-top.dut.brew.event_cnt_1[19:0]
-top.dut.brew.event_cnt_2[19:0]
-top.dut.brew.event_cnt_3[19:0]
-@1401200
--EVENT_CNTRS
 @c00200
 -RSV_LOGIC
 @28
@@ -327,6 +358,34 @@ top.dut.brew.pipeline.reg_file.rsv_addr[3:0]
 top.dut.brew.pipeline.reg_file.rsv_valid
 @1401200
 -RSV_LOGIC
+@c00201
+-DRAM0
+@22
+top.dut.system.dram0.mem.addr[15:0]
+top.dut.system.dram0.mem.addr_reg[15:0]
+@28
+top.dut.system.dram0.mem.clk
+@22
+top.dut.system.dram0.mem.data_in[7:0]
+top.dut.system.dram0.mem.data_out[7:0]
+@28
+top.dut.system.dram0.mem.write_en
+@1401201
+-DRAM0
+@c00200
+-DRAM1
+@22
+top.dut.system.dram1.mem.addr[15:0]
+top.dut.system.dram1.mem.addr_reg[15:0]
+@28
+top.dut.system.dram1.mem.clk
+@22
+top.dut.system.dram1.mem.data_in[7:0]
+top.dut.system.dram1.mem.data_out[7:0]
+@28
+top.dut.system.dram1.mem.write_en
+@1401200
+-DRAM1
 @800200
 -RF_WRITE
 @22
@@ -342,7 +401,7 @@ top.dut.brew.pipeline.reg_file.read_rsp_read1_data[31:0]
 top.dut.brew.pipeline.reg_file.read_req_read1_addr[3:0]
 top.dut.brew.pipeline.reg_file.read_rsp_read2_data[31:0]
 top.dut.brew.pipeline.reg_file.read_req_read2_addr[3:0]
-@c00200
+@800200
 -MEM_IN
 @24
 top.dut.brew.pipeline.execute_stage.memory_unit.input_port_access_len[1:0]
@@ -353,7 +412,7 @@ top.dut.brew.pipeline.execute_stage.memory_unit.input_port_data[31:0]
 top.dut.brew.pipeline.execute_stage.memory_unit.input_port_read_not_write
 top.dut.brew.pipeline.execute_stage.memory_unit.input_port_ready
 top.dut.brew.pipeline.execute_stage.memory_unit.input_port_valid
-@1401200
+@1000200
 -MEM_IN
 @800200
 -EXEC_INT
@@ -365,13 +424,13 @@ top.dut.brew.pipeline.execute_stage.input_port_exec_unit[2:0]
 top.dut.brew.pipeline.execute_stage.input_port_alu_op[2:0]
 @22
 top.dut.brew.pipeline.execute_stage.input_port_branch_op[3:0]
-@28
+@24
 top.dut.brew.pipeline.execute_stage.input_port_shifter_op[1:0]
-top.dut.brew.pipeline.execute_stage.input_port_ldst_op
+top.dut.brew.pipeline.execute_stage.input_port_ldst_op[1:0]
+@28
 top.dut.brew.pipeline.execute_stage.input_port_fetch_av
 @24
 top.dut.brew.pipeline.execute_stage.input_port_inst_len[1:0]
-@28
 top.dut.brew.pipeline.execute_stage.input_port_mem_access_len[1:0]
 @22
 top.dut.brew.pipeline.execute_stage.input_port_op_a[31:0]
@@ -390,23 +449,24 @@ top.dut.brew.pipeline.execute_stage.s1_result_reg_addr[3:0]
 top.dut.brew.pipeline.execute_stage.s2_result_reg_addr_valid
 top.dut.brew.pipeline.execute_stage.stage_1_reg_en
 top.dut.brew.pipeline.execute_stage.stage_2_reg_en
-top.dut.brew.pipeline.execute_stage.s2_ldst_op
 top.dut.brew.pipeline.execute_stage.output_port_valid
 top.dut.brew.pipeline.execute_stage.stage_2_valid
 top.dut.brew.pipeline.execute_stage.stage_2_ready
 top.dut.brew.pipeline.execute_stage.mem_input_ready
 top.dut.brew.pipeline.execute_stage.s2_mem_output_valid
+top.dut.brew.pipeline.execute_stage.ldst_output_is_csr
 @1000200
 -EXEC_INT
-@c00200
+@800200
 -CSR_IF
+@22
+top.dut.brew.csr_if_paddr[15:0]
 @28
 top.dut.brew.event_write_strobe
 top.dut.brew.pipeline.execute_stage.memory_unit.csr_active
 top.dut.brew.pipeline.execute_stage.memory_unit.csr_if_psel
 top.dut.brew.pipeline.execute_stage.memory_unit.csr_if_penable
 @22
-top.dut.brew.pipeline.execute_stage.memory_unit.csr_if_paddr[9:0]
 top.dut.brew.pipeline.execute_stage.memory_unit.csr_if_prdata[31:0]
 @28
 top.dut.brew.pipeline.execute_stage.memory_unit.csr_if_pready
@@ -415,8 +475,7 @@ top.dut.brew.pipeline.execute_stage.memory_unit.csr_if_pwdata[31:0]
 @28
 top.dut.brew.pipeline.execute_stage.memory_unit.csr_if_pwrite
 top.dut.brew.pipeline.execute_stage.memory_unit.csr_pen
-top.dut.brew.pipeline.execute_stage.memory_unit.csr_select
-@1401200
+@1000200
 -CSR_IF
 @28
 top.dut.brew.pipeline.fetch_stage.break_burst
@@ -427,6 +486,17 @@ top.dut.brew.pipeline.event_branch
 top.dut.brew.pipeline.event_branch_taken
 @800200
 -EVENT_COUNTERS
+@28
+top.dut.brew.event_write_strobe
+@22
+top.dut.brew.event_select_0[4:0]
+top.dut.brew.event_select_1[4:0]
+top.dut.brew.event_select_2[4:0]
+top.dut.brew.event_select_3[4:0]
+top.dut.brew.event_select_4[4:0]
+top.dut.brew.event_select_5[4:0]
+top.dut.brew.event_select_6[4:0]
+top.dut.brew.event_select_7[4:0]
 @24
 top.dut.brew.event_cnt_0[19:0]
 top.dut.brew.event_cnt_1[19:0]
@@ -499,22 +569,5 @@ top.dut.brew.pipeline.execute_stage.branch_target_unit.input_port_pc[30:0]
 top.dut.brew.pipeline.execute_stage.branch_target_unit.output_port_branch_addr[30:0]
 top.dut.brew.pipeline.execute_stage.branch_target_unit.output_port_straight_addr[30:0]
 top.dut.brew.pipeline.execute_stage.branch_target_unit.offset[30:0]
-@800022
-top.dut.brew.pipeline.ecause[11:0]
-@28
-(0)top.dut.brew.pipeline.ecause[11:0]
-(1)top.dut.brew.pipeline.ecause[11:0]
-(2)top.dut.brew.pipeline.ecause[11:0]
-(3)top.dut.brew.pipeline.ecause[11:0]
-(4)top.dut.brew.pipeline.ecause[11:0]
-(5)top.dut.brew.pipeline.ecause[11:0]
-(6)top.dut.brew.pipeline.ecause[11:0]
-(7)top.dut.brew.pipeline.ecause[11:0]
-(8)top.dut.brew.pipeline.ecause[11:0]
-(9)top.dut.brew.pipeline.ecause[11:0]
-(10)top.dut.brew.pipeline.ecause[11:0]
-(11)top.dut.brew.pipeline.ecause[11:0]
-@1001200
--group_end
 [pattern_trace] 1
 [pattern_trace] 0
