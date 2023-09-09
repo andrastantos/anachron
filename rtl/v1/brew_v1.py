@@ -178,7 +178,7 @@ class BrewV1Top(GenericModule):
         dma_reg_if.pwrite  <<= csr_if.pwrite
         dma_reg_if.psel    <<= csr_dma_psel
         dma_reg_if.penable <<= csr_if.penable
-        dma_reg_if.paddr   <<= csr_if.paddr[3:0]
+        dma_reg_if.paddr   <<= csr_if.paddr[4:0] # FIXME: This used to be 3:0 which generated a silent error: There are actually 17 decoded registers, yet we happily generated the decoder logic with a 4-bit address
         dma_reg_if.pwdata  <<= csr_if.pwdata
 
         bus_if_reg_if.pwrite  <<= csr_if.pwrite
