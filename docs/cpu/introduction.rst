@@ -86,6 +86,8 @@ Processor         Clock speed  CoreMark CoreMark/MHz
 80286               6MHz         2.59      0.43        Turbo off
 80286              12MHz         5.38      0.45        Turbo on
 80386              28MHz         7.53      0.27        16-bit mode, turbo off, 64kB external cache
+80386              40MHz         8.98      0.22        16-bit mode, turbo on, no external cache
+80386              40MHz        12.05      0.30        32-bit mode, no cache
 80386              40MHz        21.59      0.54        16-bit mode, turbo on, 64kB external cache
 80386              40MHz        26.47      0.66        32-bit mode, 64kB external cache
 80486              33MHz        15.49      0.47        16-bit mode, turbo off, 256kB external cache
