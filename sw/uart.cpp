@@ -35,19 +35,18 @@ void uart_init(unsigned int baud_rate) {
 	}
 }
 
+void uart_write_char(char value) {
+	uart_wait_tx();
+	uart1_base[uart_data_buf_reg_ofs] = (uint8_t)value;
+}
+
 void uart_write_str(const char *message) {
 	if (message == nullptr) return;
 	if (message[0] == 0) return;
 	while (*message != 0) {
-		uart_wait_tx();
-		uart1_base[uart_data_buf_reg_ofs] = *(uint8_t*)message;
+		uart_write_char(*message);
 		++message;
 	}
-}
-
-void uart_write_char(char value) {
-	uart_wait_tx();
-	uart1_base[uart_data_buf_reg_ofs] = (uint8_t)value;
 }
 
 static const char *hex_digit_table = "0123456789abcdef";
