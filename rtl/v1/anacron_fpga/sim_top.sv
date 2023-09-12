@@ -66,7 +66,7 @@ module top();
     initial begin
         $dumpfile("anacron_fpga.vcd");
         $dumpvars(0,top);
-        #(10*1000*1000);
+        #(1000*1000*1000);
         $display("Timeout on simulation");
         $finish;
     end
