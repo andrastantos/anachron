@@ -60,6 +60,6 @@ int main()
 		sim_uart_write_dec(ev_cnts[i]);
 		sim_uart_write_str("\n");
 	}
-
 	sim_terminate(0);
+	sim_uart_write_str("Terminating...\n");
 }
