@@ -1,7 +1,7 @@
 .set rom_base,          0x00000000
 .set gpio_base,         0x00010000
-.set dram_base,         0x18000000 # Setting a different alias so that DRAM appear above I/O with 1 WS
-.set dram_top,          0x1801ffff # Setting a different alias so that DRAM appear above I/O with 1 WS
+.set dram_base,         0xf8000000 # Setting a different alias so that DRAM appear above I/O with 1 WS
+.set dram_top,          0xf801ffff # Setting a different alias so that DRAM appear above I/O with 1 WS
 
 # Exception sources
 .set exc_reset,                0x0000 # Hardware reset
@@ -36,7 +36,6 @@
 .set rom_base,                 0x00000000
 .set gpio_base,                0x00010000
 .set io_apb_base,              0x00020000
-.set dram_base,                0x08000000
 
 
 .set wait_state_0,             0x10000000
@@ -91,12 +90,14 @@
 # bit 10-9: DRAM bank size: 0 - 22 bits, 1 - 20 bits, 2 - 18 bits, 3 - 16 bits
 # bit 11: DRAM bank swap: 0 - no swap, 1 - swap
 
-.global _start
+.global _rom_start
 
-.text
+#.section .rom_init
+.section ".rom_init"
 .p2align        1
 
-_start:
+
+_rom_start:
     $r0 <- csr[csr_ecause]
     if $r0 == 0 $pc <- _reset # Upon reset let's go to the reset vector
     $r1 <- exc_swi_2
@@ -104,7 +105,7 @@ _start:
     # For now, anything else will reset too...
 _reset:
     # Setting up TASK mode
-    $r1 <- dram_top
+    $r1 <- tiny -1
     $r0 <- tiny 0
     csr[csr_pmem_base_reg] <- $r0
     csr[csr_dmem_base_reg] <- $r0
@@ -125,7 +126,7 @@ _reset:
     $r13 <- tiny 0
     $r14 <- tiny 0
     $lr <- _end_loop
-    $tpc <- dram_base
+    $tpc <- _start
     ########### JUMP TO DRAM (in task mode)
     stm
     #$pc <- dram_base
