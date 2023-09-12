@@ -219,15 +219,17 @@ class BrewV1Top(GenericModule):
         # EVENT COUNTERS
         #############################
 
+        event_counter_size = 32
+        event_counter_cnt = 8
+
         event_cnts = []
         event_selects = []
         event_regs = []
-        event_counter_cnt = 8
         event_enabled = Wire(logic)
         event_write_strobe = csr_event_psel &  csr_if.pwrite & csr_if.penable
 
         for i in range(event_counter_cnt):
-            event_cnt = Wire(Unsigned(20))
+            event_cnt = Wire(Unsigned(event_counter_size))
             event_select = Wire(Unsigned(5))
             event = Select(event_select,
                 1,
