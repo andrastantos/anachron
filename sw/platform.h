@@ -9,6 +9,7 @@ const uint32_t io_apb_base = 0x00020000;
 const uint32_t io_apb_size = 4096*16;
 const uint32_t gpio_size =   4096;
 const uint32_t dram_base =   0x08000000;
+const uint32_t dram_size =   128*1024;
 
 const uint32_t wait_state_0  = 0x10000000;
 const uint32_t wait_state_1  = 0x20000000;
