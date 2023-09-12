@@ -82,7 +82,7 @@ So, the results:
 ================= ============ ======== ============= =========================
 Processor         Clock speed  CoreMark CoreMark/MHz
 ================= ============ ======== ============= =========================
-**Espresso**       *6MHz*      *15.9*     *2.65*
+**Espresso**       *6MHz*       *4.23*    *0.70*
 80286               6MHz         2.59      0.43        Turbo off
 80286              12MHz         5.38      0.45        Turbo on
 80386              28MHz         7.53      0.27        16-bit mode, turbo off, 64kB external cache
@@ -108,6 +108,8 @@ For the operating system, I've used :ref:`FreeDOS 1.3 <https://www.freedos.org/>
 
 I've used my port of GCC and NewLib to the platform. I ran the test under RTL simulation, where I simulated 128kB of DRAM with the system. I captured run-time using performance counters, counting up the number of simulated clock-cycles the execution takes. Needless to say, such a run takes forever, so I've only ran one iteration. That is against the official rules, but since the setup is perfectly deterministic, I don't see how it should matter. DRAM refresh was active during the simulation, but no other disturbance was simulated. The code executed in SCHEDULER mode, again, not that it matters. Being a simulation, the results needed to be scaled to an arbitrarily chosen clock rate (6MHz in this case). This clock rate would be easily achievable in real HW though, even with very slow (and cheap) DRAM.
 
+Yup, that was too good to be true. The perf counters actually overflow during the test. So, instead of the test taking ~370,000 cycles, it takes 422721 - 53878 + 2**20 = 1417419 cycles. The above numbers are corrected to these new results.
+
 *Observations*:
 
 It's interesting to see that - while the 16- or 32-bit version of the code does have measurable delta on the same platform, the jump is not as dramatic as I thought it would be. The benchmark is certainly a 32-bit one, and a 16-bit compiled variant would have needed to use multiple instructions to compute any and all 32-bit results.
@@ -116,6 +118,7 @@ The behavior of the 'turbo' switch on these motherboards is strange. On the 8028
 
 The fact that the 80486DX is almost twice as performant as the 80486 shows that not much of the external world impacts the benchmark results: the code probably is running almost entirely inside the on-chip cache. That of course makes it even more mysterious how the turbo switch can influence the results in such a dramatic way then.
 
-It's also surprising how *well* Espresso stacks up. From the MIPS/MHz numbers above, I would have expected it to be around a 80486. It is way passed that threshold. Of course, it's heard-warming to see that my little creation outperforms (MHz to MHz) a 80486, but I have doubts that this would translate to real-world performance. This is just one benchmark after all, one that is arguably not all that close to what these processors would do in reality.
+It's also nice to see how Espresso stacks up. From the MIPS/MHz numbers above, I have expected it to be in between a 80386 and a 80486. In fact it is. More or less. Of course, it's heard-warming to see that my little creation holds its own (MHz to MHz) a 80386, even compares reasonable well to a 80486, but I have doubts that this would translate to real-world performance. This is just one benchmark after all, one that is arguably not all that close to what these processors would do in reality.
 
 This also shows the future potential of the Brew architecture, if it can be scaled to the same clock speeds that subsequent Intel processors achieved.
+
