@@ -82,7 +82,7 @@ So, the results:
 ================= ============ ======== ============= =========================
 Processor         Clock speed  CoreMark CoreMark/MHz
 ================= ============ ======== ============= =========================
-**Espresso**       *6MHz*       *4.23*    *0.70*
+**Espresso**       *6MHz*       *4.19*    *0.70*
 80286               6MHz         2.59      0.43        Turbo off
 80286              12MHz         5.38      0.45        Turbo on
 80386              28MHz         7.53      0.27        16-bit mode, turbo off, 64kB external cache
@@ -106,9 +106,7 @@ For the operating system, I've used :ref:`FreeDOS 1.3 <https://www.freedos.org/>
 
 *Methodology for Espresso:*
 
-I've used my port of GCC and NewLib to the platform. I ran the test under RTL simulation, where I simulated 128kB of DRAM with the system. I captured run-time using performance counters, counting up the number of simulated clock-cycles the execution takes. Needless to say, such a run takes forever, so I've only ran one iteration. That is against the official rules, but since the setup is perfectly deterministic, I don't see how it should matter. DRAM refresh was active during the simulation, but no other disturbance was simulated. The code executed in SCHEDULER mode, again, not that it matters. Being a simulation, the results needed to be scaled to an arbitrarily chosen clock rate (6MHz in this case). This clock rate would be easily achievable in real HW though, even with very slow (and cheap) DRAM.
-
-Yup, that was too good to be true. The perf counters actually overflow during the test. So, instead of the test taking ~370,000 cycles, it takes 422721 - 53878 + 2**20 = 1417419 cycles. The above numbers are corrected to these new results.
+I've used my port of GCC and NewLib to the platform. I ran the test on an FPGA platform, with 100 iterations. I captured run-time using performance counters, counting up the number of simulated clock-cycles the execution takes. DRAM refresh was active during the simulation, but no other disturbance was simulated. The code executed in TASK mode, again, not that it matters. Since the results are reported in clock cycles, they need to be scaled to a chosen clock rate (6MHz in this case). This clock rate I chose to match that of the 80286, but it would be easily achievable in real HW, even with very slow (and cheap) DRAM.
 
 *Observations*:
 
