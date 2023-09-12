@@ -105,3 +105,27 @@ The support matrix (for -none-elf or similar):
 
 So, it seems, I'm still better off with newlib. Another approach would
 be to try and find the right benchmarks to use.
+
+JTAG And Altera
+===============
+
+The Altera JTAG server is open-sourced (sort of) here: https://github.com/intel/libaji_client
+
+So, here's what's going on: jtagconfig doesn't write /etc/jtagd/jtagd.conf.
+and jtagd refuses to open remote ports unless its config file is under /etc.
+
+There are a few undisclosed parameters to jtagd:
+
+jtagd --foreground --debug --config /home/tantos/.jtag.conf
+
+A sample config:
+
+  # This file is written by the JTAG client when its configuration is changed.
+  # If you edit this file directly then your changes will probably be lost.
+
+  Password = "xxxx";
+
+  Remote1 {
+          Host = "wafer2";
+          Password = "xxxx";
+  }
