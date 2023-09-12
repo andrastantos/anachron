@@ -308,7 +308,7 @@ class FpgaSystem(GenericModule):
     def body(self):
         dram_addr_width = int(log2(self.dram_size/2))//2
 
-        dram0 = Dram(init_content=self.dram0_content, inv_clock=True)
+        dram0 = Dram(init_content=self.dram0_content, inv_clock=False)
         dram1 = Dram(init_content=self.dram1_content, inv_clock=False)
         rom = Sram(init_content=self.rom_content)
         gpio = Gpio()
@@ -371,18 +371,22 @@ class FpgaSystem(GenericModule):
         decode.brew_if <<= decode_input
 
         # We support 128kByte of DRAM.
+        dram0_n_cas = Wire()
+        dram0_n_cas <<= ext_if_n_cas_0 | Reg(ext_if_n_cas_0, clock_port=self.clk2, reset_value_port=1)
         dram0.clk     <<= self.clk2
         dram0.addr    <<= ext_if_addr[dram_addr_width-1:0]
         dram0.data_in <<= ext_if_data_out_0
         dram0.n_ras   <<= ext_if_n_ras_a
-        dram0.n_cas   <<= ext_if_n_cas_0
+        dram0.n_cas   <<= dram0_n_cas | ~Reg(dram0_n_cas, clock_port=self.clk2, reset_value_port=1)
         dram0.n_we    <<= ext_if_n_we
 
+        dram1_n_cas = Wire()
+        dram1_n_cas <<= ext_if_n_cas_1 | Reg(ext_if_n_cas_1, clock_port=self.clk2, reset_value_port=1)
         dram1.clk     <<= self.clk2
         dram1.addr    <<= ext_if_addr[dram_addr_width-1:0]
         dram1.data_in <<= ext_if_data_out_1
         dram1.n_ras   <<= ext_if_n_ras_a
-        dram1.n_cas   <<= ext_if_n_cas_1
+        dram1.n_cas   <<= dram1_n_cas | ~Reg(dram1_n_cas, clock_port=self.clk2, reset_value_port=1)
         dram1.n_we    <<= ext_if_n_we
 
         # We have 8kB of ROM (SRAM really)
