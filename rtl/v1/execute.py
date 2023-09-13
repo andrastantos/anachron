@@ -469,7 +469,7 @@ class ExecuteStage(GenericModule):
 
         stage_1_fsm = ForwardBufLogic()
         stage_1_fsm.clear <<= self.do_branch
-        stage_1_fsm.input_valid <<= ~multi_cycle_exec_lockout & ~s1_was_branch & self.input_port.valid
+        stage_1_fsm.input_valid <<= ~multi_cycle_exec_lockout & ~s1_was_branch & ~self.do_branch & self.input_port.valid
         # we 'bite out' a cycle for two-cycle units, such as multiply
         self.input_port.ready <<= ~multi_cycle_exec_lockout & ~s1_was_branch  & stage_1_fsm.input_ready
         stage_1_valid <<= stage_1_fsm.output_valid
@@ -495,7 +495,7 @@ class ExecuteStage(GenericModule):
         ldst_output = Wire(LoadStoreOutputIf)
         ldst_unit = LoadStoreUnit()
         ldst_unit.input_port.is_ldst        <<= self.input_port.exec_unit == op_class.ld_st
-        ldst_unit.input_port.is_csr         <<= (self.input_port.ldst_op == ldst_ops.csr_load) | (self.input_port.ldst_op == ldst_ops.csr_store) 
+        ldst_unit.input_port.is_csr         <<= (self.input_port.ldst_op == ldst_ops.csr_load) | (self.input_port.ldst_op == ldst_ops.csr_store)
         ldst_unit.input_port.op_b           <<= self.input_port.op_b
         ldst_unit.input_port.op_c           <<= self.input_port.op_c
         ldst_unit.input_port.mem_base       <<= self.mem_base
