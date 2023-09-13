@@ -12,3 +12,5 @@ void sim_uart_write_dec(unsigned int value);
 void sim_uart_wait_tx();
 
 void sim_terminate(uint8_t exit_code);
+
+bool is_sim();

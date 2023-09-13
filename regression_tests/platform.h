@@ -32,8 +32,9 @@ const uint32_t wait_state_default = wait_state_15;
 /////////////////////////////////////////////////////////////////////////////////////
 // GPIO
 /////////////////////////////////////////////////////////////////////////////////////
-volatile uint8_t* const gpio1_base = (volatile uint8_t *)(gpio_base);
-volatile uint8_t* const gpio2_base = (volatile uint8_t *)(gpio_base + gpio_size);
+volatile uint8_t* const gpio1_base    = (volatile uint8_t *)(gpio_base + 0*gpio_size);
+volatile uint8_t* const gpio2_base    = (volatile uint8_t *)(gpio_base + 1*gpio_size);
+volatile uint8_t* const gpio_int_base = (volatile uint8_t *)(gpio_base + 2*gpio_size);
 
 const uint32_t gpio_data_reg_ofs  = 0;
 
