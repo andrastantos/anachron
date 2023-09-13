@@ -19,7 +19,8 @@ void sim_uart_write_str(const char *message) {
 
 void sim_uart_write_char(char value) {
 	gpio3_base[0] = (uint8_t)value;
-	uart_write_char(value);
+	if (!is_sim())
+		uart_write_char(value);
 }
 
 void sim_uart_write_hex(uint8_t value) {
@@ -71,4 +72,8 @@ void sim_uart_write_dec(unsigned int value) {
 	while (idx > 0) {
 		sim_uart_write_char(char('0'+digits[--idx]));
 	}
+}
+
+bool is_sim() {
+	return (gpio_int_base[0] & 1) != 0;
 }

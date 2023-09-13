@@ -27,12 +27,17 @@ module top();
     logic rts;
     logic n_tx_en;
 
+    // SIMULATION
+    logic is_sim;
+
     FpgaTop dut(.*);
 
     initial begin
         clk = 1;
         clk2 = 1;
     end
+
+    assign is_sim = 1'b1;
 
     always #10 clk2 = ~clk2;
     always #50 clk = ~clk;

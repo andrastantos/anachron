@@ -27,7 +27,10 @@ module FpgaTop (
     output logic txd,
     input logic cts,
     output logic rts,
-    output logic n_tx_en
+    output logic n_tx_en,
+
+    // SIMULATION
+    input logic is_sim
 );
 
     logic rst;
@@ -115,7 +118,9 @@ module FpgaTop (
         .input_pins(input_pins),
 
         .output_pins2(output_pins2),
-        .input_pins2(input_pins2)
+        .input_pins2(input_pins2),
+
+        .is_sim(is_sim)
     );
 
     logic uart1_psel;

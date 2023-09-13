@@ -290,13 +290,17 @@ class FpgaSystem(GenericModule):
     output_pins2 = Output(BrewByte)
     input_pins2 = Input(BrewByte)
 
-    rom_base = 0x0000_0000
-    gpio_base = 0x0001_0000
-    gpio2_base = 0x0001_1000
-    io_apb_base = 0x0002_0000
-    io_apb_size = 4096*16
-    gpio_size = 4096
-    dram_base = 0x8000_0000
+    n_int = Output(logic)
+    is_sim = Input(logic)
+
+    rom_base =      0x0000_0000
+    gpio_base =     0x0001_0000
+    gpio2_base =    0x0001_1000
+    gpio_int_base = 0x0001_2000
+    io_apb_base =   0x0002_0000
+    io_apb_size =   4096*16
+    gpio_size =     4096
+    dram_base =     0x8000_0000
 
     def construct(self, rom_content: str, *, dram_size: int = 128*1024, rom_size: int = 8*1024, dram0_content: str = None, dram1_content: str = None):
         self.rom_content = rom_content
@@ -313,6 +317,7 @@ class FpgaSystem(GenericModule):
         rom = Sram(init_content=self.rom_content)
         gpio = Gpio()
         gpio2 = Gpio()
+        gpio_int = Gpio()
         apb_bridge = ApbBridge()
 
         ext_if_addr = Reg(self.brew_if.addr, clock_port=self.clk2)
@@ -337,10 +342,11 @@ class FpgaSystem(GenericModule):
         decode_input = Wire(ExternalBusIf)
         decode = AddrDecode(
             (
-                ("rom",    self.rom_base,    self.rom_size),
-                ("gpio",   self.gpio_base,   self.gpio_size),
-                ("gpio2",  self.gpio2_base,  self.gpio_size),
-                ("io_apb", self.io_apb_base, self.io_apb_size)
+                ("rom",        self.rom_base,        self.rom_size),
+                ("gpio",       self.gpio_base,       self.gpio_size),
+                ("gpio2",      self.gpio2_base,      self.gpio_size),
+                ("gpio_int",   self.gpio_int_base,   self.gpio_size),
+                ("io_apb",     self.io_apb_base,     self.io_apb_size)
             )
         )
 
@@ -412,6 +418,14 @@ class FpgaSystem(GenericModule):
 
         gpio2.input_pins <<= self.input_pins2
         self.output_pins2 <<= gpio2.output_pins
+
+        gpio_int.n_ce <<= decode.gpio_int
+        gpio_int.n_we <<= ext_if_n_we
+        gpio_int.data_in <<= ext_if_data_out_0
+        decode.gpio_int_data_in <<= gpio_int.data_out
+        self.n_int <<= ~gpio_int.output_pins[0]
+
+        gpio_int.input_pins <<= self.is_sim
 
         apb_bridge.clk <<= self.clk2
         apb_bridge.addr <<= decode.addr[15:0]
