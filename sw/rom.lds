@@ -9,7 +9,7 @@
 OUTPUT_FORMAT("elf32-brew", "elf32-brew",
 	      "elf32-brew")
 OUTPUT_ARCH(brew)
-ENTRY(_start)
+ENTRY(_rom_start)
 SEARCH_DIR("/home/tantos/brew-toolset/brew-none-elf/lib");
 SECTIONS
 {

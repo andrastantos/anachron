@@ -91,12 +91,12 @@
 # bit 10-9: DRAM bank size: 0 - 22 bits, 1 - 20 bits, 2 - 18 bits, 3 - 16 bits
 # bit 11: DRAM bank swap: 0 - no swap, 1 - swap
 
-.global _start
+.global _rom_start
 
 .text
 .p2align        1
 
-_start:
+_rom_start:
     $pc <- _fast_start # Set WS to 0
 _fast_start:
     $r0 <- csr[csr_ecause]
