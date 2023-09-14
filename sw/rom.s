@@ -97,6 +97,8 @@
 .p2align        1
 
 _start:
+    $pc <- _fast_start # Set WS to 0
+_fast_start:
     $r0 <- csr[csr_ecause]
     if $r0 == 0 $pc <- _reset # Upon reset let's go to the reset vector
     $r1 <- exc_swi_2
@@ -151,16 +153,19 @@ _reset:
 
     $r11 <- tiny 0
 .reg_dump_loop:
+    $r9 <- .hex_conv_str
     $a0 <- .reg_str
     CALL uart_write_str
     $a0 <- $r11
     $a0 <- short $a0 & 15
-    $a0 <- mem8[$a0 + .hex_conv_str]
+    $a0 <- $a0 + $r9
+    $a0 <- mem8[$a0]
     CALL uart_write_char
     $a0 <- .reg_after_str
     CALL uart_write_str
     $a0 <- short $r11 << 2
-    $a0 <- mem[$a0 + .reg_save]
+    $a0 <- $a0 + .reg_save
+    $a0 <- mem[$a0]
     CALL uart_write_hex
     $a0 <- .newline_str
     CALL uart_write_str
