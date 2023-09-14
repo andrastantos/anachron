@@ -133,6 +133,7 @@ inline uint32_t next_power_of_2(uint32_t v) {
 const size_t csr_event_base =  0x8100;
 const size_t csr_bus_if_base = 0x0200;
 const size_t csr_dma_base =    0x0300;
+const size_t csr_timer_base =  0x0400;
 
 #define csr_rd(addr, value) \
     asm volatile ( \

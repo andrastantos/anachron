@@ -3,7 +3,7 @@ Control and Status Register Summary
 
 Espresso has a set of internal peripherals and registers controlling its operation. These are collectively called CSRs. CSRs are accessible though special instructions. There are a total of 65536 CSR register addresses available, however most of them are not used.
 
-Accessing 
+Accessing
 
 CSR addresses above 0x8000 are accessible from both TASK and SCHEDULER mode, while addresses below that are only accessible from SCHEDULER mode.
 
@@ -40,8 +40,12 @@ Address    Name                           Access type    Reset value       Descr
 0x030e     :code:`dma_cha_3_config`       R/W            0x0000_0000       Channel 3 configuration register
 0x030f     :code:`dma_cha_3_status`       R              0x0000_0000       Channel 3 status register
 0x0310     :code:`dma_int_stat`           R/W1C          0x0000_0000       DMA Interrupt status register (for all channels)
+
+0x0400     :code:`timer_val_limit`        R/W            0x0000_0000       Timer counter limit register when written, current timer count when read
+0x0401     :code:`timer_int_status`       R/W1C          0x0000_0000       Bit 0: when set, timer interrupt is pending
+0x0402     :code:`timer_ctrl`             R/W            0x0000_0000       Bit 0: when set, timer is enabled
 ========== ============================== ============== ================= ===================================================
- 
+
 ========== ============================== ============== ================= ===================================================
 Address    Name                           Access type    Reset value       Description
 ========== ============================== ============== ================= ===================================================

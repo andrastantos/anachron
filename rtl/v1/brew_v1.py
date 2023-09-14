@@ -18,6 +18,8 @@ try:
     from .cpu_dma import CpuDma
     from .synth import *
     from .assembler import *
+    from .apb_timer import ApbSimpleTimer
+
 except ImportError:
     from brew_types import *
     from brew_utils import *
@@ -27,6 +29,7 @@ except ImportError:
     from cpu_dma import CpuDma
     from synth import *
     from assembler import *
+    from apb_timer import ApbSimpleTimer
 
 class BrewV1Top(GenericModule):
     clk               = ClkPort()
@@ -71,6 +74,7 @@ class BrewV1Top(GenericModule):
         bus_if = BusIf(nram_base=self.nram_base)
         pipeline = Pipeline(has_multiply=self.has_multiply, has_shift=self.has_shift, page_bits=self.page_bits)
         dma = CpuDma()
+        timer = ApbSimpleTimer()
 
         # Things that need CSR access
         ecause     = Wire(EnumNet(exceptions))
@@ -108,6 +112,7 @@ class BrewV1Top(GenericModule):
         self.cpu_scheduler_mode_csr_if = Wire(CsrIf)
         bus_if_reg_if = Wire(CsrIf)
         dma_reg_if = Wire(CsrIf)
+        timer_reg_if = Wire(CsrIf)
 
         # BUS INTERFACE
         ###########################
@@ -131,6 +136,10 @@ class BrewV1Top(GenericModule):
 
         dma.reg_if <<= dma_reg_if
 
+        # Timer
+        ############################
+        timer.bus_if <<= timer_reg_if
+
         # PIPELINE
         ############################
         fetch_to_bus <<= pipeline.fetch_to_bus
@@ -147,7 +156,7 @@ class BrewV1Top(GenericModule):
         pipeline.dmem_base  <<= dmem_base
         pipeline.dmem_limit <<= dmem_limit
 
-        pipeline.interrupt <<= ~self.n_int
+        pipeline.interrupt <<= ~self.n_int | ~timer.n_int
 
         event_fetch_wait_on_bus = pipeline.event_fetch_wait_on_bus
         event_decode_wait_on_rf = pipeline.event_decode_wait_on_rf
@@ -169,6 +178,7 @@ class BrewV1Top(GenericModule):
         csr_event_psel              = csr_if.psel & (csr_if.paddr[15:8] == 0x81)
         csr_bus_if_psel             = csr_if.psel & (csr_if.paddr[15:8] == 0x02)
         csr_dma_psel                = csr_if.psel & (csr_if.paddr[15:8] == 0x03)
+        csr_timer_psel              = csr_if.psel & (csr_if.paddr[15:8] == 0x04)
 
         top_level_prdata = Wire(Unsigned(32))
         top_level_pready = Wire(logic)
@@ -187,6 +197,12 @@ class BrewV1Top(GenericModule):
         bus_if_reg_if.paddr   <<= csr_if.paddr[3:0]
         bus_if_reg_if.pwdata  <<= csr_if.pwdata
 
+        timer_reg_if.pwrite  <<= csr_if.pwrite
+        timer_reg_if.psel    <<= csr_timer_psel
+        timer_reg_if.penable <<= csr_if.penable
+        timer_reg_if.paddr   <<= csr_if.paddr[1:0]
+        timer_reg_if.pwdata  <<= csr_if.pwdata
+
         self.cpu_task_mode_csr_if.pwrite  <<= csr_if.pwrite
         self.cpu_task_mode_csr_if.psel    <<= csr_cpu_task_mode_psel
         self.cpu_task_mode_csr_if.penable <<= csr_if.penable
@@ -203,6 +219,7 @@ class BrewV1Top(GenericModule):
 
         csr_if.prdata <<= SelectOne(
             csr_dma_psel,                dma_reg_if.prdata,
+            csr_timer_psel,              timer_reg_if.prdata,
             csr_bus_if_psel,             bus_if_reg_if.prdata,
             csr_event_psel,              event_prdata,
             csr_cpu_task_mode_psel,      self.cpu_task_mode_csr_if.prdata,
@@ -210,6 +227,7 @@ class BrewV1Top(GenericModule):
         )
         csr_if.pready <<= SelectOne(
             csr_dma_psel,                dma_reg_if.pready,
+            csr_timer_psel,              timer_reg_if.pready,
             csr_bus_if_psel,             bus_if_reg_if.pready,
             csr_event_psel,              1,
             csr_cpu_task_mode_psel,      self.cpu_task_mode_csr_if.pready,
