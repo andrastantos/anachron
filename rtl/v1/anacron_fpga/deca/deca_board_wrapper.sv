@@ -137,6 +137,8 @@ module DecaTop(
         .rxd(GPIO0_D[5]),
 	    .txd(GPIO0_D[7]),
 	    .cts(GPIO0_D[9]),
-	    .rts(GPIO0_D[1])
+	    .rts(GPIO0_D[1]),
+		 
+		 .is_sim(1'b0)
     );
 endmodule
