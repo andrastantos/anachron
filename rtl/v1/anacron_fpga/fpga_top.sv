@@ -61,7 +61,6 @@ module FpgaTop (
     logic        system_io_apb_if_pready;
 
     assign drq = 1'h0;
-    assign n_int = 1'h1;
 
     assign rst =  ~ n_rst;
 
@@ -120,7 +119,9 @@ module FpgaTop (
         .output_pins2(output_pins2),
         .input_pins2(input_pins2),
 
-        .is_sim(is_sim)
+        .is_sim(is_sim),
+
+        .n_int(n_int)
     );
 
     logic uart1_psel;
