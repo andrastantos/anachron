@@ -110,7 +110,7 @@ _rom_start:
 .p2align        1
 _start:
     $pc <- dram_base
-  
+
 
 .text
 .p2align        1
@@ -145,6 +145,7 @@ _reset:
     $r14 <- tiny 0
     $lr <- _end_loop
     $tpc <- _start
+    CALL sched_mode_setup
     ########### JUMP TO DRAM (in task mode)
     stm
     #$pc <- dram_base
@@ -354,5 +355,8 @@ uart_write_str:
 .global test
 .weak test
     test: # Defined as a pure return. If defined outside, should do the proper testing
+.global sched_mode_setup
+.weak sched_mode_setup
+    sched_mode_setup: # Defined as a pure return. If defined outside, should do the proper testing
     $pc <- $lr
 
