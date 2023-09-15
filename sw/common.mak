@@ -4,14 +4,21 @@ CFLAGS += -ffunction-sections -fdata-sections -I..
 AFLAGS += -ffunction-sections -fdata-sections
 LDFLAGS += -Wl,--gc-sections
 DRAM_LDFLAGS = $(LDFLAGS) -T ../dram.lds
-ifeq ($(TARGET),rom)
-  ROM_LDFLAGS = $(LDFLAGS) -T ../rom.lds
-  all: rom_bin
-else
-  ROM_LDFLAGS = $(LDFLAGS) -T ../rom.lds -nostdlib
-  all: rom_bin dram_bin
+ROM_LDFLAGS = $(LDFLAGS) -T ../rom.lds
+ifneq ($(TARGET),rom)
+  ROM_LDFLAGS += -nostdlib
 endif
 
+RTL=../../rtl/v1/anacron_fpga
+
+all: rom_bin dram_bin
+
+run: all
+	cp $(BIN_DIR)/dram.0.mef $(RTL)/
+	cp $(BIN_DIR)/dram.1.mef $(RTL)/
+	cp $(BIN_DIR)/rom.mef $(RTL)/
+	cd $(RTL)
+	./run
 
 OBJ_DIR=_obj
 BIN_DIR=_bin
@@ -53,7 +60,12 @@ $(BIN_DIR)/rom.elf: $(ROM_OBJ_FILES)
 $(BIN_DIR)/rom.mef: $(BIN_DIR)/rom.elf
 	../elf2mef $^ rom $(basename $@)
 
+ifeq ($(TARGET),rom)
+$(BIN_DIR)/dram.0.mef $(BIN_DIR)/dram.1.mef &:
+	echo > $(BIN_DIR)/dram.0.mef
+	echo > $(BIN_DIR)/dram.1.mef
+else
 $(BIN_DIR)/dram.0.mef $(BIN_DIR)/dram.1.mef &: $(BIN_DIR)/dram.elf
 	../elf2mef $^ dram $(basename $(basename $@))
-
+endif
 
