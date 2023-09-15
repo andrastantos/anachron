@@ -36,6 +36,7 @@
 .set rom_base,                 0x00000000
 .set gpio_base,                0x00010000
 .set io_apb_base,              0x00020000
+.set dram_base,                0x08000000
 
 
 .set wait_state_0,             0x10000000
@@ -54,6 +55,10 @@
 .set wait_state_13,            0xe0000000
 .set wait_state_14,            0xf0000000
 .set wait_state_15,            0x00000000
+
+.set gpio1_base,               (gpio_base + 0x0000) | wait_state_0
+.set gpio2_base,               (gpio_base + 0x1000) | wait_state_0
+.set gpio_int_base,            (gpio_base + 0x2000) | wait_state_0
 
 .set uart1_base,               (io_apb_base + 0x0000) | wait_state_0
 .set gpio3_base,               (io_apb_base + 0x0100) | wait_state_0
@@ -92,13 +97,16 @@
 
 .global _rom_start
 
-#.section .rom_init
-.section ".rom_init"
+.section .rom_init
 .p2align        1
 
 
 _rom_start:
     $pc <- _fast_start # Set WS to 0
+
+.text
+.p2align        1
+
 _fast_start:
     $r0 <- csr[csr_ecause]
     if $r0 == 0 $pc <- _reset # Upon reset let's go to the reset vector
@@ -107,7 +115,7 @@ _fast_start:
     # For now, anything else will reset too...
 _reset:
     # Setting up TASK mode
-    $r1 <- tiny -1
+    $r1 <- dram_top
     $r0 <- tiny 0
     csr[csr_pmem_base_reg] <- $r0
     csr[csr_dmem_base_reg] <- $r0
@@ -154,11 +162,12 @@ _reset:
 
     $r11 <- tiny 0
 .reg_dump_loop:
+    $r9 <- .hex_conv_str
     $a0 <- .reg_str
     CALL uart_write_str
     $a0 <- $r11
     $a0 <- short $a0 & 15
-    $a0 <- $a0 + .hex_conv_str
+    $a0 <- $a0 + $r9
     $a0 <- mem8[$a0]
     CALL uart_write_char
     $a0 <- .reg_after_str
@@ -176,6 +185,7 @@ _reset:
     $a0 <- .ecause_str
     CALL uart_write_str
     $a0 <- csr[csr_ecause]
+    mem[.ecause_save] <- $a0
     CALL uart_write_hex
     $a0 <- .newline_str
     CALL uart_write_str
@@ -183,16 +193,20 @@ _reset:
     $a0 <- .eaddr_str
     CALL uart_write_str
     $a0 <- csr[csr_eaddr]
+    mem[.eaddr_save] <- $a0
     CALL uart_write_hex
     $a0 <- .newline_str
     CALL uart_write_str
 
     $a0 <- .tpc_str
+    mem[.tpc_save] <- $a0
     CALL uart_write_str
     $a0 <- $tpc
     CALL uart_write_hex
     $a0 <- .newline_str
     CALL uart_write_str
+
+    CALL test
 
     # Terminate under simulation
     $r0 <- gpio4_base
@@ -213,6 +227,7 @@ _end_loop:
 .tpc_str:
     .string "$tpc:   "
 
+.global .newline_str
     .p2align        2
 .newline_str:
     .string "\n"
@@ -225,6 +240,7 @@ _end_loop:
 .reg_after_str:
     .string "     "
 
+.global .reg_save
     .p2align        2
 .reg_save:
     .int 0xdeadbeef
@@ -243,7 +259,17 @@ _end_loop:
     .int 0xdeadbeef
     .int 0xdeadbeef
     .int 0xdeadbeef
+.global .eaddr_save
+.eaddr_save:
+    .int 0xdeadbeef
+.global .ecause_save
+.ecause_save:
+    .int 0xdeadbeef
+.global .tpc_save
+.tpc_save:
+    .int 0xdeadbeef
 
+.global uart_wait_tx
     .p2align        1
 uart_wait_tx:
     # Clobbers $r0
@@ -253,23 +279,34 @@ uart_wait_tx:
     if $r0 == 0 $pc <- uart_wait_tx
     $pc <- $lr
 
+.global uart_write_char
     .p2align        1
 uart_write_char:
+    $r0 <- mem8[gpio_int_base]
+    $r0 <- short $r0 & 1
+    if $r0 != 0 $pc <- uart_write_char_sim
+
     # Clobbers $r0, has char to write in $a0
+uart_write_char_wait:
     $r0 <- uart_status_reg     # Wait for the UART to be ready
     $r0 <- mem8[$r0]
     $r0 <- short $r0 & uart_status_tx_empty_bit_mask
-    if $r0 == 0 $pc <- uart_write_char
+    if $r0 == 0 $pc <- uart_write_char_wait
 
-    $r0 <- gpio3_base          # Output to sim
-    mem8[$r0] <- $a0
     $r0 <- uart_data_buf_reg   # Output to UART
     mem8[$r0] <- $a0
+    $pc <- $lr
+
+uart_write_char_sim:
+    $r0 <- gpio3_base          # Output to sim
+    mem8[$r0] <- $a0
+
     $pc <- $lr
 
 .hex_conv_str:
     .string         "0123456789abcdef"
 
+.global uart_write_hex
     .p2align        1
 uart_write_hex:
     # Clobbers $r0, $r1, $r2, $r3, $r10; input value in $a0
@@ -292,7 +329,7 @@ uart_write_hex:
     $pc <- $lr
 
 
-
+.global uart_write_str
     .p2align        1
 uart_write_str:
     # Clobbers $r0, $r1, $a0, $r10; input pointer in $a0
@@ -306,4 +343,7 @@ uart_write_str:
     $pc <- .uart_write_str_loop
 .uart_write_str_end:
     $lr <- $r10
+.weak test
+    test: # Defined as a pure return. If defined outside, should do the proper testing
     $pc <- $lr
+

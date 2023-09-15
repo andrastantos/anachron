@@ -1,7 +1,8 @@
-.set rom_base,          0x00000000
-.set gpio_base,         0x00010000
-.set dram_base,         0x18000000 # Setting a different alias so that DRAM appear above I/O with 1 WS
-.set dram_top,          0x1801ffff # Setting a different alias so that DRAM appear above I/O with 1 WS
+.set rom_base,                 0x00000000
+.set gpio_base,                0x00010000
+.set io_apb_base,              0x00020000
+.set dram_base,                0xf8000000 # Setting a different alias so that DRAM appear above I/O with 1 WS
+.set dram_top,                 0xf801ffff # Setting a different alias so that DRAM appear above I/O with 1 WS
 
 # Exception sources
 .set exc_reset,                0x0000 # Hardware reset
@@ -33,10 +34,6 @@
 
 .set bus_if_cfg_reg,           csr_bus_if_base + 0x0
 
-.set rom_base,                 0x00000000
-.set gpio_base,                0x00010000
-.set io_apb_base,              0x00020000
-.set dram_base,                0x08000000
 
 
 .set wait_state_0,             0x10000000
@@ -55,6 +52,10 @@
 .set wait_state_13,            0xe0000000
 .set wait_state_14,            0xf0000000
 .set wait_state_15,            0x00000000
+
+.set gpio1_base,               (gpio_base + 0x0000) | wait_state_0
+.set gpio2_base,               (gpio_base + 0x1000) | wait_state_0
+.set gpio_int_base,            (gpio_base + 0x2000) | wait_state_0
 
 .set uart1_base,               (io_apb_base + 0x0000) | wait_state_0
 .set gpio3_base,               (io_apb_base + 0x0100) | wait_state_0
@@ -93,11 +94,27 @@
 
 .global _rom_start
 
-.text
+.section .rom_init
 .p2align        1
+
+
+# Define start to be at the beginning of DRAM unless someone overrides that
+
+.global _start
+.weak _start
 
 _rom_start:
     $pc <- _fast_start # Set WS to 0
+
+.section .init
+.p2align        1
+_start:
+    $pc <- dram_base
+  
+
+.text
+.p2align        1
+
 _fast_start:
     $r0 <- csr[csr_ecause]
     if $r0 == 0 $pc <- _reset # Upon reset let's go to the reset vector
@@ -127,7 +144,7 @@ _reset:
     $r13 <- tiny 0
     $r14 <- tiny 0
     $lr <- _end_loop
-    $tpc <- dram_base
+    $tpc <- _start
     ########### JUMP TO DRAM (in task mode)
     stm
     #$pc <- dram_base
@@ -176,6 +193,7 @@ _reset:
     $a0 <- .ecause_str
     CALL uart_write_str
     $a0 <- csr[csr_ecause]
+    mem[.ecause_save] <- $a0
     CALL uart_write_hex
     $a0 <- .newline_str
     CALL uart_write_str
@@ -183,16 +201,20 @@ _reset:
     $a0 <- .eaddr_str
     CALL uart_write_str
     $a0 <- csr[csr_eaddr]
+    mem[.eaddr_save] <- $a0
     CALL uart_write_hex
     $a0 <- .newline_str
     CALL uart_write_str
 
     $a0 <- .tpc_str
+    mem[.tpc_save] <- $a0
     CALL uart_write_str
     $a0 <- $tpc
     CALL uart_write_hex
     $a0 <- .newline_str
     CALL uart_write_str
+
+    CALL test
 
     # Terminate under simulation
     $r0 <- gpio4_base
@@ -213,6 +235,7 @@ _end_loop:
 .tpc_str:
     .string "$tpc:   "
 
+.global .newline_str
     .p2align        2
 .newline_str:
     .string "\n"
@@ -225,6 +248,7 @@ _end_loop:
 .reg_after_str:
     .string "     "
 
+.global .reg_save
     .p2align        2
 .reg_save:
     .int 0xdeadbeef
@@ -243,7 +267,17 @@ _end_loop:
     .int 0xdeadbeef
     .int 0xdeadbeef
     .int 0xdeadbeef
+.global .eaddr_save
+.eaddr_save:
+    .int 0xdeadbeef
+.global .ecause_save
+.ecause_save:
+    .int 0xdeadbeef
+.global .tpc_save
+.tpc_save:
+    .int 0xdeadbeef
 
+.global uart_wait_tx
     .p2align        1
 uart_wait_tx:
     # Clobbers $r0
@@ -253,23 +287,34 @@ uart_wait_tx:
     if $r0 == 0 $pc <- uart_wait_tx
     $pc <- $lr
 
+.global uart_write_char
     .p2align        1
 uart_write_char:
+    $r0 <- mem8[gpio_int_base]
+    $r0 <- short $r0 & 1
+    if $r0 != 0 $pc <- uart_write_char_sim
+
     # Clobbers $r0, has char to write in $a0
+uart_write_char_wait:
     $r0 <- uart_status_reg     # Wait for the UART to be ready
     $r0 <- mem8[$r0]
     $r0 <- short $r0 & uart_status_tx_empty_bit_mask
-    if $r0 == 0 $pc <- uart_write_char
+    if $r0 == 0 $pc <- uart_write_char_wait
 
-    $r0 <- gpio3_base          # Output to sim
-    mem8[$r0] <- $a0
     $r0 <- uart_data_buf_reg   # Output to UART
     mem8[$r0] <- $a0
+    $pc <- $lr
+
+uart_write_char_sim:
+    $r0 <- gpio3_base          # Output to sim
+    mem8[$r0] <- $a0
+
     $pc <- $lr
 
 .hex_conv_str:
     .string         "0123456789abcdef"
 
+.global uart_write_hex
     .p2align        1
 uart_write_hex:
     # Clobbers $r0, $r1, $r2, $r3, $r10; input value in $a0
@@ -292,7 +337,7 @@ uart_write_hex:
     $pc <- $lr
 
 
-
+.global uart_write_str
     .p2align        1
 uart_write_str:
     # Clobbers $r0, $r1, $a0, $r10; input pointer in $a0
@@ -306,4 +351,8 @@ uart_write_str:
     $pc <- .uart_write_str_loop
 .uart_write_str_end:
     $lr <- $r10
+.global test
+.weak test
+    test: # Defined as a pure return. If defined outside, should do the proper testing
     $pc <- $lr
+

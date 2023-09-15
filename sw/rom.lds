@@ -76,14 +76,12 @@ SECTIONS
     {
       *(.rela.plt)
     }
-  .init           :
-  {
-    KEEP (*(SORT_NONE(.init)))
-  }
   .plt            : { *(.plt) }
   .iplt           : { *(.iplt) }
   .text           :
   {
+    KEEP (*(SORT_NONE(.rom_init)))
+    KEEP (*(SORT_NONE(.init)))
     *(.text.unlikely .text.*_unlikely .text.unlikely.*)
     *(.text.exit .text.exit.*)
     *(.text.startup .text.startup.*)
@@ -115,7 +113,10 @@ SECTIONS
   .exception_ranges   : ONLY_IF_RO { *(.exception_ranges*) }
   /* Adjust the address for the data segment.  We want to adjust up to
      the same address within the page on the next page up.  */
-  . = ALIGN(CONSTANT (MAXPAGESIZE)) + (. & (CONSTANT (MAXPAGESIZE) - 1));
+  /* :::TA: We don't actually align the data segment to a page boundary. */
+  /* The ROM is too precious for that. We will only align up to a DWORD boundary. */
+  /*. = ALIGN(CONSTANT (MAXPAGESIZE)) + (. & (CONSTANT (MAXPAGESIZE) - 1)); */
+  . = ALIGN(4);
   /* Exception handling  */
   .eh_frame       : ONLY_IF_RW { KEEP (*(.eh_frame)) *(.eh_frame.*) }
   .gnu_extab      : ONLY_IF_RW { *(.gnu_extab) }

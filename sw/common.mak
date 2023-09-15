@@ -5,7 +5,7 @@ AFLAGS += -ffunction-sections -fdata-sections
 LDFLAGS += -Wl,--gc-sections
 DRAM_LDFLAGS = $(LDFLAGS) -T ../dram.lds
 ifeq ($(TARGET),rom)
-  ROM_LDFLAGS = $(LDFLAGS) -T ../rom_c.lds
+  ROM_LDFLAGS = $(LDFLAGS) -T ../rom.lds
   all: rom_bin
 else
   ROM_LDFLAGS = $(LDFLAGS) -T ../rom.lds -nostdlib
