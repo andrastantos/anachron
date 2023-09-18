@@ -171,6 +171,7 @@ _reset:
     mem32[.reg_save+0x38] <- $r14
     # test for syscalls
     $r11 <- csr[csr_ecause]
+    mem[.ecause_save] <- $r11
     $r11 <- $r11 - 0x22 # SWI exception cause
     if $r11 == 0 $pc <- .syscall_handler
     # All other exceptions cause termination for now.
@@ -199,8 +200,7 @@ _reset:
 
     $a0 <- .ecause_str
     CALL uart_write_str
-    $a0 <- csr[csr_ecause]
-    mem[.ecause_save] <- $a0
+    $a0 <- mem[.ecause_save]
     CALL uart_write_hex
     $a0 <- .newline_str
     CALL uart_write_str

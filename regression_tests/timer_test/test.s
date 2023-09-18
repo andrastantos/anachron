@@ -31,6 +31,7 @@ test:
     # Testing ecause
     $a1 <- mem[.ecause_save]
     $a1 <- $a1 - 0x10
+    if $a1 != 0 $pc <- _fail
     # Testing $a0
     $a1 <- mem32[.reg_save+0x10]
     $a1 <- $a1 - 2
