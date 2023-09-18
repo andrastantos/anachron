@@ -266,6 +266,7 @@ _end_loop:
     .int 0xdeadbeef
 .r3_save:
     .int 0xdeadbeef
+.global .a0_save
 .r4_save:
 .a0_save:
     .int 0xdeadbeef

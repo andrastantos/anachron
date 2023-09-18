@@ -243,6 +243,7 @@ class BranchUnitInputIf(Interface):
     f_carry         = logic
     f_overflow      = logic
     is_branch_insn  = logic
+    woi             = logic
 
 class BranchUnitOutputIf(Interface):
     spc                       = BrewInstAddr
@@ -329,7 +330,7 @@ class BranchUnit(Module):
         )
 
         self.output_port.spc            <<= Select(is_exception, spc_branch_target, 0)
-        self.output_port.spc_changed    <<= ~self.input_port.task_mode & (is_exception | in_mode_branch)
+        self.output_port.spc_changed    <<= ~self.input_port.task_mode & (is_exception | (in_mode_branch & (~self.input_port.woi | ~self.input_port.interrupt)))
         self.output_port.tpc            <<= branch_target
         self.output_port.tpc_changed    <<= Select(
             self.input_port.task_mode,
@@ -552,6 +553,7 @@ class ExecuteStage(GenericModule):
         s1_do_wse = Reg(self.input_port.do_wse, clock_en = stage_1_reg_en)
         s1_do_bze = Reg(self.input_port.do_bze, clock_en = stage_1_reg_en)
         s1_do_wze = Reg(self.input_port.do_wze, clock_en = stage_1_reg_en)
+        s1_woi = Reg(self.input_port.woi, clock_en = stage_1_reg_en)
         s1_result_reg_addr = Reg(self.input_port.result_reg_addr, clock_en = stage_1_reg_en)
         s1_result_reg_addr_valid = Reg(self.input_port.result_reg_addr_valid, clock_en = stage_1_reg_en)
         s1_fetch_av = Reg(self.input_port.fetch_av, clock_en = stage_1_reg_en)
@@ -627,6 +629,7 @@ class ExecuteStage(GenericModule):
         branch_input.f_carry         <<= s1_alu_output.f_carry
         branch_input.f_overflow      <<= s1_alu_output.f_overflow
         branch_input.is_branch_insn  <<= (s1_exec_unit == op_class.branch) | (s1_exec_unit == op_class.branch_ind)
+        branch_input.woi             <<= s1_woi
 
         branch_unit.input_port <<= branch_input
         branch_output <<= branch_unit.output_port

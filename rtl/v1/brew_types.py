@@ -144,6 +144,7 @@ class DecodeExecIf(ReadyValid):
     do_wse = logic
     do_bze = logic
     do_wze = logic
+    woi = logic
     result_reg_addr = BrewRegAddr
     result_reg_addr_valid = logic
     fetch_av = logic
