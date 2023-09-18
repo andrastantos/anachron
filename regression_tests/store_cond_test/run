@@ -1,0 +1,11 @@
+#!/bin/sh
+RTL=../../rtl/v1
+make -B || exit 1
+cp _bin/dram.0.mef $RTL/anacron_fpga/ || exit 1
+cp _bin/dram.1.mef $RTL/anacron_fpga/ || exit 1
+cp _bin/rom.mef $RTL/anacron_fpga/ || exit 1
+CUR_DIR=$PWD
+cd $RTL/anacron_fpga
+./run
+cd $CUR_DIR
+
