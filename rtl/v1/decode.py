@@ -305,12 +305,8 @@ class DecodeStage(GenericModule):
             ( "  .ed.: $rD <- SMEM16[$rA]",           oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           0,          a16,    0,  1,  0,  0 ),
             # Indirect jump group                    EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  1ee.: invalid_instruction",          *invalid_instruction),
-            ( "  2ee.: invalid_instruction",          *invalid_instruction),
-            ( "  3ee.: invalid_instruction",          *invalid_instruction),
-            # Offset-indirect type operations        EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
-            ( "  1ee.: invalid_instruction",          *invalid_instruction),
-            ( "  2ee.: invalid_instruction",          *invalid_instruction),
-            ( "  3ee.: invalid_instruction",          *invalid_instruction),
+            ( "  2ee.: $pc <- MEM32[$rA]",            oc.branch_ind, None,       None,        bo.pc_w_ind, lo.load,   None,       field_a,        field_d,   None,            "REG",           0,          a32,    0,  0,  0,  0 ),
+            ( "  3ee.: $tpc <- MEM32[$rA]",           oc.branch_ind, None,       None,        bo.tpc_w_ind,lo.load,   None,       field_a,        field_d,   None,            "REG",           0,          a32,    0,  0,  0,  0 ),
             # Offset-indirect load/store group       EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  .f4.: $rD <- MEM8[$rA+FIELD_E]",     oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           field_e,    a8,     0,  0,  1,  0 ),
             ( "  .f5.: $rD <- MEM16[$rA+FIELD_E]",    oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           field_e,    a16,    0,  0,  0,  1 ),
@@ -324,8 +320,8 @@ class DecodeStage(GenericModule):
             ( "  .fd.: $rD <- SMEM16[$rA+FIELD_E]",   oc.ld_st,    None,         None,        None,        lo.load,   None,       field_a,        field_d,   None,            "REG",           field_e,    a16,    0,  1,  0,  0 ),
             # Offset-indirect jump group             EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  1fe.: invalid_instruction",          *invalid_instruction),
-            ( "  2fe.: invalid_instruction",          *invalid_instruction),
-            ( "  3fe.: invalid_instruction",          *invalid_instruction),
+            ( "  2fe.: $pc <- MEM32[$rA+FIELD_E]",    oc.branch_ind, None,       None,        bo.pc_w_ind, lo.load,   None,       field_a,        field_d,   None,            "REG",           field_e,    a32,    0,  0,  0,  0 ),
+            ( "  3fe.: $tpc <- MEM32[$rA+FIELD_E]",   oc.branch_ind, None,       None,        bo.tpc_w_ind,lo.load,   None,       field_a,        field_d,   None,            "REG",           field_e,    a32,    0,  0,  0,  0 ),
             # CSR group                              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  .0f8: $rD <- CSR[FIELD_E]",          oc.ld_st,    None,         None,        None,        lo.csr_load,   None,    None,          field_d,   None,            0,               field_e,    a32,    0,  0,  0,  0 ),
             ( "  .0f9: CSR[FIELD_E] <- $rD",          oc.ld_st,    None,         None,        None,        lo.csr_store,  field_d, None,          None,      "REG",           0,               field_e,    a32,    0,  0,  0,  0 ),
@@ -342,8 +338,8 @@ class DecodeStage(GenericModule):
             ( "  .fdf: $rD <- SMEM16[FIELD_E]",       oc.ld_st,    None,         None,        None,        lo.load,   None,       None,           field_d,   None,            0,               field_e,    a16,    0,  1,  0,  0 ),
             # Absolute jump group                    EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE
             ( "  1fef: invalid_instruction",          *invalid_instruction),
-            ( "  2fef: invalid_instruction",          *invalid_instruction),
-            ( "  3fef: invalid_instruction",          *invalid_instruction),
+            ( "  2fef: $pc <- MEM32[FIELD_E]",        oc.branch_ind, None,       None,        bo.pc_w_ind, lo.load,   None,       None,           field_d,   None,            0,               field_e,    a32,    0,  0,  0,  0 ),
+            ( "  3fef: $tpc <- MEM32[FIELD_E]",       oc.branch_ind, None,       None,        bo.tpc_w_ind,lo.load,   None,       None,           field_d,   None,            0,               field_e,    a32,    0,  0,  0,  0 ),
         )
 
         def is_mini_set(full_mask:str) -> bool:

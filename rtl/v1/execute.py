@@ -305,16 +305,20 @@ class BranchUnit(Module):
 
         # Set whenever we branch without a mode change
         in_mode_branch = SelectOne(
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w),     1,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w),    self.input_port.task_mode,
-            is_exception,                                                                     ~self.input_port.task_mode,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.stm),      0,
-            default_port =                                                                    condition_result,
+            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w),        1,
+            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w_ind),    1,
+            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w),       self.input_port.task_mode,
+            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w_ind),   self.input_port.task_mode,
+            is_exception,                                                                        ~self.input_port.task_mode,
+            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.stm),         0,
+            default_port =                                                                       condition_result,
         )
 
         branch_target = SelectOne(
             self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w),                                 self.input_port.op_a[31:1],
             self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w),                                self.input_port.op_a[31:1],
+            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w_ind),                             self.input_port.branch_addr,
+            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w_ind),                            self.input_port.branch_addr,
             self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.stm),                                  self.input_port.tpc,
             default_port =                                                                                                Select(is_exception | self.input_port.interrupt, self.input_port.branch_addr, self.input_port.tpc),
         )
@@ -494,7 +498,7 @@ class ExecuteStage(GenericModule):
         # Load-store
         ldst_output = Wire(LoadStoreOutputIf)
         ldst_unit = LoadStoreUnit()
-        ldst_unit.input_port.is_ldst        <<= self.input_port.exec_unit == op_class.ld_st
+        ldst_unit.input_port.is_ldst        <<= (self.input_port.exec_unit == op_class.ld_st) | (self.input_port.exec_unit == op_class.branch_ind)
         ldst_unit.input_port.is_csr         <<= (self.input_port.ldst_op == ldst_ops.csr_load) | (self.input_port.ldst_op == ldst_ops.csr_store)
         ldst_unit.input_port.op_b           <<= self.input_port.op_b
         ldst_unit.input_port.op_c           <<= self.input_port.op_c
@@ -567,7 +571,7 @@ class ExecuteStage(GenericModule):
         s2_pc = Select(s1_task_mode, s1_spc, s1_tpc)
 
         stage_2_valid = Wire(logic)
-        s2_exec_unit = Wire()
+        s2_exec_unit = Wire(EnumNet(op_class))
         s2_ldst_op = Wire()
 
         # NOTE: The use of s1_exec_unit here is not exactly nice: we depend on it being static independent of stage_2_ready.
@@ -579,10 +583,12 @@ class ExecuteStage(GenericModule):
         stage_2_fsm.input_valid <<= stage_1_valid
         stage_2_fsm.clear <<= self.do_branch
         block_mem = s1_ldst_output.mem_av | s1_ldst_output.mem_unaligned | s1_fetch_av
-        mem_input.valid <<= stage_1_valid & ~block_mem & (s1_exec_unit == op_class.ld_st)
-        stage_2_ready <<= Select((s1_exec_unit == op_class.ld_st) & ~block_mem, stage_2_fsm.input_ready,  mem_input.ready)
-        stage_2_valid <<= Select((s2_exec_unit == op_class.ld_st) & ~block_mem, stage_2_fsm.output_valid, s2_mem_output.valid) & ~s2_was_branch
-        stage_2_fsm.output_ready <<= Select((s2_exec_unit == op_class.ld_st) & ((s2_ldst_op == ldst_ops.load) | (s2_ldst_op == ldst_ops.csr_load)) & ~block_mem, 1, s2_mem_output.valid)
+        s1_is_ld_st = (s1_exec_unit == op_class.ld_st) | (s1_exec_unit == op_class.branch_ind)
+        s2_is_ld_st = (s2_exec_unit == op_class.ld_st) | (s2_exec_unit == op_class.branch_ind)
+        mem_input.valid <<= stage_1_valid & ~block_mem & s1_is_ld_st
+        stage_2_ready <<= Select(s1_is_ld_st & ~block_mem, stage_2_fsm.input_ready,  mem_input.ready)
+        stage_2_valid <<= Select(s2_is_ld_st & ~block_mem, stage_2_fsm.output_valid, s2_mem_output.valid) & ~s2_was_branch
+        stage_2_fsm.output_ready <<= Select(s2_is_ld_st & ((s2_ldst_op == ldst_ops.load) | (s2_ldst_op == ldst_ops.csr_load)) & ~block_mem, 1, s2_mem_output.valid)
 
         stage_2_reg_en = Wire(logic)
         stage_2_reg_en <<= stage_1_valid & stage_2_ready & ~Reg(self.do_branch)
@@ -604,7 +610,11 @@ class ExecuteStage(GenericModule):
         branch_input.spc             <<= s1_spc
         branch_input.tpc             <<= s1_tpc
         branch_input.task_mode       <<= s1_task_mode
-        branch_input.branch_addr     <<= s1_branch_target_output.branch_addr
+        branch_input.branch_addr     <<= Select(
+            (s1_exec_unit == op_class.branch_ind),
+            s1_branch_target_output.branch_addr,
+            concat(s2_mem_output.data_h, s2_mem_output.data_l)[31:1]
+        )
         branch_input.interrupt       <<= self.interrupt
         branch_input.fetch_av        <<= s1_fetch_av
         branch_input.mem_av          <<= s1_ldst_output.mem_av
@@ -616,7 +626,7 @@ class ExecuteStage(GenericModule):
         branch_input.f_sign          <<= s1_alu_output.f_sign
         branch_input.f_carry         <<= s1_alu_output.f_carry
         branch_input.f_overflow      <<= s1_alu_output.f_overflow
-        branch_input.is_branch_insn  <<= s1_exec_unit == op_class.branch
+        branch_input.is_branch_insn  <<= (s1_exec_unit == op_class.branch) | (s1_exec_unit == op_class.branch_ind)
 
         branch_unit.input_port <<= branch_input
         branch_output <<= branch_unit.output_port
@@ -633,7 +643,7 @@ class ExecuteStage(GenericModule):
         memory_unit = MemoryStage()
 
 
-        mem_input.read_not_write <<= (s1_exec_unit == op_class.ld_st) & ((s1_ldst_op == ldst_ops.load) | (s1_ldst_op == ldst_ops.csr_load))
+        mem_input.read_not_write <<= s1_is_ld_st & ((s1_ldst_op == ldst_ops.load) | (s1_ldst_op == ldst_ops.csr_load))
         mem_input.data <<= s1_op_a
         mem_input.addr <<= s1_ldst_output.phy_addr
         mem_input.is_csr <<= s1_ldst_output.is_csr
@@ -658,12 +668,18 @@ class ExecuteStage(GenericModule):
             result = s1_alu_output.result
 
         s2_result_reg_addr_valid = Reg(s1_result_reg_addr_valid, clock_en = stage_2_reg_en)
-        self.output_port.valid <<= stage_2_valid & s2_result_reg_addr_valid & (Reg(stage_2_reg_en) | s2_mem_output.valid)
+        self.output_port.valid <<= stage_2_valid & s2_result_reg_addr_valid & (Reg(stage_2_reg_en) | (s2_mem_output.valid & s2_is_ld_st))
         # TODO: I'm not sure if we need these delayed versions for write-back
         #s2_result_reg_addr = Reg(s1_result_reg_addr, clock_en = stage_2_reg_en)
         #ldst_result_reg_addr = Reg(s1_result_reg_addr, clock_en = mem_input.ready)
 
-        s2_exec_unit <<= Reg(s1_exec_unit, clock_en = stage_2_reg_en)
+        # When we have a branch, we have to clear the exec unit from s2; otherwise it will potentially prevent 'sideband_strobe' from firing when we resume from the target.
+        # The test for this is:
+        #   $pc <- mem[some_table] # jumps to xxx
+        # xxx:
+        #   $pc <- yyy
+        # These back-to-back jumps would fail without the intervention
+        s2_exec_unit <<= Reg(Select(self.do_branch, Select(stage_2_reg_en, s2_exec_unit, s1_exec_unit), op_class.invalid))
         s2_ldst_op <<= Reg(s1_ldst_op, clock_en = stage_2_reg_en)
 
         self.output_port.data_l <<= Select(s2_exec_unit == op_class.ld_st, Reg(result[15: 0], clock_en = stage_2_reg_en), s2_mem_output.data_l)
@@ -677,13 +693,18 @@ class ExecuteStage(GenericModule):
         self.output_port.do_wze <<= Reg(s1_do_wze, clock_en = stage_2_reg_en)
 
         # Set sideband outputs as needed
-        self.do_branch <<= branch_output.do_branch & stage_2_reg_en
+        sideband_strobe = Select(
+            s2_exec_unit == op_class.branch_ind,
+            (s1_exec_unit != op_class.branch_ind) & stage_2_reg_en,
+            s2_mem_output.valid
+        )
+        self.do_branch <<= branch_output.do_branch & sideband_strobe
 
         straight_tpc_out = Select(stage_1_reg_en, self.tpc_in, Select(self.task_mode_in, self.tpc_in, branch_target_output.straight_addr))
         self.tpc_out <<= Select(
             s1_was_branch,
             Select(
-                stage_2_reg_en & branch_output.tpc_changed,
+                sideband_strobe & branch_output.tpc_changed,
                 straight_tpc_out,
                 branch_output.tpc,
             ),
@@ -693,7 +714,7 @@ class ExecuteStage(GenericModule):
         self.spc_out <<= Select(
             s1_was_branch,
             Select(
-                stage_2_reg_en & branch_output.spc_changed,
+                sideband_strobe & branch_output.spc_changed,
                 straight_spc_out,
                 branch_output.spc,
             ),
@@ -702,14 +723,14 @@ class ExecuteStage(GenericModule):
         self.task_mode_out <<= Select(
             s1_was_branch,
             Select(
-                stage_2_reg_en & branch_output.task_mode_changed,
+                sideband_strobe & branch_output.task_mode_changed,
                 self.task_mode_in,
                 branch_output.task_mode,
             ),
             self.task_mode_in
         )
         self.ecause_out <<= Select(
-            stage_2_reg_en & ~s1_was_branch,
+            sideband_strobe & ~s1_was_branch,
             self.ecause_in,
             Select(
                 branch_output.is_exception_or_interrupt,

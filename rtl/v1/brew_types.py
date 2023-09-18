@@ -48,23 +48,23 @@ class shifter_ops(Enum):
     shar     = 2
 
 class branch_ops(Enum):
-    cb_eq    = 1
-    cb_ne    = 2
-    cb_lts   = 3
-    cb_ges   = 4
-    cb_lt    = 5
-    cb_ge    = 6
+    cb_eq     = 1
+    cb_ne     = 2
+    cb_lts    = 3
+    cb_ges    = 4
+    cb_lt     = 5
+    cb_ge     = 6
 
-    # Bit-selection coming in op_b
-    bb_one   = 7
-    # Bit-selection coming in op_a
-    bb_zero  = 8
+    bb_one    = 7 # Bit-selection coming in op_b
+    bb_zero   = 8 # Bit-selection coming in op_a
 
-    swi      = 9 # SWI index comes in op_a
-    stm      = 10
-    pc_w     = 11
-    tpc_w    = 12
-    unknown  = 13
+    swi       = 9 # SWI index comes in op_a
+    stm       = 10
+    pc_w      = 11
+    tpc_w     = 12
+    unknown   = 13
+    pc_w_ind  = 14 # Branch target is result of memory load
+    tpc_w_ind = 15 # Branch target is result of memory load
 
 class ldst_ops(Enum):
     store = 0
@@ -73,11 +73,13 @@ class ldst_ops(Enum):
     csr_load =3
 
 class op_class(Enum):
-    alu     = 0
-    mult    = 1
-    shift   = 2
-    branch  = 3
-    ld_st   = 4
+    alu        = 0
+    mult       = 1
+    shift      = 2
+    branch     = 3
+    ld_st      = 4
+    branch_ind = 5
+    invalid    = 7
 
 access_len_8 = 0
 access_len_16 = 1

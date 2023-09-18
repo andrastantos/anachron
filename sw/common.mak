@@ -4,8 +4,8 @@ SW_BASE ?= ..
 CFLAGS += -ffunction-sections -fdata-sections -I$(SW_BASE)
 AFLAGS += -ffunction-sections -fdata-sections
 LDFLAGS += -Wl,--gc-sections
-DRAM_LDFLAGS = $(LDFLAGS) -T $(SW_BASE)/dram.lds
-ROM_LDFLAGS = $(LDFLAGS) -T $(SW_BASE)/rom.lds
+DRAM_LDFLAGS += $(LDFLAGS) -T $(SW_BASE)/dram.lds
+ROM_LDFLAGS += $(LDFLAGS) -T $(SW_BASE)/rom.lds
 ifneq ($(TARGET),rom)
   ROM_LDFLAGS += -nostdlib
 endif
