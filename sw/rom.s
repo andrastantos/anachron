@@ -147,6 +147,7 @@ _reset:
     $tpc <- _start
     CALL sched_mode_setup
     ########### JUMP TO DRAM (in task mode)
+.enter_task_mode:
     stm
     #$pc <- dram_base
     ########### WE'RE BACK FROM DRAM
@@ -168,7 +169,12 @@ _reset:
     mem32[.reg_save+0x30] <- $r12
     mem32[.reg_save+0x34] <- $r13
     mem32[.reg_save+0x38] <- $r14
-
+    # test for syscalls
+    $r11 <- csr[csr_ecause]
+    $r11 <- $r11 - 0x22 # SWI exception cause
+    if $r11 == 0 $pc <- .syscall_handler
+    # All other exceptions cause termination for now.
+.task_mode_exit:
     $r11 <- tiny 0
 .reg_dump_loop:
     $r9 <- .hex_conv_str
@@ -252,20 +258,42 @@ _end_loop:
 .global .reg_save
     .p2align        2
 .reg_save:
+.r0_save:
     .int 0xdeadbeef
+.r1_save:
     .int 0xdeadbeef
+.r2_save:
     .int 0xdeadbeef
+.r3_save:
     .int 0xdeadbeef
+.r4_save:
+.a0_save:
     .int 0xdeadbeef
+.r5_save:
+.a1_save:
     .int 0xdeadbeef
+.r6_save:
+.a2_save:
     .int 0xdeadbeef
+.r7_save:
+.a3_save:
     .int 0xdeadbeef
+.r8_save:
     .int 0xdeadbeef
+.r9_save:
     .int 0xdeadbeef
+.r10_save:
     .int 0xdeadbeef
+.r11_save:
     .int 0xdeadbeef
+.r12_save:
+.fp_save:
     .int 0xdeadbeef
+.r13_save:
+.sp_save:
     .int 0xdeadbeef
+.r14_save:
+.lr_save:
     .int 0xdeadbeef
     .int 0xdeadbeef
 .global .eaddr_save
@@ -360,3 +388,157 @@ uart_write_str:
     sched_mode_setup: # Defined as a pure return. If defined outside, should do the proper testing
     $pc <- $lr
 
+
+/*
+========     =====================================
+Register     Functionality
+========     =====================================
+$r0          call-clobbered general purpose register; used in thunks for virtual inheritance. Must be call-clobbered
+$r1          call-clobbered general purpose register; struct value address (return value area pointer for large return values). EH_RETURN_STACKADJ_RTX BREW_STACKADJ_REG. Must be call-clobbered
+$r2          call-clobbered general purpose register; static chain register
+$r3          call-clobbered general purpose register
+$r4          call-clobbered first argument/return value register.
+$r5          call-clobbered second argument/return value register.
+$r6          call-clobbered third argument/return value register;
+$r7          call-clobbered fourth argument/return value register;
+
+$r8          call-saved general purpose register; EH_RETURN_DATA_REGNO
+$r9          call-saved general purpose register; EH_RETURN_DATA_REGNO
+$r10         call-saved general purpose register
+$r11         call-saved general purpose register
+$r12         call-saved register a.k.a. $fp - frame pointer.
+$r13         call-saved register a.k.a. $sp - stack pointer.
+$r14         call-saved register a.k.a. $lr - link register.
+========     =====================================
+*/
+
+.syscall_table:
+    .int  .sys_invalid    #  0
+    .int  .sys_exit       #  1
+    .int  .sys_open       #  2
+    .int  .sys_close      #  3
+    .int  .sys_read       #  4
+    .int  .sys_write      #  5
+    .int  .sys_lseek      #  6
+    .int  .sys_unlink     #  7
+    .int  .sys_getpid     #  8
+    .int  .sys_kill       #  9
+    .int  .sys_fstat      # 10
+
+.set .syscall_table_size, .-.syscall_table
+.set .syscall_max, .syscall_table_size / 4 - 1
+
+.set EINVAL, 22
+.syscall_handler:
+    # We're going to handle a few syscalls that newlib defines.
+    # When we're called, all registers are saved into the reg_save area
+    $lr <- mem[.lr_save]
+    # Extract syscall number and adjust return address
+    $r0 <- $tpc
+    $r0 <- $r0 + 2
+    $r1 <- mem16[$r0]
+    $r0 <- $r0 + 2
+    $tpc <- $r0
+    $r0 <- .syscall_max
+    if $r1 <= $r0 $pc <- .syscall_ok
+    # We have an invalid syscall number --> simply return with error
+.sys_invalid:
+    $lr <- EINVAL
+    $pc <- .syscall_ret
+
+.syscall_ok_str:
+    .string "SYSCALL OK: "
+
+.p2align 1
+    # We have a valid syscall number, jump to the handler
+.syscall_ok:
+    #$a1 <- $r1
+    #$a0 <- .syscall_ok_str
+    #CALL uart_write_str
+    #$a0 <- $a1
+    #CALL uart_write_hex
+    #$a0 <- .newline_str
+    #CALL uart_write_str
+    #$r1 <- $a1
+    $r1 <- short $r1 << 2
+    $r0 <- $r1 + .syscall_table
+    #$a0 <- mem[$r0]
+    #CALL uart_write_hex
+    #$pc <- $a0
+    $pc <- mem[$r0]
+
+.syscall_ret:
+    $r0 <- .r8_save
+    $r8 <- mem[$r0]
+    $r9 <- mem[$r0 + 4]
+    $r10 <- mem[$r0 + 8]
+    $r11 <- mem[$r0 + 12]
+    $r12 <- mem[$r0 + 16]
+    $r13 <- mem[$r0 + 20]
+    $pc <- .enter_task_mode
+
+
+.sys_exit:
+    $pc <- .task_mode_exit
+
+.sys_open:
+    $a0 <- tiny -1
+    $lr <- EINVAL
+    $pc <- .syscall_ret
+
+.sys_close:
+    $a0 <- tiny -1
+    $pc <- .syscall_ret
+
+.sys_read:
+    $a0 <- tiny -1
+    $lr <- EINVAL
+    $pc <- .syscall_ret
+
+.sys_write:
+    # We only support write to stdout and stderr
+    $a0 <- mem[.a0_save] # load file descriptor
+    $a0 <- $a0 - 1
+    if $a0 <= 0 $pc <- .sys_write_fd_ok
+    $a0 <- tiny -1
+    $lr <- EINVAL
+    $pc <- .syscall_ret
+.sys_write_fd_ok:
+    $r10 <- $lr # Save off errno value
+    $r1 <- mem[.a1_save] # Load string pointer
+    $r2 <- mem[.a2_save] # Load buffer size
+.sys_write_loop:
+    $a0 <- mem8[$r1]
+    if $r2 == 0 $pc <- .sys_write_end
+    CALL uart_write_char
+    $r1 <- tiny $r1 + 1
+    $r2 <- tiny $r2 - 1
+    $pc <- .sys_write_loop
+.sys_write_end:
+    $lr <- $r10
+    $a0 <- mem[.a2_save] # return the number of bytes written, which is all
+    $pc <- .syscall_ret
+
+.sys_lseek:
+    $a0 <- tiny -1
+    $lr <- EINVAL
+    $pc <- .syscall_ret
+
+.sys_unlink:
+    $a0 <- tiny -1
+    $lr <- EINVAL
+    $pc <- .syscall_ret
+
+.sys_getpid:
+    $a0 <- tiny -1
+    $pc <- .syscall_ret
+
+.sys_kill:
+    $a0 <- tiny -1
+    $lr <- EINVAL
+    $pc <- .syscall_ret
+
+.sys_fstat:
+    $a0 <- tiny -1
+    $lr <- EINVAL
+    $pc <- .syscall_ret
