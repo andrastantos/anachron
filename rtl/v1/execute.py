@@ -283,6 +283,8 @@ class BranchUnit(Module):
                 bit_code == 14, word[31],
             )
 
+        unknown_inst_exception = Wire()
+
         # Branch codes:
         #  eq: f_zero = 1
         #  ne: f_zero = 0
@@ -302,7 +304,7 @@ class BranchUnit(Module):
         )
 
         # Set if we have an exception: in task mode this results in a switch to scheduler mode, in scheduler mode, it's a reset
-        is_exception = (self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.swi)) | self.input_port.mem_av | self.input_port.mem_unaligned | self.input_port.fetch_av
+        is_exception = (self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.swi)) | self.input_port.mem_av | self.input_port.mem_unaligned | self.input_port.fetch_av | unknown_inst_exception
 
         # Set whenever we branch without a mode change
         in_mode_branch = SelectOne(
@@ -351,7 +353,7 @@ class BranchUnit(Module):
         self.output_port.do_branch  <<= in_mode_branch | self.output_port.task_mode_changed
 
         swi_exception = self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.swi)
-        unknown_inst_exception = self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.unknown)
+        unknown_inst_exception <<= self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.unknown)
 
         # We set the ECAUSE bits even in scheduler mode: this allows for interrupt polling and,
         # after a reset, we can check it to determine the reason for the reset
