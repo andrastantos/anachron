@@ -17,7 +17,7 @@ BrewRegCnt = 15
 #BrewRegAddr = Unsigned(BrewRegCnt.bit_length())
 BrewRegAddr = Number(min_val=0, max_val=BrewRegCnt-1)
 
-BrewMemBase = Unsigned(22)
+BrewMemBase = Unsigned(18)
 BrewMemShift = 10 # This is in bytes
 
 BrewCsrAddrWidth = 16

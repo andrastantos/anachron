@@ -402,11 +402,11 @@ class LoadStoreUnit(Module):
         eff_addr = TIMING_CLOSURE_REG((self.input_port.op_b + self.input_port.op_c)[31:0])
         phy_addr = Select(
             self.input_port.is_csr,
-            (eff_addr + Select(self.input_port.task_mode, 0, (self.input_port.mem_base << BrewMemShift)))[31:0],
+            get_phy_addr(eff_addr, Select(self.input_port.task_mode, 0, self.input_port.mem_base)),
             concat(self.input_port.op_c[15:0], "2'b00") | Select(self.input_port.task_mode, 0, 0x20000),
         )
 
-        mem_av = self.input_port.task_mode & self.input_port.is_ldst & (eff_addr[31:BrewMemShift] > self.input_port.mem_limit) & ~self.input_port.is_csr
+        mem_av = self.input_port.task_mode & self.input_port.is_ldst & is_over_limit(eff_addr, self.input_port.mem_limit) & ~self.input_port.is_csr
         mem_unaligned = ~self.input_port.is_csr & self.input_port.is_ldst & Select(self.input_port.mem_access_len,
             0, # 8-bit access is always aligned
             eff_addr[0], # 16-bit access is unaligned if LSB is non-0

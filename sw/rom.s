@@ -1,8 +1,8 @@
 .set rom_base,                 0x00000000
 .set gpio_base,                0x00010000
 .set io_apb_base,              0x00020000
-.set dram_base,                0xf8000000 # Setting a different alias so that DRAM appear above I/O with 1 WS
-.set dram_top,                 0xf801ffff # Setting a different alias so that DRAM appear above I/O with 1 WS
+.set dram_base,                0x08000000
+.set dram_top,                 0x0800ffff
 
 # Exception sources
 .set exc_reset,                0x0000 # Hardware reset

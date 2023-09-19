@@ -14,7 +14,7 @@ SEARCH_DIR("/home/tantos/brew-toolset/brew-none-elf/lib");
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
-  PROVIDE (__executable_start = SEGMENT_START("text-segment", 0x18000000)); . = SEGMENT_START("text-segment", 0x18000000);
+  PROVIDE (__executable_start = SEGMENT_START("text-segment", 0x08000000)); . = SEGMENT_START("text-segment", 0x08000000);
   .interp         : { *(.interp) }
   .note.gnu.build-id  : { *(.note.gnu.build-id) }
   .hash           : { *(.hash) }
@@ -221,7 +221,7 @@ SECTIONS
   . = SEGMENT_START("ldata-segment", .);
   . = ALIGN(32 / 8);
   _end = .; PROVIDE (end = .);
-  .stack         0x18010000 :
+  .stack         0x08010000 :
   {
     _stack = .;
     *(.stack)

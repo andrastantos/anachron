@@ -161,7 +161,7 @@ class InstBuffer(GenericModule):
         branch_target <<= Select(
             self.task_mode,
             self.spc,
-            truncate_addr(self.tpc + (self.mem_base << BrewMemShift))
+            get_phy_addr(concat(self.tpc, "1'b0"), self.mem_base)[31:1]
         )
 
         # Capture task mode into a register to make sure we don't AV in scheduler mode
@@ -198,7 +198,7 @@ class InstBuffer(GenericModule):
             0
         ))
 
-        fetch_av = task_mode_fetch & (fetch_addr[BrewInstAddr.get_length()-1:BrewMemShift-1] > self.mem_limit)
+        fetch_av = task_mode_fetch & is_over_limit(concat(fetch_addr, "1'b0"), self.mem_limit)
 
         self.fsm = FSM()
 
