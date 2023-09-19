@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Mon Sep 18 02:40:22 2023
+[*] Tue Sep 19 23:59:39 2023
 [*]
 [dumpfile] "/home/tantos/anachron/rtl/v1/anacron_fpga/anacron_fpga.vcd"
-[dumpfile_mtime] "Mon Sep 18 02:36:32 2023"
-[dumpfile_size] 27946814
+[dumpfile_mtime] "Tue Sep 19 23:55:02 2023"
+[dumpfile_size] 169394935
 [savefile] "/home/tantos/anachron/rtl/v1/anacron_fpga/anacron_fpga.gtkw"
-[timestart] 393472
+[timestart] 2260640
 [size] 1920 990
 [pos] -1 -1
-*-10.675911 397600 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-9.454320 2263400 2263400 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
 [treeopen] top.dut.brew.
@@ -316,7 +316,7 @@ top.dut.brew.pipeline.fetch_stage.inst_assemble.fsm_state[1:0]
 @28
 top.dut.brew.pipeline.clk
 top.dut.brew.pipeline.fetch_stage.inst_buf.do_branch
-@c00200
+@800200
 -DECODE_IN
 @28
 top.dut.brew.pipeline.decode_stage.fetch_valid
@@ -328,7 +328,7 @@ top.dut.brew.pipeline.decode_stage.fetch_inst_1[15:0]
 top.dut.brew.pipeline.decode_stage.fetch_inst_2[15:0]
 @24
 top.dut.brew.pipeline.decode_stage.fetch_inst_len[1:0]
-@1401200
+@1000200
 -DECODE_IN
 @28
 top.dut.brew.pipeline.event_decode_wait_on_rf
@@ -432,9 +432,7 @@ top.dut.brew.pipeline.execute_stage.input_port_ready
 @24
 top.dut.brew.pipeline.execute_stage.input_port_exec_unit[2:0]
 top.dut.brew.pipeline.execute_stage.input_port_alu_op[2:0]
-@22
 top.dut.brew.pipeline.execute_stage.input_port_branch_op[3:0]
-@24
 top.dut.brew.pipeline.execute_stage.input_port_shifter_op[1:0]
 top.dut.brew.pipeline.execute_stage.input_port_ldst_op[1:0]
 @28
@@ -465,6 +463,12 @@ top.dut.brew.pipeline.execute_stage.stage_2_ready
 top.dut.brew.pipeline.execute_stage.mem_input_ready
 top.dut.brew.pipeline.execute_stage.s2_mem_output_valid
 top.dut.brew.pipeline.execute_stage.ldst_output_is_csr
+top.dut.brew.pipeline.execute_stage.branch_unit.is_exception
+top.dut.brew.pipeline.execute_stage.branch_unit.input_port_is_branch_insn
+@24
+top.dut.brew.pipeline.execute_stage.branch_unit.input_port_opcode[3:0]
+@28
+top.dut.brew.pipeline.execute_stage.branch_unit.unknown_inst_exception
 @1000200
 -EXEC_INT
 @c00200
@@ -545,8 +549,105 @@ top.dut.brew.pipeline.execute_stage.stage_2_reg_en
 @22
 top.dut.brew.pipeline.execute_stage.s1_exec_unit[2:0]
 top.dut.brew.pipeline.execute_stage.s2_exec_unit[2:0]
+@28
+top.dut.brew.pipeline.execute_stage.s2_ldst_op[1:0]
+top.dut.brew.pipeline.execute_stage.output_port_valid
+top.dut.brew.pipeline.execute_stage.stage_1_valid
+top.dut.brew.pipeline.execute_stage.stage_2_ready
+top.dut.brew.pipeline.execute_stage.stage_2_valid
+top.dut.brew.pipeline.execute_stage.mem_input_ready
+top.dut.brew.pipeline.execute_stage.block_mem
+top.dut.brew.pipeline.execute_stage.s2_is_ld_st
+top.dut.brew.pipeline.execute_stage.s2_mem_output_valid
+top.dut.brew.pipeline.execute_stage.stage_2_fsm_output_valid
+top.dut.brew.pipeline.execute_stage.s2_result_reg_addr_valid
 @1000200
 -EXEC_INTERNAL
+@800200
+-LDST_UNIT
+@28
+top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_is_csr
+top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_is_ldst
+top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_access_len[1:0]
+@22
+top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_base[17:0]
+@c00022
+top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+@28
+(0)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(1)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(2)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(3)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(4)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(5)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(6)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(7)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(8)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(9)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(10)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(11)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(12)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(13)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(14)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(15)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(16)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+(17)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_mem_limit[17:0]
+@1401200
+-group_end
+@c00023
+top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+@28
+(0)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(1)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(2)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(3)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(4)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(5)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(6)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(7)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(8)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(9)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(10)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(11)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(12)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(13)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(14)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(15)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(16)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(17)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(18)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(19)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(20)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(21)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(22)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(23)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(24)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(25)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(26)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(27)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(28)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(29)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(30)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+(31)top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_b[31:0]
+@1401201
+-group_end
+@22
+top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_op_c[31:0]
+@28
+top.dut.brew.pipeline.execute_stage.ldst_unit.input_port_task_mode
+top.dut.brew.pipeline.execute_stage.ldst_unit.mem_av
+top.dut.brew.pipeline.execute_stage.ldst_unit.mem_unaligned
+@22
+top.dut.brew.pipeline.execute_stage.ldst_unit.output_port_eff_addr[31:0]
+@28
+top.dut.brew.pipeline.execute_stage.ldst_unit.output_port_is_csr
+top.dut.brew.pipeline.execute_stage.ldst_unit.output_port_mem_av
+top.dut.brew.pipeline.execute_stage.ldst_unit.output_port_mem_unaligned
+@22
+top.dut.brew.pipeline.execute_stage.ldst_unit.output_port_phy_addr[31:0]
+top.dut.brew.pipeline.execute_stage.ldst_unit.phy_addr[31:0]
+@1000200
+-LDST_UNIT
 @28
 top.dut.brew.pipeline.do_branch
 @c00022
@@ -592,9 +693,8 @@ top.dut.brew.pipeline.execute_stage.branch_target_unit.output_port_branch_addr[3
 top.dut.brew.pipeline.execute_stage.branch_target_unit.output_port_straight_addr[30:0]
 top.dut.brew.pipeline.execute_stage.branch_target_unit.offset[30:0]
 top.dut.brew.ecause[6:0]
-@29
-top.dut.brew.pipeline.task_mode
 @28
+top.dut.brew.pipeline.task_mode
 top.dut.brew.timer.bus_if_pwrite
 top.dut.brew.timer.bus_if_psel
 @22
@@ -612,5 +712,10 @@ top.dut.brew.timer_n_int
 top.dut.brew.n_int
 top.dut.brew.pipeline.interrupt
 top.dut.brew.timer.tick
+@22
+top.dut.brew.pipeline.dmem_limit[17:0]
+top.dut.brew.pipeline.pmem_limit[17:0]
+top.dut.brew.pipeline.dmem_base[17:0]
+top.dut.brew.pipeline.pmem_base[17:0]
 [pattern_trace] 1
 [pattern_trace] 0
