@@ -40,33 +40,26 @@ class Dram(GenericModule):
     n_cas = Input(logic)
     n_we =  Input(logic)
 
-    def construct(self, inv_clock: bool, init_content: Optional[str] = None):
-        self.inv_clock = inv_clock
+    def construct(self, init_content: Optional[str] = None):
         self.init_content = init_content
 
     def body(self):
         self.data_out.set_net_type(self.data_in.get_net_type())
 
+        # A read will happen in every clock cycle when both n_ras and n_cas asserted
+        # A write however will only happen on the falling edge of all three control signals
+        #
+        # Both row and column addresses are latched on the respective edges of the control signals
 
-        #def edge_detect(signal: Junction, edge: EdgeType):
-        #    prev_signal = Reg(signal)
-        #    is_edge = prev_signal ^ signal
-        #    if edge == EdgeType.Positive:
-        #        return is_edge & ~prev_signal
-        #    elif edge == EdgeType.Negative:
-        #        return is_edge & prev_signal
-        #    elif edge == EdgeType.Undefined:
-        #        return is_edge
-        #    else:
-        #        assert False
+        def fall_edge_detect(signal):
+            was = Reg(signal)
+            return was & ~signal
 
-        #n_ras_neg_edge = edge_detect(self.n_ras, EdgeType.Negative)
-        #n_cas_neg_edge = edge_detect(self.n_cas, EdgeType.Negative)
+        n_is_write = self.n_cas | self.n_ras | self.n_we
 
-        #row_addr = Reg(self.addr, clock_en=n_ras_neg_edge)
-        #col_addr = Reg(self.addr, clock_en=n_cas_neg_edge)
-        #read_not_write = Reg(self.n_we, clock_en=n_cas_neg_edge)
-
+        do_write =  fall_edge_detect(Reg(n_is_write, reset_value_port = 1))
+        latch_row = fall_edge_detect(Reg(self.n_ras, reset_value_port = 1))
+        latch_col = fall_edge_detect(Reg(self.n_cas, reset_value_port = 1))
 
         """
             CLK             \___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\__
@@ -82,25 +75,20 @@ class Dram(GenericModule):
             CLK             \___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\___/^^^\__
         """
 
-        prev_n_ras = Reg(self.n_ras)
-        row_addr = Reg(self.addr, clock_en=~self.n_ras & prev_n_ras)
-        if self.inv_clock:
-            ram_clk = ~self.clk
-        else:
-            ram_clk = self.clk
+        row_addr = Reg(self.addr, clock_en=latch_row)
+        col_addr = Select(latch_col, Reg(self.addr, clock_en=latch_col), self.addr)
 
-        with ram_clk as clk:
-            mem = Memory(MemoryConfig(
-                (
-                    MemoryPortConfig(addr_type=Unsigned(self.addr.get_num_bits()*2), data_type=self.data_in.get_net_type(), registered_input=True, registered_output=False),
-                ),
-                self.init_content
-            ))
+        mem = Memory(MemoryConfig(
+            (
+                MemoryPortConfig(addr_type=Unsigned(self.addr.get_num_bits()*2), data_type=self.data_in.get_net_type(), registered_input=True, registered_output=False),
+            ),
+            self.init_content
+        ))
 
-            mem.addr <<= concat(row_addr, self.addr)
-            mem.data_in <<= self.data_in
-            self.data_out <<= mem.data_out
-            mem.write_en <<= ~self.n_cas & ~self.n_we & ~self.n_ras
+        mem.addr <<= concat(row_addr, col_addr)
+        mem.data_in <<= self.data_in
+        self.data_out <<= mem.data_out
+        mem.write_en <<= do_write
 
 class Sram(GenericModule):
     clk = ClkPort()
@@ -312,19 +300,16 @@ class FpgaSystem(GenericModule):
     def body(self):
         dram_addr_width = int(log2(self.dram_size/2))//2
 
-        dram0 = Dram(init_content=self.dram0_content, inv_clock=False)
-        dram1 = Dram(init_content=self.dram1_content, inv_clock=False)
+        dram0 = Dram(init_content=self.dram0_content)
+        dram1 = Dram(init_content=self.dram1_content)
         rom = Sram(init_content=self.rom_content)
         gpio = Gpio()
         gpio2 = Gpio()
         gpio_int = Gpio()
         apb_bridge = ApbBridge()
 
-        ext_if_addr = Reg(self.brew_if.addr, clock_port=self.clk2)
         ext_if_data_out_r = Reg(self.brew_if.data_out, clock_port=self.clk2)
-        ext_if_data_out_nr = NegReg(self.brew_if.data_out, clock_port=self.clk2)
         ext_if_data_out_0 = Reg(ext_if_data_out_r, clock_port=self.clk2)
-        ext_if_data_out_1 = Reg(ext_if_data_out_nr, clock_port=self.clk2)
         ext_if_n_ras_a = Reg(self.brew_if.n_ras_a, clock_port=self.clk2, reset_value_port=1)
         ext_if_n_ras_b = Reg(self.brew_if.n_ras_b, clock_port=self.clk2, reset_value_port=1)
         ext_if_n_cas_0 = Reg(self.brew_if.n_cas_0, clock_port=self.clk2, reset_value_port=1)
@@ -377,23 +362,19 @@ class FpgaSystem(GenericModule):
         decode.brew_if <<= decode_input
 
         # We support 128kByte of DRAM.
-        dram0_n_cas = Wire()
-        dram0_n_cas <<= ext_if_n_cas_0 | Reg(ext_if_n_cas_0, clock_port=self.clk2, reset_value_port=1)
-        dram0.clk     <<= self.clk2
-        dram0.addr    <<= ext_if_addr[dram_addr_width-1:0]
-        dram0.data_in <<= ext_if_data_out_0
-        dram0.n_ras   <<= ext_if_n_ras_a
-        dram0.n_cas   <<= dram0_n_cas | ~Reg(dram0_n_cas, clock_port=self.clk2, reset_value_port=1)
-        dram0.n_we    <<= ext_if_n_we
+        dram0.clk     <<= ~self.clk2
+        dram0.addr    <<= self.brew_if.addr[dram_addr_width-1:0]
+        dram0.data_in <<= self.brew_if.data_out
+        dram0.n_ras   <<= self.brew_if.n_ras_a
+        dram0.n_cas   <<= self.brew_if.n_cas_0
+        dram0.n_we    <<= self.brew_if.n_we
 
-        dram1_n_cas = Wire()
-        dram1_n_cas <<= ext_if_n_cas_1 | Reg(ext_if_n_cas_1, clock_port=self.clk2, reset_value_port=1)
-        dram1.clk     <<= self.clk2
-        dram1.addr    <<= ext_if_addr[dram_addr_width-1:0]
-        dram1.data_in <<= ext_if_data_out_1
-        dram1.n_ras   <<= ext_if_n_ras_a
-        dram1.n_cas   <<= dram1_n_cas | ~Reg(dram1_n_cas, clock_port=self.clk2, reset_value_port=1)
-        dram1.n_we    <<= ext_if_n_we
+        dram1.clk     <<= ~self.clk2
+        dram1.addr    <<= self.brew_if.addr[dram_addr_width-1:0]
+        dram1.data_in <<= self.brew_if.data_out
+        dram1.n_ras   <<= self.brew_if.n_ras_a
+        dram1.n_cas   <<= self.brew_if.n_cas_1
+        dram1.n_we    <<= self.brew_if.n_we
 
         # We have 8kB of ROM (SRAM really)
         rom.clk <<= self.clk2

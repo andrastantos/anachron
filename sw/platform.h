@@ -46,7 +46,7 @@ volatile uint8_t* const gpio4_base = (volatile uint8_t *)((io_apb_base + 0x0200)
 /////////////////////////////////////////////////////////////////////////////////////
 
 const uint32_t cpu_clock_rate    = 10000000; // 10MHz clock for the processor
-const uint32_t system_clock_rate = 50000000; // 50MHz clock for the system
+const uint32_t system_clock_rate = 40000000; // 40MHz clock for the system
 
 volatile uint8_t* const uart1_base = (volatile uint8_t *)((io_apb_base + 0x0000) | wait_state_0);
 const uint32_t uart1_clock_rate = system_clock_rate;

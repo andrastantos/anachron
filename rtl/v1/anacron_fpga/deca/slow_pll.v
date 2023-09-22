@@ -105,7 +105,7 @@ module slow_pll (
 		altpll_component.clk0_phase_shift = "0",
 		altpll_component.clk1_divide_by = 1,
 		altpll_component.clk1_duty_cycle = 50,
-		altpll_component.clk1_multiply_by = 5,
+		altpll_component.clk1_multiply_by = 4,
 		altpll_component.clk1_phase_shift = "0",
 		altpll_component.compensate_clock = "CLK0",
 		altpll_component.inclk0_input_frequency = 100000,
