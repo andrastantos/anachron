@@ -297,3 +297,10 @@ More on OpenRAM and sky130:
 http://ef.content.s3.amazonaws.com/OpenRAM_%20FOSSI%20Dial-Up%202020.pdf
 https://openram.org/docs/source/
 
+
+HDMI out
+--------
+
+A nice, open-source HDMI output core, with audio support.
+
+https://github.com/hdl-util/hdmi/

@@ -148,7 +148,7 @@ While most of the memory map is determined by external address decode circuitry,
 Start address     End address        Usage                    Access qualifier signal
 ================= ================== ======================== =======================
 0x000_0000        0x3ff_ffff         non-DRAM address space   n_nram
-0x400_0000        0x7ff_ffff         CSR address space        N/A
+0x400_0000        0x7ff_ffff         reserved                 N/A
 0x800_0000        0xbff_ffff         DRAM address space       n_ras_a/b
 0xc00_0000        0xfff_ffff         reserved                 N/A
 ================= ================== ======================== =======================
