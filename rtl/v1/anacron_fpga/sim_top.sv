@@ -30,6 +30,19 @@ module top();
     // SIMULATION
     logic is_sim;
 
+    // BUS INTERFACE
+    logic        bus_mon_n_we;
+    logic        bus_mon_data_out_en;
+    logic        bus_mon_n_ras_a;
+    logic        bus_mon_n_ras_b;
+    logic        bus_mon_n_nren;
+    logic        bus_mon_n_cas_0;
+    logic        bus_mon_n_cas_1;
+    logic [10:0] bus_mon_addr;
+    logic [7:0]  bus_mon_data_out;
+    logic        bus_mon_bus_en;
+
+
     FpgaTop dut(.*);
 
     initial begin
@@ -40,7 +53,7 @@ module top();
     assign is_sim = 1'b1;
 
     always #10 clk2 = ~clk2;
-    always #50 clk = ~clk;
+    always #40 clk = ~clk;
 
     assign cts = 0;
 
