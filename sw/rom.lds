@@ -222,11 +222,13 @@ SECTIONS
   . = SEGMENT_START("ldata-segment", .);
   . = ALIGN(32 / 8);
   _end = .; PROVIDE (end = .);
+  /* ROM code now depends on $sp set up before _start gets involked. We don't provide a stack segment anymore.
   .stack         0x80002000 :
   {
     _stack = .;
     *(.stack)
   }
+  */
   /* Stabs debugging sections.  */
   .stab          0 : { *(.stab) }
   .stabstr       0 : { *(.stabstr) }
