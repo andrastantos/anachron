@@ -144,6 +144,7 @@ _reset:
     $r13 <- tiny 0
     $r14 <- tiny 0
     $lr <- _end_loop
+    $sp <- dram_top + 1
     $tpc <- _start
     CALL sched_mode_setup
     ########### JUMP TO DRAM (in task mode)
