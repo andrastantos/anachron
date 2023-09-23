@@ -1,4 +1,18 @@
 create_clock -name ADC_CLK_10 -period 100.00 [get_ports {ADC_CLK_10}]
+#create_clock -name clk_40 -period 25.00 [get_ports {*DecaTop*clk2}]
+
+## Set input delays (for 100ns part https://www.jameco.com/Jameco/Products/ProdDS/2288063.pdf)
+## Data from CAS: t_CAC. CAS is delayed by half of a 40MHz clock, so t_CAC counts from there.
+#set_input_delay  -clock { ADC_CLK_10 } -clock_fall -max 25+12.5+5 [get_ports {????}]
+#set_input_delay  -clock { ADC_CLK_10 }             -max 25+12.5+5 [get_ports {????}]
+## n_wait input: it's sampled on the rising edge of the 10MHz clock, but can't be driven before CAS is active.
+##               let's allow for 50ns of extra address decode latency
+#set_input_delay  -clock { ADC_CLK_10 }             -max 50+12.5+5 [get_ports {????}]
+## Data output: data should be stable before CAS is driven
+#set_output_delay -clock { ADC_CLK_10 }             -max 12.5    [get_ports {????}]
+## Control output: control should arrive very quickly after the 40MHz clock edge
+#set_output_delay -clock { clk_40 }     -clock_fall -max 5       [get_ports {????}]
+
 #create_clock -name MAX10_CLK1_50 -period 20.00 [get_ports {MAX10_CLK1_50}]
 #create_clock -name clk -period 100.00 [get_ports {*DecaTop*clk}]
 #create_clock -name clk2 -period 20.00 [get_ports {*DecaTop*clk2}]
