@@ -30,7 +30,20 @@ module FpgaTop (
     output logic n_tx_en,
 
     // SIMULATION
-    input logic is_sim
+    input logic is_sim,
+
+    // BUS INTERFACE MONITOR
+    output logic        bus_mon_n_we,
+    output logic        bus_mon_data_out_en,
+    output logic        bus_mon_n_ras_a,
+    output logic        bus_mon_n_ras_b,
+    output logic        bus_mon_n_nren,
+    output logic        bus_mon_n_cas_0,
+    output logic        bus_mon_n_cas_1,
+    output logic [10:0] bus_mon_addr,
+    output logic [7:0]  bus_mon_data_out,
+    output logic        bus_mon_bus_en
+
 );
 
     logic rst;
@@ -200,5 +213,17 @@ module FpgaTop (
         gpio3_psel ? gpio3_pready :
         gpio4_psel ? gpio4_pready :
         1'bX;
+
+
+    assign bus_mon_n_we = ext_bus_n_we;
+    assign bus_mon_data_out_en = ext_bus_data_out_en;
+    assign bus_mon_n_ras_a = ext_bus_n_ras_a;
+    assign bus_mon_n_ras_b = ext_bus_n_ras_b;
+    assign bus_mon_n_nren = ext_bus_n_nren;
+    assign bus_mon_n_cas_0 = ext_bus_n_cas_0;
+    assign bus_mon_n_cas_1 = ext_bus_n_cas_1;
+    assign bus_mon_addr = ext_bus_addr;
+    assign bus_mon_data_out = ext_bus_data_out;
+    assign bus_mon_bus_en = ext_bus_bus_en;
 
 endmodule
