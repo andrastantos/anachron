@@ -48,6 +48,8 @@ class shifter_ops(Enum):
     shar     = 2
 
 class branch_ops(Enum):
+    unknown   = 0
+
     cb_eq     = 1
     cb_ne     = 2
     cb_lts    = 3
@@ -62,7 +64,7 @@ class branch_ops(Enum):
     stm       = 10
     pc_w      = 11
     tpc_w     = 12
-    unknown   = 13
+    unused    = 13
     pc_w_ind  = 14 # Branch target is result of memory load
     tpc_w_ind = 15 # Branch target is result of memory load
 
