@@ -178,6 +178,7 @@ class BusIf(GenericModule):
     # bit 8: refresh disable (if set)
     # bit 10-9: DRAM bank size: 0 - 16 bits, 1 - 18 bits, 2 - 20 bits, 3 - 22 bits
     # bit 11: DRAM bank swap: 0 - no swap, 1 - swap
+    # bit 12: Single-bank DRAM: 0 - decode both banks, 1 - bank 0 and 1 are the same
     refresh_counter_size = 8
 
     #### TODO:
@@ -203,7 +204,9 @@ class BusIf(GenericModule):
         refresh_disable = Reg(self.reg_if.pwdata[self.refresh_counter_size], clock_en=(reg_addr == self.reg_dram_config_ofs) & reg_write_strobe)
         dram_bank_size = Reg(self.reg_if.pwdata[self.refresh_counter_size+2:self.refresh_counter_size+1], clock_en=(reg_addr == self.reg_dram_config_ofs) & reg_write_strobe)
         dram_bank_swap = Reg(self.reg_if.pwdata[self.refresh_counter_size+3], clock_en=(reg_addr == self.reg_dram_config_ofs) & reg_write_strobe)
+        dram_single_bank = Reg(self.reg_if.pwdata[self.refresh_counter_size+4], clock_en=(reg_addr == self.reg_dram_config_ofs) & reg_write_strobe)
         self.reg_if.prdata <<= concat(
+            dram_single_bank,
             dram_bank_swap,
             dram_bank_size,
             refresh_disable,
@@ -437,8 +440,19 @@ class BusIf(GenericModule):
             (next_state == BusIfStates.dma_first) |
             (next_state == BusIfStates.dma_wait)
         )
-        dram_ras_a = Reg((dram_ras_active & (dram_bank == dram_bank_swap)) | (next_state == BusIfStates.refresh)) # We re-register the state to remove all glitches
-        dram_ras_b = Reg((dram_ras_active & (dram_bank != dram_bank_swap)) | (next_state == BusIfStates.refresh)) # We re-register the state to remove all glitches
+        # Decode DRAM banks as follows:
+        #
+        # dram_bank    bank_swap    single_bank   ras_a     ras_b
+        #     0            0              0         1         0
+        #     1            0              0         0         1
+        #     0            1              0         0         1
+        #     1            1              0         1         0
+        #     0            0              1         1         0
+        #     1            0              1         1         0
+        #     0            1              1         0         1
+        #     1            1              1         0         1
+        dram_ras_a = Reg((dram_ras_active & ((dram_bank == dram_bank_swap) | (~dram_bank_swap & dram_single_bank))) | (next_state == BusIfStates.refresh)) # We re-register the state to remove all glitches
+        dram_ras_b = Reg((dram_ras_active & ((dram_bank != dram_bank_swap) | ( dram_bank_swap & dram_single_bank))) | (next_state == BusIfStates.refresh)) # We re-register the state to remove all glitches
         dram_n_ras_a = ~dram_ras_a
         dram_n_ras_b = ~dram_ras_b
         n_nren = Wire()
