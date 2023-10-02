@@ -663,15 +663,13 @@ class ExecuteStage(GenericModule):
         #data_h
 
         # Combine all outputs into a single output register, mux-in memory results
-        if self.has_multiply | self.has_shift:
-            selector_choices = [s1_exec_unit == op_class.alu, s1_alu_output.result]
-            if self.has_multiply:
-                selector_choices += [s1_exec_unit == op_class.mult, mult_output.result]
-            if self.has_shift:
-                selector_choices += [s1_exec_unit == op_class.shift, s1_shifter_output.result]
-            result = SelectOne(*selector_choices)
-        else:
-            result = s1_alu_output.result
+        selector_choices = [s1_exec_unit == op_class.alu, s1_alu_output.result]
+        if self.has_multiply:
+            selector_choices += [s1_exec_unit == op_class.mult, mult_output.result]
+        if self.has_shift:
+            selector_choices += [s1_exec_unit == op_class.shift, s1_shifter_output.result]
+        selector_choices += [(s1_exec_unit == op_class.branch) | (s1_exec_unit == op_class.branch_ind), s1_branch_target_output.straight_addr]
+        result = SelectOne(*selector_choices)
 
         s2_result_reg_addr_valid <<= Reg(s1_result_reg_addr_valid, clock_en = stage_2_reg_en)
         self.output_port.valid <<= stage_2_valid & s2_result_reg_addr_valid & (Reg(stage_2_reg_en) | (s2_mem_output.valid & s2_is_ld_st))
