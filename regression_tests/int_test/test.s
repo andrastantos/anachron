@@ -15,14 +15,14 @@ test:
     $a0 <- .fail_str
     # Testing $tpc
     $a1 <- $tpc
-    $a1 <- $a1 - 0x180000bc
+    $a1 <- $a1 - 0x080000b6
     if $a1 != 0 $pc <- _fail
     # Testing ecause
     $a1 <- mem[.ecause_save]
     $a1 <- $a1 - 0x10
     if $a1 != 0 $pc <- _fail
     # Testing $a0
-    $a1 <- mem32[.reg_save+0x10]
+    $a1 <- mem32[.a0_save]
     $a1 <- $a1 - 2
     if $a1 != 0 $pc <- _fail
     $a0 <- .success_str

@@ -569,6 +569,9 @@ class ExecuteStage(GenericModule):
         # Stage 2
         ########################################
         # Ready-valid FSM
+        branch_input = Wire(BranchUnitInputIf)
+        branch_output = Wire(BranchUnitOutputIf)
+
         mem_input = Wire(MemInputIf)
         s2_mem_output = Wire(MemOutputIf)
 
@@ -586,7 +589,10 @@ class ExecuteStage(GenericModule):
         #       is if there's a pending bus operation.
         stage_2_fsm = ForwardBufLogic()
         stage_2_fsm.input_valid <<= stage_1_valid
-        stage_2_fsm.clear <<= self.do_branch
+        # We cancel stage-2 of an instruction, if there was an exception or an interrupt.
+        # This is different from stage-1, where we want to cancel all instructions in a branch-shadow.
+        # The distinction is only relevant for CALL-s, which do branch, yet have side-effects as well.
+        stage_2_fsm.clear <<= branch_output.is_exception_or_interrupt
         block_mem = s1_ldst_output.mem_av | s1_ldst_output.mem_unaligned | s1_fetch_av
         s1_is_ld_st = (s1_exec_unit == op_class.ld_st) | (s1_exec_unit == op_class.branch_ind)
         s2_is_ld_st = (s2_exec_unit == op_class.ld_st) | (s2_exec_unit == op_class.branch_ind)
@@ -607,8 +613,6 @@ class ExecuteStage(GenericModule):
         # To make things right, 'execute 2' has priority updating xPC
 
         # Branch unit
-        branch_input = Wire(BranchUnitInputIf)
-        branch_output = Wire(BranchUnitOutputIf)
         branch_unit = BranchUnit()
         branch_input.opcode          <<= s1_branch_op
         #branch_input.pc              <<= s2_pc
@@ -668,7 +672,7 @@ class ExecuteStage(GenericModule):
             selector_choices += [s1_exec_unit == op_class.mult, mult_output.result]
         if self.has_shift:
             selector_choices += [s1_exec_unit == op_class.shift, s1_shifter_output.result]
-        selector_choices += [(s1_exec_unit == op_class.branch) | (s1_exec_unit == op_class.branch_ind), s1_branch_target_output.straight_addr]
+        selector_choices += [(s1_exec_unit == op_class.branch) | (s1_exec_unit == op_class.branch_ind), concat(s1_branch_target_output.straight_addr, "1'b0")]
         result = SelectOne(*selector_choices)
 
         s2_result_reg_addr_valid <<= Reg(s1_result_reg_addr_valid, clock_en = stage_2_reg_en)
@@ -688,7 +692,7 @@ class ExecuteStage(GenericModule):
 
         self.output_port.data_l <<= Select(s2_exec_unit == op_class.ld_st, Reg(result[15: 0], clock_en = stage_2_reg_en), Select(s2_ldst_op == ldst_ops.store, s2_mem_output.data_l, 0))
         self.output_port.data_h <<= Select(s2_exec_unit == op_class.ld_st, Reg(result[31:16], clock_en = stage_2_reg_en), Select(s2_ldst_op == ldst_ops.store, s2_mem_output.data_h, 0))
-        self.output_port.data_en <<= Reg(~branch_output.do_branch, clock_en = stage_2_reg_en)
+        self.output_port.data_en <<= 1
         #self.output_port.addr <<= Select(s2_exec_unit == op_class.ld_st, s2_result_reg_addr, ldst_result_reg_addr)
         self.output_port.addr <<= Reg(s1_result_reg_addr, clock_en = stage_2_reg_en)
         self.output_port.do_bse <<= Reg(s1_do_bse, clock_en = stage_2_reg_en)
