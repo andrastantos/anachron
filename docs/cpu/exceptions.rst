@@ -4,49 +4,42 @@ Exception Handling
 Exception cause
 ---------------
 
-The :code:`csr_ecause_reg` contains a bit-field where each bit corresponds to a particular possible exception cause.
+The :code:`csr_ecause_reg` contains the value corresponding to the last exception.
 
-The :code:`csr_ecause_reg` register is 'write-one-to-clear', that is to say: to clear a bit in the ecause register SW needs to write a '1' to that bit. If an exception happens on the same cycle when the :code:`csr_ecause_reg` bit is cleared by SW, the bit stays set.
+The :code:`csr_ecause_reg` register is cleared when read.
 
-:code:`csr_ecause_reg` bits are set even in SCHEDULER mode. This is useful for polling for pending interrupts. Other exceptions in SCHEDULER mode cause the processor to jump to address 0. The :code:`csr_ecause_reg` register in these cases can be interrogated to determine the (approximate) reset cause.
-
-In some cases the cause of the reset can't be fully determined. Consider for instance a TASK-mode exception, resulting in a transfer to SCHEDULER mode. Afterwards, a second SCHEDULER mode exception occurs before the SCHEDULER-mode SW had a chance to clear the previous :code:`csr_ecause_reg` bit. The processor jumps to address 0, but when code starts executing from address 0, two :code:`csr_ecause_reg` bits would be set and the cause of the reset could not be unambiguously determined.
+The value of :code:`csr_ecause_reg` is set even in SCHEDULER mode. This is useful for polling for pending interrupts as well as determining the cause of a reset (SCHEDULER mode exceptions cause a jump to address 0). In some cases the cause of the reset can't be fully determined. Consider for instance a TASK-mode exception, resulting in a transfer to SCHEDULER mode. Afterwards, a second SCHEDULER mode exception occurs before the SCHEDULER-mode SW had a chance to read :code:`csr_ecause_reg`. The processor jumps to address 0, but when code starts executing from address 0, only the second exceptions' cause would be available.
 
 The following exception causes are defined:
 
-========== ==================== =================================
-Bit-field  Name                 Description
-========== ==================== =================================
- 0         :code:`exc_swi_0`    SWI 0 instruction executed
- 1         :code:`exc_swi_1`    SWI 1 instruction executed
- 2         :code:`exc_swi_2`    SWI 2 instruction executed
- 3         :code:`exc_swi_3`    SWI 3 instruction executed
- 4         :code:`exc_swi_4`    SWI 4 instruction executed
- 5         :code:`exc_swi_5`    SWI 5 instruction executed
- 6         :code:`exc_swi_6`    SWI 6 instruction executed
- 7         :code:`exc_swi_7`    SWI 7 instruction executed
- 8         :code:`exc_cua`      Unaligned memory access
- 9         :code:`exc_mdp`      Memory access AV (only in TASK mode)
-10         :code:`exc_mip`      Instruction fetch AV (only in TASK mode)
-11         :code:`exc_hwi`      Hardware interrupt (only in TASK mode)
-========== ==================== =================================
+========== ======================== =================================
+Value      Name                     Description
+========== ======================== =================================
+0x0000     :code:`exc_reset`        Hardware reset
+0x0010     :code:`exc_hwi`          Hardware interrupt (only in TASK mode)
+0x0020     :code:`exc_swi_0`        SWI 0 instruction executed (FILL)
+0x0021     :code:`exc_swi_1`        SWI 1 instruction executed (BREAK)
+0x0022     :code:`exc_swi_2`        SWI 2 instruction executed (SYSCALL)
+0x0023     :code:`exc_swi_3`        SWI 3 instruction executed
+0x0024     :code:`exc_swi_4`        SWI 4 instruction executed
+0x0025     :code:`exc_swi_5`        SWI 5 instruction executed
+0x0026     :code:`exc_swi_6`        SWI 6 instruction executed
+0x0027     :code:`exc_swi_7`        SWI 7 instruction executed
+0x0030     :code:`exc_unknown_inst` Undefined instruction
+0x0031     :code:`exc_type`         Type error in instruction operands
+0x0032     :code:`exc_unaligned`    Unaligned memory access
+0x0040     :code:`exc_inst_av`      Instruction fetch access violation
+0x0041     :code:`exc_mem_av`       Memory access violation
+========== ======================== =================================
 
-.. admonition:: Why?
-
-    There are special branch instructions in Espresso that can test a bit in a register and branch based on them being set or cleared. Using these instructions, the SCHEDULER-mode code can very quickly determine the (rough) source of the exception and jump to the appropriate handler. Having a simple exception code would require several more instructions, slowing exception handling down.
-
-    Another reason to have a bit-vector is that there could actually be multiple simultaneous exceptions occurring for an instruction, even though that is a rather rare occasion.
-
-    Finally, clearing exception sources is easiest with a write-1-to-clear semantics: not only does it allow for each individual handler to simply clear it's own 'cause' bit, but it allows the collection of further exceptions (interrupts) while in SCHEDULER mode.
-
-.. todo:: this is WRONG!!! We should change exceptions to an enumeration!!!! The ECAUSE register should be clear-on-read. Finally, we should follow-up with the new exception types for Brew.
+.. note:: The :code:`csr_eaddr_reg` clears to zero when read, which is the same value as :code:`exc_reset`. This aliasing is not problematic if SW handles resets and exceptions in different code-paths.
 
 Interrupts
 ----------
 
-Interrupts can occur both in TASK or SCHEDULER mode. When Espresso is in TASK mode, it transfers execution into SCHEDULER mode. When an interrupt occurs in SCHEDULER mode, the execution flow is not modified, but the :code:`exc_hwi` bit in :code:`csr_ecause_reg` is set. This allows SCHEDULER-mode code to poll for interrupts.
+Interrupts can occur both in TASK or SCHEDULER mode. When Espresso is in TASK mode, it transfers execution into SCHEDULER mode. When an interrupt occurs in SCHEDULER mode, the execution flow is not modified, but :code:`csr_ecause_reg` is set to :code:`exc_hwi`. This allows SCHEDULER-mode code to poll for interrupts.
 
-The external interrupt input of Espresso is level-sensitive, active low. This means that each interrupt source must have its own interrupt clear logic, and that interrupt handling SW must clear the pending interrupt both at the source as well as in :code:`csr_ecause_reg`.
+The external interrupt input of Espresso is level-sensitive, active low. This means that each interrupt source must have its own interrupt clear logic, and that interrupt handling SW must clear the pending interrupt at the source.
 
 Multiple external interrupt sources can share the interrupt input of Espresso through wired-and logic.
 
@@ -61,7 +54,7 @@ CSRs
 ================= =========================== ============ ================================
 Offset            Name                        Access       Description
 ================= =========================== ============ ================================
-0x400_0014        :code:`csr_ecause_reg`      R/W1C        Contains the reason for the last exception.
+0x400_0014        :code:`csr_ecause_reg`      R-to-clear   Contains the reason for the last exception.
 0x400_0018        :code:`csr_eaddr_reg`       R            The effective address that caused the latest exception
 ================= =========================== ============ ================================
 

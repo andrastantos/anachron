@@ -1,3 +1,6 @@
+Debugging CoreMark
+==================
+
 So, this is interesting...
 
 The coremark test runs to completion in the simulator (i.e. iVerilog), yet it keeps restarting in the FPGA.

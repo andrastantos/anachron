@@ -48,8 +48,42 @@ Espresso mostly adheres to the Brew ISA, but for various reasons there are a few
  - No synchronization (load-acquire; store-release) primitives
 
 
+
+Memory access patterns
+----------------------
+
+Since Espressos internal implementation is tightly coupled to - and optimized for - its external memory interface, it's performance is largely predicted by the memory access patterns on this interface.
+
+Espresso supports 8-beat bursts for instruction fetches, and 2-beat bursts for memory accesses. Each beat transfers 16-bits of data. Each burst is preceded and followed by a clock-cycle of extra activity (to satisfy DRAM timing requirements). This means that a 16-byte instruction fetch burst takes 10 clock cycles, while a 32-bit load or store takes 4 clock cycles on the bus.
+
+.. admonition:: Why?
+
+    Loads and stores can only use up to 4-beat bursts; Espresso can't deal with more than 32-bits of data at a time. Instruction fetch bursts can be much longer as long as we can put the fetched data in some temporary buffer, but there's a limit: every time the code branches, we have to throw away all the prefetched instruction words and start over from the new location. There is a balance between the amount of data we are willing to throw away and the benefits of a long burst. Profiling shows that the optimum point is 8 word (16-byte) long bursts.
+
+
+
+Mips/MHz (IPC) expectations
+---------------------------
+
+We should expect about 25% of our operations to be memory accesses, stalling for 3 cycles. Branches, which happen about 12.5% of the time would have a penalty of ~5 clock cycles. Other hazards will add about one stall every 8 instructions. On top of this, our instruction length on average is 24 bits, so we should expect 0.5 cycles of stall just from instruction assembly. An extra 2/10th of stall comes from the burst overhead of the DRAM access patterns for fetches. This gives us 2.2 stall cycles for every instruction executed, or an expected IPC of 0.31.
+
+Memory bandwidth implications
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A video of 320x240 resolution, 8 bits per pixel and 50Hz update rate (this is PAL video) would need 3.84MByte/sec of data on average. Higher during active lines, but nothing during blanking and sync periods. With the 10-cycles-for-16-bytes burst rate, we would need 2.4M memory cycles every second to refresh the screen. However, we should probably add about 4 cycles of memory arbitration lost between the CPU and the video controller for every burst, resulting in 3.36M cycles for display activity. At a 10MHz clock rate, this leaves us with 6.64M cycles for CPU access.
+
+An IPC of 0.31 at 10MHz means that the processor would need to fetch 3.1M instructions (at 24 bits each) every second, resulting in 9.3MByte/sec fetch requirements. That amount of data needs 5.81M cycles to transfer after considering the burst overhead.
+
+Out of the 3.1M instructions, 0.775M would either a load or a store, each requiring 4 cycles on the bus to complete. This is an extra 3.1M cycles.
+
+Adding it up: 3.36M for video, 5.81M for fetch and 3.1M for load/store = 12.27M cycles. But we're running at 10MHz, we only have 10M cycles to work with in every second.
+
+The result is that the processor will get throttled by video: we won't be able to achieve our 0.31 IPC once we turn video on. The real number should be around 0.23 instead.
+
 Comparison
 ----------
+
+Let's quickly compare Espresso to its imaginary contemporaries:
 
 ==============   ========   ==========================   =========
 Chip             Year       Cost (small quantities)      MIPS/MHz `* <https://en.wikipedia.org/wiki/Instructions_per_second>`_
@@ -60,7 +94,7 @@ Intel 8088       1979       $125 ('79) $14 ('81)           0.075
 MC68000          1979       ~$400 ('79) $125 ('81)         0.175
 Intel 80286      1982       $155 ('85)                     0.107
 MC68010          1982                                      0.193
-**Espresso**     *1982*     *~$85* [#note_cost]_         *~0.27*
+**Espresso**     *1982*     *~$85* [#note_cost]_         *~0.23*
 MC68020          1984       $487 ('84)                     0.303
 Intel 80386      1985       $300 ('85)                     0.134
 ARM2             1986                                      0.5
@@ -99,10 +133,10 @@ Processor         Clock speed  CoreMark CoreMark/MHz
 
 *Methodology for PCs:*
 
-I've used :ref:`ia16-elf-gcc <https://launchpad.net/~tkchia/+archive/ubuntu/build-ia16/>` for 16-bit mode compilations. This generated a 'tiny' .com file, running under DOS in real mode.
-I've used :ref:`djgpp <https://github.com/andrewwutw/build-djgpp>` (version 12.2.0) for 32-bit compilations. This generated an .exe file that run under a dos-extender in protected mode.
+I've used `ia16-elf-gcc <https://launchpad.net/~tkchia/+archive/ubuntu/build-ia16/>`_ for 16-bit mode compilations. This generated a 'tiny' .com file, running under DOS in real mode.
+I've used `djgpp <https://github.com/andrewwutw/build-djgpp>`_ (version 12.2.0) for 32-bit compilations. This generated an .exe file that run under a dos-extender in protected mode.
 
-For the operating system, I've used :ref:`FreeDOS 1.3 <https://www.freedos.org/>`, with as minimal amount of drivers loaded as I could. All the machines used a VGA card for display and a CFCard and a 1.44" floppy for storage. Not that any of this should matter...
+For the operating system, I've used `FreeDOS 1.3 <https://www.freedos.org/>`_, with as minimal amount of drivers loaded as I could. All the machines used a VGA card for display and a CFCard and a 1.44" floppy for storage. Not that any of this should matter...
 
 *Methodology for Espresso:*
 
@@ -114,9 +148,11 @@ It's interesting to see that - while the 16- or 32-bit version of the code does 
 
 The behavior of the 'turbo' switch on these motherboards is strange. On the 80286, it's straight-forward: it cuts the clock rate in half. On the 80386 one, it's more complicated. This motherboard also contains an external cache, maybe the turbo switch mocks with that? Since the CoreMark/MHz rating changes depending on the turbo status, it can't simply be the change in clock rate. For the 80486 motherboard, I have even less clue what is going on.
 
-The fact that the 80486DX is almost twice as performant as the 80486 shows that not much of the external world impacts the benchmark results: the code probably is running almost entirely inside the on-chip cache. That of course makes it even more mysterious how the turbo switch can influence the results in such a dramatic way.
+The fact that the 80486DX2 is almost twice as performant as the 80486 shows that not much of the external world impacts the benchmark results: the code probably is running almost entirely inside the on-chip cache. That of course makes it even more mysterious how the turbo switch can influence the results in such a dramatic way.
 
 It's also nice to see how Espresso stacks up. From the MIPS/MHz numbers above, I have expected it to be in between a 80386 and a 80486. In fact it is. More or less. Of course, it's heard-warming to see that my little creation holds its own (MHz to MHz) gainst a 80386, even compares reasonable well to a 80486, but I have doubts that this would translate to real-world performance. This is just one benchmark after all, one that is arguably not all that close to what these processors would do in reality.
 
-This also shows the future potential of the Brew architecture, if it can be scaled to the same clock speeds that subsequent Intel processors achieved.
+It's also important to note that Espresso would not be able to run at 33MHz or anything close to it: not only would it be limited by the clock rates achievable in 1.5u, it's architecture directly ties it to the memory speed. It would max out at around 12MHz with the highest speed (non-FPM) DRAMs that were available.
+
+Still, the comparison shows the future potential of the Brew architecture: an updated memory interface (with FPM support), some internal instruction cache to decouple the CPU clock for memory speed and it would be quite competitive with more advanced Intel processors.
 
