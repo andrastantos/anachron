@@ -156,3 +156,29 @@ It's also important to note that Espresso would not be able to run at 33MHz or a
 
 Still, the comparison shows the future potential of the Brew architecture: an updated memory interface (with FPM support), some internal instruction cache to decouple the CPU clock for memory speed and it would be quite competitive with more advanced Intel processors.
 
+Synthesis
+.........
+
+Another way to compare the core to its contemporaries is through synthesis. I don't have access to the original cores (they weren't written in Verilog anyways), but there have been several efforts in accurate re-implementations of some of the CPUs of the era. One can at least synthesize those to see how Espresso compares to them:
+
+===================== =======  ========  =======  ========= ============  ==================================================================
+Core name             CLS      BSRAM     DSP      Fmax      Transistors   Notes
+===================== =======  ========  =======  ========= ============  ==================================================================
+t65                   542      0         0        56MHz     4528          6502 core
+i8088 (MCL86)         1072     8         0        45.8MHz   29000         Used the version from MiSTer PCXT project
+t80                   1243     0         1        32MHz     8500          Z80 core
+**Espresso**          *2745*   *0*       *2*      *27MHz*                 Disabled re-synchronizer to attain timing report
+fx68k                 3274     23        0        43MHz     68000         BSRAMs are used for the various micro-code sequencers
+===================== =======  ========  =======  ========= ============  ==================================================================
+
+*Methodology*
+
+For these builds, I've used MiSTer cores for the most part, as those have seen a good amount of use and thus testing coverage. I've used the GoWin toolset version 1.9.8.10 build (60820), targeting a GW1N-9 part in the C7/I6 speed grade.
+
+Transistor counts come from `wikipedia <https://en.wikipedia.org/wiki/Transistor_count#Transistor_density>`_.
+
+*Observations*
+
+These results seem to confirm that Espresso would have stacked up well with the 16-bit processors of its era: certainly more complex and larger than the 8-bitters of the age, but competitive with the new crop: the MC68000 from Motorola and the i80286 from Intel (this later core I don't have, but it's about 4x more complex than the 8088 based on transistor counts).
+
+The timing closure results are not favorable, something I'm hoping to improve upon.
