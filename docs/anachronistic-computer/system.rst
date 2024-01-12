@@ -573,3 +573,133 @@ According to http://www.bitsavers.org/components/national/_dataBooks/1983_Nation
 for power, and on par for speed.
 
 ALS was also around and was still twice as fast as either LS or HC.
+
+
+INTERNAL PERIPHERALS
+====================
+
+3 chip-selects: Keyboard matrix interface (13-bit column, 8-bit row)
+1 chip-select: I/O 1
+    RTC+CMOS SRAM (I2C)
+    HDD (SDCard)
+    WiFi (SPI)
+    Timer(s)
+    USB
+1 chip-select: I/O 2
+    USB
+    IRQ controller
+1 chip-select: internal FDD
+1 chip-select: config GPO (DMA enable, extra address pins for GFX, etc.)
+1 chip-select: GFX
+
+This happens to be 8 (yay, something actually works out!!)
+
+EXTERNAL PERIPHERALS
+====================
+
+Keyboard: USB
+Mouse: USB
+Flash drive: USB
+Game controller: USB
+Ethernet: USB (?)
+Printer: USB (?)
+
+Serial terminal: dedicated RS-232
+
+DMA channel mapping
+===================
+
+Channel 0: Bus-master for Graphics and sound
+Channel 1: ISA_DMA1
+Channel 2: FDD/SDCard/WiFi/USB/ISA_DMA2
+Channel 3: ISA_DMA3
+
+Interrupt channel mapping
+=========================
+
+Int0:  Graphics    GFX
+Int1:  Sound       GFX
+Int2:  Timer0      IO0
+Int2:  Timer1      IO1
+Int3:  RTC         GPIO
+Int4:  WiFi        GPIO
+Int5:  USB         IO1/IO2
+Int6:  ISA_IRQ2    GPIO
+Int7:  ISA_IRQ3    GPIO
+Int8:  ISA_IRQ4    GPIO
+Int9:  ISA_IRQ5    GPIO
+Int10: ISA_IRQ6    GPIO
+Int11: ISA_IRQ7    GPIO
+
+Now, whether all these need an interrupt controller or not, that's debatable. The ISA interrupts certainly do.
+
+Let's see how this can map to an I/O controller...
+
+
+========== ==================== ===========
+Pin Number Pin Name             Description
+========== ==================== ===========
+1          PC_0_USB_A_D+        Port C bit 0; USB D+
+2          PC_1_USB_A_D-        Port C bit 1; USB D-
+3          PC_2_USB_B_D+        Port C bit 2; USB D+
+4          PC_3_USB_B_D-        Port C bit 3; USB D-
+5          PC_4_USB_C_D+        Port C bit 4; USB D+
+6          PC_5_USB_C_D-        Port C bit 5; USB D-
+7          PA_0_TXD             Port A bit 0; UART  serial RX
+8          PA_1_RXD             Port A bit 1; UART  serial TX
+9          PA_2_RST_SPI_MOSI    Port A bit 2; SPI   serial RST/TX_EN
+10         PA_3_CTS_SPI_MISO    Port A bit 3; SPI   serial CST
+11         PA_4_KB_C_SPI_CLK    Port A but 4; SPI   PS/2 keyboard port clock pin
+12         PA_5_KB_D_SPI_CS     Port A but 5; SPI   PS/2 keyboard port data pin
+13         PA_6_SDA             Port A bit 6; I2C
+14         PA_7_SCL             Port A bit 7; I2C
+15         PB_0_SD_D0           Port B bit 0; SDIO
+16         PB_1_SD_D1           Port B bit 1; SDIO
+17         PB_2_SD_D2           Port B bit 2; SDIO
+18         SYS_CLK              Clock input
+19         PB_3_SD_D3           Port B bit 3; SDIO
+20         GND                  Ground input
+
+21         PB_4_SD_CMD          Port B bit 4; SDIO
+22         PB_5_SD_CLK          Port B bit 5; SDIO
+23         nDRQ                 Active low DMA request
+24         nDACK                Active low DMA response
+25         nDMA_TC              DMA terminal count
+26         nCS                  Active low chip select
+27         nWE                  Active low write-enable
+28         USB_CLK              48MHz clock input for USB
+29         nRST                 Active low reset input
+30         nINT                 Active low interrupt output
+31         A0                   Index/data register select
+32         D0                   Data bus
+33         D1                   Data bus
+34         D2                   Data bus
+35         D3                   Data bus
+36         D4                   Data bus
+37         D5                   Data bus
+38         D6                   Data bus
+39         D7                   Data bus
+40         VCC                  Power input
+========== ==================== ===========
+
+
+The clock inputs are in a bit weird locations, but that's due to how UnIC has its clock inputs connected. It's not a requirement to use clock pins for clocks, but it's better.
+Also, USB pins are connected to diff-pairs. Again, not a requirement, but probably better.
+
+So, it actually fits. I can actually get 3 USB ports on it.
+
+Two of these chips would give me 6 USB ports and enough GPIOs to handle the interrupt controller functionality needed.
+
+Now, to DMA sharing: USB (at 12Mbps) doesn't need priming, if I have internal buffers. And I *can* have internal buffers as USB is already something that couldn't have existed in the old days so the fact that it wouldn't have fit in the chip doesn't matter. Same goes for SDIO and SPI. So, all can now share the same DMA channel: the transfer needs to be set up by the host and the target peripheral would need to be selected inside the chip. In fact, both of the I/O chips can share the same DMA channel for the same reason without conflicts.
+
+Now, can we share with the FDD controller? The same logic holds, but I need to filter nDACK towards the FDD controller at least until it's proven not to be problematic. That can be done by a simple OR gate, where the other leg is driven by a GPIO. DRQ needs OR-ing together (or something) with all the shared sources. Not sure if open-collector driving with pull-down is fast enough.
+
+In fact, the very same trick can be done with the ISA bus as well, especially if the DMA channel in question ends up being ISA_DMA2; that's pretty much dedicated for FDD anyway: on this we clearly understand the behavior, we know it doesn't need priming, so sharing is possible.
+
+We *could* also disperse the two I/O controllers to two DMA channels, but I'm not sure it's interesting: one would mostly have GPIOs and USB while the other would have all the high-speed interfaces, so most DMA-aware things would share anyway (and USB is unpredictable, depends on where the user plugs stuff in).
+
+
+
+
+
+

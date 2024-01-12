@@ -5,9 +5,11 @@ According to http://tinyvga.com/vga-timing: VGA pixel clock is 25.175MHz for 640
 
 VGA monitors though never really had a resolution of 320x240. The VGA controller instead doubled every scan-line (480 scan-lines) and each pixel (640 pixels). The refresh rate was 60Hz. Since devices at the time surely didn't have the internal memory to store the scan-line needed for doubling, they read it from memory twice. The end result of this is that the average datarate for 640x480 is 18.4Mpixel/s. For 320x240 it's only half of it, around 9.2Mpixel/s. In a modern implementation though we can cheat, and create the internal scan-line store needed for doubling. This would reduce 320x240 datarate to *4.6Mpixel/s*.
 
+Similar techniques can be used to create 256x192 and potentially 512x384 pixel resolutions as well from the VESA 768x576@60Hz or the 1024x768@60Hz base resolutions.
+
 NTSC or PAL TV was different: it used 60Hz (50Hz) field rate, but only 30Hz (25Hz) refresh rate. On top, NTSC only guaranteed 200 or so visible scan-lines. So, for TV it was either 320x200x60Hz or 320x240x50Hz. These both turn into the same, *3.84MPixel/s*.
 
-Given that we have give-or-take 16MBps memory bandwidth in the whole system, we can expect to support the following:
+Given that we have, give-or-take, 16MBps memory bandwidth in the whole system, we can expect to support the following:
 
 1. VGA, 640x480 resolution at 4bpp -> ~9.2MBps bandwidth requirement.
 2. QGVA, 320x240 resolution at 8bpp, but *with* internal scan-line doubler -> ~4.6MBps
@@ -15,11 +17,55 @@ Given that we have give-or-take 16MBps memory bandwidth in the whole system, we 
 
 The first resolution is going to slow the CPU to a crawl. It's OK for interactive, non-CPU intensive tasks, such as GUIs, but not for games, I don't think. The second and the third modes are roughly the same. The second one would not have been possible with the chip-technology of the time (the scan-line buffer is too large to fit, I'm afraid), but it's doable for an FPGA implementation. The third would have been the main way of using the machine originally, but pointless to implement today.
 
-So, the two supported resolutions are:
-1. VGA: 640x680@60Hz, 4bpp (or less)
-2. QVGA: 320x240@60Hz, 8bpp (or less)
+So, the supported resolutions are the following:
 
-Let's see timing-wise where we end up!
+Based on 640x480@60Hz timing (12.5875MHz pixel clock):
+===================  =============  =============  =================  ==================  =========  ========  ====================
+ Mode                Back Porch     Sync Pulse     Front Porch        Active Area         Total      Setup     Pixel replication
+===================  =============  =============  =================  ==================  =========  ========  ====================
+   640x480@60Hz  H     24             48              8                 320                 400         80        0.5
+                 V     33              2             10                 480                 525         45          1
+   320x240@60Hz  H     24             48              8                 320                 400         80          1
+                 V     33              2             10                 480                 525         45          2
+   Timing regs   H     11             35             39                                     199
+                 V    512            514                                479                 524
+===================  =============  =============  =================  ==================  =========  ========  ====================
+
+Based on 640x400@60Hz timing (12.5875MHz pixel clock):
+===================  =============  =============  =================  ==================  =========  ========  ====================
+ Mode                Back Porch     Sync Pulse     Front Porch        Active Area         Total      Setup     Pixel replication
+===================  =============  =============  =================  ==================  =========  ========  ====================
+   640x400@60Hz  H     24             48              8                 320                 400         80        0.5
+                 V     35              2             12                 400                 449         49          1
+   320x200@60Hz  H     24             48              8                 320                 400         80          1
+                 V     35              2             12                 400                 449         49          2
+   Timing regs   H     11             35             39                                     199
+                 V    434            436                                399                 448
+===================  =============  =============  =================  ==================  =========  ========  ====================
+
+Based on 768x576@60Hz timing **not exact** (11.6773MHz pixel clock):
+===================  =============  =============  =================  ==================  =========  ========  ====================
+ Mode                Back Porch     Sync Pulse     Front Porch        Active Area         Total      Setup     Pixel replication
+===================  =============  =============  =================  ==================  =========  ========  ====================
+   256x192@60Hz  H     36             26              8                 256                 326         70          1
+                 V     17              3              1                 576                 597         21          3
+   Timing regs   H     17             30             34                                     162
+                 V    592            595                                575                 596
+===================  =============  =============  =================  ==================  =========  ========  ====================
+
+Based on 1024x768@60Hz timing (16.25MHz pixel clock):
+===================  =============  =============  =================  ==================  =========  ========  ====================
+ Mode                Back Porch     Sync Pulse     Front Porch        Active Area         Total      Setup     Pixel replication
+===================  =============  =============  =================  ==================  =========  ========  ====================
+   512x384@60Hz  H     40             34              6                 256                 336         80          0.5
+                 V     29              6              3                 768                 806         38          2
+   256x192@60Hz  H     40             34              6                 256                 336         80          1
+                 V     29              6              3                 768                 806         38          4
+   Timing regs   H     19             36             39                                     167
+                 V    796            802                                767                 805
+===================  =============  =============  =================  ==================  =========  ========  ====================
+
+Let's see where we end up in bus utilization!
 
 VGA@4bbp resolution needs 156,600 bytes for every refresh. Using 16-byte bursts, each burst would take 16/2+2=10 cycles. A frame takes 9600 such bursts, or 96,000 clock-cycles. At 60Hz refresh rate this turns into 5.76M clock cycles. If our system runs at an 8MHz clock rate, that's a whopping 72% of the available bus bandwidth.
 
@@ -52,7 +98,7 @@ We have to independent clock inputs (and two internal clock-domains): one for th
 
 .. admonition:: Why?
 
-    Many computers of the era (maybe most) used a single clock source and derived their system clock from their video clock (the IBM PC is an obvious exception). I would not want to go that route. The strict division ratios (we couldn't have had fancy PLLs) would mean that we can't maximize system performance as :code:`sys_clk` would be slower than it could otherwise be. It would also have meant that PAL and NTSC versions would have run at different speed. So, I decided to eat the extra cost and include a second crystal oscillator.
+    Many computers of the era (maybe most) used a single clock source and derived their system clock from their video clock (the IBM PC is an obvious exception). I would not want to go that route. The strict division ratios (we couldn't have had fancy PLLs) would mean that we can't maximize system performance as :code:`sys_clk` would be slower than it could otherwise be. It would also have meant that PAL and NTSC versions would have run at different speed. So, I decided to eat the extra cost and include a second crystal oscillator. In fact, if we wanted to support the 256 and 512 pixel horizontal resolutions, a third clock source would need to be provided.
 
 Output signals
 --------------
@@ -102,11 +148,11 @@ The problem with emulating interlace on a VGA monitor is the following: in inter
 Smooth-scrolling
 ----------------
 
-Smooth scrolling is a shared feature between the DMA and the graphics controller. The DMA can shift it's starting read-out position, but only by 16 bits. That's (depending on the bit-depth of the screen) either 2,4, 8 or 16 pixels.
+Smooth scrolling is a shared feature between the DMA and the graphics controller. The DMA can shift it's starting read-out position, but only by 32 bits. That's (depending on the bit-depth of the screen) somewhere between 4 and 32 pixels.
 
-The graphics controller will have to support the throwing away of the excess data at the beginning (and end) of the scan-line to implement pixel-level smooth scrolling.
+The graphics controller will have to support the throwing away of the excess data at the beginning of the scan-line to implement pixel-level smooth scrolling. The DMA controller also needs to support a post-scan-line adjustment of the read pointer to align the reads with the next scan-line (i.e. screen buffer pitch is independent of screen resolution).
 
-The programmer would need to be careful to set the active portion of the 2D DMA in the fractional pixel cases to include these excess reads.
+The programmer would need to be careful to set the active portion of the 2D DMA in the fractional pixel cases to include these excess reads and to set the post-scan-line update amount appropriately as well.
 
 Vertical smooth scrolling of course is purely a function of the DMA controller by moving the address of the buffer-start.
 
@@ -115,31 +161,27 @@ To allow for 'infinite' smooth horizontal (or vertical) scrolling, the DMA contr
 2D DMA
 ------
 
-There are two 2D DMA engines, one for each layer. The 2D DMA has the following registers:
+There is a 2D DMA engine for each layer. The 2D DMA has the following registers:
 
-#. BASE_ADDR: 32-bit physical address (16-bit aligned, LSB is not implemented)
-#. LINE_LEN: length of a scan-line in 16-bit increments. This is an 8-bit register, though occupies a 32-bit location
-#. LINE_OFS: offset to the next scan-line in 16-bit increments. This is an 10-bit register, though occupied a 32-bit location
-#. WRAP_BITS: Number of bits used for addressing. This is a 5-bit register. When incrementing the address, only the specified bits are changed. The top bits are determined by BASE_ADDR and never change
-
-.. note:: The (re)start of the DMA is controlled by the timing module: it is restarted at the beginning of the last scan-line that is part of the vertical blanking.
-
-.. note:: 2D DMA generates 16-byte (8-beat) bursts in single-layer and 8-byte (4-beat) bursts in dual-layer mode. It needs to check for and early-terminate page-crossing bursts.
-
-.. note:: Do we want to support scan-line replication in DMA as well? That's how it would have been done in the days of yore...
+===============  ===============  ===========
+Size             Name             Notes
+===============  ===============  ===========
+30               base_addr        Physical base address; bottom 2 bits are always 0 (i.e. measured in 32-bit quantities)
+5                update_mask      Number of bits to update during DMA address updates
+8                post_increment   Signed end-of-line post-increment value, measured in DWORDs
+30               cur_addr         Physical current address; bottom 2 bits are always 0 (i.e. measured in 32-bit quantities)
+===============  ===============  ===========
 
 Sprite DMA
 ~~~~~~~~~~
 
-#. BASE_ADDR: 32-bit physical address (32-bit aligned, lower two bits are not implemented)
-
-.. note:: Timing (including re-start and gating) of the DMA is directed from the timing module: no need to specify the total DMA size
+===============  ===============  ===========
+Size             Name             Notes
+===============  ===============  ===========
+30               base_addr        Physical base address; bottom 2 bits are always 0 (i.e. measured in 32-bit quantities)
+===============  ===============  ===========
 
 .. note:: there's one sprite DMA for each HW sprite
-
-.. note:: Sprite DMAs generate 8-byte (4-beat) bursts. They can't generate and thus are not interested in page-crossing bursts.
-
-.. note:: Do we want to support scan-line replication in DMA as well? That's how it would have been done in the days of yore...
 
 
 Data FIFOs

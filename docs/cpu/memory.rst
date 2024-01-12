@@ -64,7 +64,7 @@ a[4]         addr[13]    addr[5]   addr[16]   addr[5]
 a[5]         addr[14]    addr[6]   addr[17]   addr[6]
 a[6]         addr[15]    addr[7]   addr[18]   addr[7]
 a[7]         addr[16]    addr[8]   addr[19]   addr[8]
-a[8]         addr[19]    addr[17]  addr[20]   addr[9]
+a[8]         addr[18]    addr[17]  addr[20]   addr[9]
 a[9]         addr[20]    addr[19]  addr[21]   addr[10]
 a[10]        addr[22]    addr[21]  addr[22]   addr[11]
 =========== =========== ========= =========== =========
