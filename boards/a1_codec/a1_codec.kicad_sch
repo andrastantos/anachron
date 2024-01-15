@@ -788,7 +788,7 @@
       (property "Value" "74LV6T17" (at 5.08 -3.81 0)
         (effects (font (size 1.27 1.27)))
       )
-      (property "Footprint" "Package_SO:TSSOP-14_4.4x5mm_P0.65mm" (at 0 0 0)
+      (property "Footprint" "Package_SO:TSSOP-14_4.4x5mm_P0.65mm" (at 0 -2.54 0)
         (effects (font (size 1.27 1.27)) hide)
       )
       (property "Datasheet" "https://www.ti.com/lit/ds/symlink/sn74lv6t17.pdf" (at 2.54 8.89 0)
@@ -805,27 +805,6 @@
       )
       (property "ki_fp_filters" "DIP*W7.62mm*" (at 0 0 0)
         (effects (font (size 1.27 1.27)) hide)
-      )
-      (symbol "74LV6T17_0_1"
-        (polyline
-          (pts
-            (xy -1.778 -0.762)
-            (xy -0.762 -0.762)
-            (xy -0.762 0.762)
-          )
-          (stroke (width 0) (type default))
-          (fill (type none))
-        )
-        (polyline
-          (pts
-            (xy -2.54 -0.762)
-            (xy -1.778 -0.762)
-            (xy -1.778 0.762)
-            (xy 0 0.762)
-          )
-          (stroke (width 0) (type default))
-          (fill (type none))
-        )
       )
       (symbol "74LV6T17_1_0"
         (polyline
@@ -847,6 +826,27 @@
           (number "2" (effects (font (size 1.27 1.27))))
         )
       )
+      (symbol "74LV6T17_1_1"
+        (polyline
+          (pts
+            (xy -1.778 -0.635)
+            (xy -0.762 -0.635)
+            (xy -0.762 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
+        )
+        (polyline
+          (pts
+            (xy -2.54 -0.635)
+            (xy -1.778 -0.635)
+            (xy -1.778 0.889)
+            (xy 0 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
+        )
+      )
       (symbol "74LV6T17_2_0"
         (polyline
           (pts
@@ -862,9 +862,30 @@
           (name "~" (effects (font (size 1.27 1.27))))
           (number "3" (effects (font (size 1.27 1.27))))
         )
-        (pin open_collector inverted (at 7.62 0 180) (length 3.81)
+        (pin open_collector line (at 7.62 0 180) (length 3.81)
           (name "~" (effects (font (size 1.27 1.27))))
           (number "4" (effects (font (size 1.27 1.27))))
+        )
+      )
+      (symbol "74LV6T17_2_1"
+        (polyline
+          (pts
+            (xy -1.778 -0.635)
+            (xy -0.762 -0.635)
+            (xy -0.762 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
+        )
+        (polyline
+          (pts
+            (xy -2.54 -0.635)
+            (xy -1.778 -0.635)
+            (xy -1.778 0.889)
+            (xy 0 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
         )
       )
       (symbol "74LV6T17_3_0"
@@ -882,9 +903,30 @@
           (name "~" (effects (font (size 1.27 1.27))))
           (number "5" (effects (font (size 1.27 1.27))))
         )
-        (pin open_collector inverted (at 7.62 0 180) (length 3.81)
+        (pin open_collector line (at 7.62 0 180) (length 3.81)
           (name "~" (effects (font (size 1.27 1.27))))
           (number "6" (effects (font (size 1.27 1.27))))
+        )
+      )
+      (symbol "74LV6T17_3_1"
+        (polyline
+          (pts
+            (xy -1.778 -0.635)
+            (xy -0.762 -0.635)
+            (xy -0.762 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
+        )
+        (polyline
+          (pts
+            (xy -2.54 -0.635)
+            (xy -1.778 -0.635)
+            (xy -1.778 0.889)
+            (xy 0 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
         )
       )
       (symbol "74LV6T17_4_0"
@@ -898,13 +940,34 @@
           (stroke (width 0.254) (type default))
           (fill (type background))
         )
-        (pin open_collector inverted (at 7.62 0 180) (length 3.81)
+        (pin open_collector line (at 7.62 0 180) (length 3.81)
           (name "~" (effects (font (size 1.27 1.27))))
           (number "8" (effects (font (size 1.27 1.27))))
         )
         (pin input line (at -7.62 0 0) (length 3.81)
           (name "~" (effects (font (size 1.27 1.27))))
           (number "9" (effects (font (size 1.27 1.27))))
+        )
+      )
+      (symbol "74LV6T17_4_1"
+        (polyline
+          (pts
+            (xy -1.778 -0.635)
+            (xy -0.762 -0.635)
+            (xy -0.762 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
+        )
+        (polyline
+          (pts
+            (xy -2.54 -0.635)
+            (xy -1.778 -0.635)
+            (xy -1.778 0.889)
+            (xy 0 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
         )
       )
       (symbol "74LV6T17_5_0"
@@ -918,13 +981,34 @@
           (stroke (width 0.254) (type default))
           (fill (type background))
         )
-        (pin open_collector inverted (at 7.62 0 180) (length 3.81)
+        (pin open_collector line (at 7.62 0 180) (length 3.81)
           (name "~" (effects (font (size 1.27 1.27))))
           (number "10" (effects (font (size 1.27 1.27))))
         )
         (pin input line (at -7.62 0 0) (length 3.81)
           (name "~" (effects (font (size 1.27 1.27))))
           (number "11" (effects (font (size 1.27 1.27))))
+        )
+      )
+      (symbol "74LV6T17_5_1"
+        (polyline
+          (pts
+            (xy -1.778 -0.635)
+            (xy -0.762 -0.635)
+            (xy -0.762 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
+        )
+        (polyline
+          (pts
+            (xy -2.54 -0.635)
+            (xy -1.778 -0.635)
+            (xy -1.778 0.889)
+            (xy 0 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
         )
       )
       (symbol "74LV6T17_6_0"
@@ -938,13 +1022,34 @@
           (stroke (width 0.254) (type default))
           (fill (type background))
         )
-        (pin open_collector inverted (at 7.62 0 180) (length 3.81)
+        (pin open_collector line (at 7.62 0 180) (length 3.81)
           (name "~" (effects (font (size 1.27 1.27))))
           (number "12" (effects (font (size 1.27 1.27))))
         )
         (pin input line (at -7.62 0 0) (length 3.81)
           (name "~" (effects (font (size 1.27 1.27))))
           (number "13" (effects (font (size 1.27 1.27))))
+        )
+      )
+      (symbol "74LV6T17_6_1"
+        (polyline
+          (pts
+            (xy -1.778 -0.635)
+            (xy -0.762 -0.635)
+            (xy -0.762 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
+        )
+        (polyline
+          (pts
+            (xy -2.54 -0.635)
+            (xy -1.778 -0.635)
+            (xy -1.778 0.889)
+            (xy 0 0.889)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
         )
       )
       (symbol "74LV6T17_7_0"
@@ -1890,6 +1995,12 @@
   (wire (pts (xy 125.73 36.83) (xy 125.73 44.45))
     (stroke (width 0) (type default))
     (uuid ff53ba92-30af-4652-990d-a88b5c177d6d)
+  )
+
+  (text "TODO:\n- Replace all 402-s with 602-es\n- Widen power traces\n- Double-check power consumption on LDO\n"
+    (at 186.69 93.98 0)
+    (effects (font (size 1.27 1.27)) (justify left bottom))
+    (uuid 458ac735-a445-43ee-a257-ab612c485b65)
   )
 
   (label "RLIN{slash}GPIO3" (at 76.2 168.91 180) (fields_autoplaced)
