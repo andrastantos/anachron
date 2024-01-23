@@ -436,7 +436,7 @@
     },
     "net_colors": {
       "+5V": "rgb(181, 255, 158)",
-      "GND": "rgb(182, 93, 85)"
+      "GND": "rgb(129, 29, 182)"
     },
     "netclass_assignments": null,
     "netclass_patterns": []
@@ -510,6 +510,10 @@
     [
       "0237d891-a96a-4307-a4d5-070a11371520",
       "ETH"
+    ],
+    [
+      "77f1c88a-ea71-40c5-9918-dee285c676a1",
+      "USB"
     ],
     [
       "58d11f1c-6aae-4928-b318-2d07bb2e6df5",
