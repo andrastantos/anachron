@@ -1758,7 +1758,7 @@
     (effects (font (size 1.27 1.27)) (justify right))
     (uuid c0f7dabe-6cce-4695-b960-ee1d26005e13)
   )
-  (hierarchical_label "~{LAN_IRQ}" (shape output) (at 158.115 80.01 0) (fields_autoplaced)
+  (hierarchical_label "~{INT}" (shape output) (at 158.115 80.01 0) (fields_autoplaced)
     (effects (font (size 1.27 1.27)) (justify left))
     (uuid ef00cf4c-8228-42f4-9e0d-93f10745c660)
   )
