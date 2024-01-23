@@ -408,7 +408,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "a1_mega.kicad_pro",
+    "filename": "a1_mini.kicad_pro",
     "version": 1
   },
   "net_settings": {
@@ -435,7 +435,8 @@
       "version": 3
     },
     "net_colors": {
-      "+5V": "rgb(181, 255, 158)"
+      "+5V": "rgb(181, 255, 158)",
+      "GND": "rgb(182, 93, 85)"
     },
     "netclass_assignments": null,
     "netclass_patterns": []
@@ -499,10 +500,6 @@
       "RAM_BANK0"
     ],
     [
-      "3e6ee833-a7f7-4da7-b5ea-588368c55a06",
-      "ISA"
-    ],
-    [
       "ca3554d2-b22b-4135-824b-57937af5503f",
       "GFX"
     ],
@@ -511,8 +508,8 @@
       "MIO"
     ],
     [
-      "352c0396-4404-4b50-a288-4add57e99139",
-      "Power"
+      "0237d891-a96a-4307-a4d5-070a11371520",
+      "ETH"
     ],
     [
       "58d11f1c-6aae-4928-b318-2d07bb2e6df5",
