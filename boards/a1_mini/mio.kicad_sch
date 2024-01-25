@@ -442,11 +442,11 @@
         )
       )
     )
-    (symbol "Device:Crystal" (pin_numbers hide) (pin_names (offset 1.016) hide) (in_bom yes) (on_board yes)
-      (property "Reference" "Y" (at 0 3.81 0)
+    (symbol "Device:Crystal_GND3" (pin_names (offset 1.016) hide) (in_bom yes) (on_board yes)
+      (property "Reference" "Y" (at 0 5.715 0)
         (effects (font (size 1.27 1.27)))
       )
-      (property "Value" "Crystal" (at 0 -3.81 0)
+      (property "Value" "Crystal_GND3" (at 0 3.81 0)
         (effects (font (size 1.27 1.27)))
       )
       (property "Footprint" "" (at 0 0 0)
@@ -458,13 +458,13 @@
       (property "ki_keywords" "quartz ceramic resonator oscillator" (at 0 0 0)
         (effects (font (size 1.27 1.27)) hide)
       )
-      (property "ki_description" "Two pin crystal" (at 0 0 0)
+      (property "ki_description" "Three pin crystal, GND on pin 3" (at 0 0 0)
         (effects (font (size 1.27 1.27)) hide)
       )
       (property "ki_fp_filters" "Crystal*" (at 0 0 0)
         (effects (font (size 1.27 1.27)) hide)
       )
-      (symbol "Crystal_0_1"
+      (symbol "Crystal_GND3_0_1"
         (rectangle (start -1.143 2.54) (end 1.143 -2.54)
           (stroke (width 0.3048) (type default))
           (fill (type none))
@@ -487,22 +487,40 @@
         )
         (polyline
           (pts
-            (xy 1.905 -1.27)
+            (xy 0 -3.81)
+            (xy 0 -3.556)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
+        )
+        (polyline
+          (pts
+            (xy 1.905 0)
+            (xy 2.54 0)
+          )
+          (stroke (width 0) (type default))
+          (fill (type none))
+        )
+        (polyline
+          (pts
             (xy 1.905 1.27)
+            (xy 1.905 -1.27)
           )
           (stroke (width 0.508) (type default))
           (fill (type none))
         )
         (polyline
           (pts
-            (xy 2.54 0)
-            (xy 1.905 0)
+            (xy -2.54 -2.286)
+            (xy -2.54 -3.556)
+            (xy 2.54 -3.556)
+            (xy 2.54 -2.286)
           )
           (stroke (width 0) (type default))
           (fill (type none))
         )
       )
-      (symbol "Crystal_1_1"
+      (symbol "Crystal_GND3_1_1"
         (pin passive line (at -3.81 0 0) (length 1.27)
           (name "1" (effects (font (size 1.27 1.27))))
           (number "1" (effects (font (size 1.27 1.27))))
@@ -510,6 +528,10 @@
         (pin passive line (at 3.81 0 180) (length 1.27)
           (name "2" (effects (font (size 1.27 1.27))))
           (number "2" (effects (font (size 1.27 1.27))))
+        )
+        (pin passive line (at 0 -5.08 90) (length 1.27)
+          (name "3" (effects (font (size 1.27 1.27))))
+          (number "3" (effects (font (size 1.27 1.27))))
         )
       )
     )
@@ -2390,6 +2412,31 @@
     )
   )
 
+  (symbol (lib_id "power:GND") (at 200.66 128.27 0) (unit 1)
+    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
+    (uuid 0c435e9f-2aea-425f-bfd4-274bba37c662)
+    (property "Reference" "#PWR0135" (at 200.66 134.62 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Value" "GND" (at 200.66 133.35 0)
+      (effects (font (size 1.27 1.27)))
+    )
+    (property "Footprint" "" (at 200.66 128.27 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (property "Datasheet" "" (at 200.66 128.27 0)
+      (effects (font (size 1.27 1.27)) hide)
+    )
+    (pin "1" (uuid f07de03d-e47a-4cb4-bf81-065d785f7612))
+    (instances
+      (project "a1_mini"
+        (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/d5a6ed82-5dcc-475e-b753-55c600f390da"
+          (reference "#PWR0135") (unit 1)
+        )
+      )
+    )
+  )
+
   (symbol (lib_id "power:+5V") (at 90.17 134.62 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 0e4cd0ee-70c7-4963-a240-eb613670a703)
@@ -3293,31 +3340,6 @@
     )
   )
 
-  (symbol (lib_id "power:GND") (at 203.2 156.21 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
-    (uuid 9c57c9e2-fee9-4e52-b02e-3356eec88cf1)
-    (property "Reference" "#PWR0171" (at 203.2 162.56 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Value" "GND" (at 203.2 161.29 0)
-      (effects (font (size 1.27 1.27)))
-    )
-    (property "Footprint" "" (at 203.2 156.21 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Datasheet" "" (at 203.2 156.21 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (pin "1" (uuid c8535547-f44c-4758-9a40-53f914597e59))
-    (instances
-      (project "a1_mini"
-        (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/d5a6ed82-5dcc-475e-b753-55c600f390da"
-          (reference "#PWR0171") (unit 1)
-        )
-      )
-    )
-  )
-
   (symbol (lib_id "power:GND") (at 88.9 106.68 0) (unit 1)
     (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
     (uuid 9d45c508-00dd-4096-8b36-0a2fe23eb140)
@@ -3502,7 +3524,7 @@
     )
   )
 
-  (symbol (lib_id "Device:Crystal") (at 200.66 123.19 0) (mirror y) (unit 1)
+  (symbol (lib_id "Device:Crystal_GND3") (at 200.66 123.19 0) (mirror y) (unit 1)
     (in_bom yes) (on_board yes) (dnp no)
     (uuid b422020c-0406-43f9-ba81-b2b3daab8035)
     (property "Reference" "Y1" (at 200.66 115.57 0)
@@ -3519,6 +3541,7 @@
     )
     (pin "1" (uuid 0adba67a-a550-4b8d-ab83-d8cc2b61b810))
     (pin "2" (uuid 42f2868a-92b1-4cca-b143-9e2562f85351))
+    (pin "3" (uuid 7e943913-a12f-44ce-ab2f-29657a191ec3))
     (instances
       (project "a1_mini"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/d5a6ed82-5dcc-475e-b753-55c600f390da"
@@ -3848,31 +3871,6 @@
       (project "a1_mini"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/d5a6ed82-5dcc-475e-b753-55c600f390da"
           (reference "C36") (unit 1)
-        )
-      )
-    )
-  )
-
-  (symbol (lib_id "power:+5V") (at 203.2 148.59 0) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
-    (uuid f6c4fafd-987d-4fe6-a097-5d2a7282b19b)
-    (property "Reference" "#PWR0170" (at 203.2 152.4 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Value" "+5V" (at 203.2 143.51 0)
-      (effects (font (size 1.27 1.27)))
-    )
-    (property "Footprint" "" (at 203.2 148.59 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (property "Datasheet" "" (at 203.2 148.59 0)
-      (effects (font (size 1.27 1.27)) hide)
-    )
-    (pin "1" (uuid e56fb4d2-d6ac-4192-922e-9ffb375a4c32))
-    (instances
-      (project "a1_mini"
-        (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/d5a6ed82-5dcc-475e-b753-55c600f390da"
-          (reference "#PWR0170") (unit 1)
         )
       )
     )
