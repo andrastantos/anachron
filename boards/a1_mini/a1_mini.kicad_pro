@@ -53,6 +53,11 @@
           "gap": 0.0,
           "via_gap": 0.0,
           "width": 0.0
+        },
+        {
+          "gap": 0.15,
+          "via_gap": 1.0,
+          "width": 0.8
         }
       ],
       "drc_exclusions": [],
@@ -61,7 +66,7 @@
       },
       "rule_severities": {
         "annular_width": "error",
-        "clearance": "error",
+        "clearance": "warning",
         "connection_width": "warning",
         "copper_edge_clearance": "error",
         "copper_sliver": "warning",
@@ -111,7 +116,7 @@
       },
       "rules": {
         "max_error": 0.005,
-        "min_clearance": 0.19999999999999998,
+        "min_clearance": 0.15,
         "min_connection": 0.19999999999999998,
         "min_copper_edge_clearance": 0.5,
         "min_hole_clearance": 0.19999999999999998,
@@ -418,9 +423,9 @@
       {
         "bus_width": 12,
         "clearance": 0.2,
-        "diff_pair_gap": 0.25,
+        "diff_pair_gap": 0.15,
         "diff_pair_via_gap": 0.25,
-        "diff_pair_width": 0.2,
+        "diff_pair_width": 0.8,
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
@@ -434,10 +439,27 @@
       },
       {
         "bus_width": 12,
-        "clearance": 1.0,
-        "diff_pair_gap": 0.25,
+        "clearance": 0.5,
+        "diff_pair_gap": 0.15,
         "diff_pair_via_gap": 0.25,
-        "diff_pair_width": 0.2,
+        "diff_pair_width": 0.8,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "ETH",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.2,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.5,
+        "diff_pair_gap": 0.15,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.8,
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
@@ -445,6 +467,40 @@
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 0.6,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.5,
+        "diff_pair_gap": 0.15,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.8,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "USB",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.2,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.5,
+        "diff_pair_gap": 0.15,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.8,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "USB2",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.2,
         "via_diameter": 0.6,
         "via_drill": 0.3,
         "wire_width": 6
@@ -458,16 +514,40 @@
       "GND": "rgb(129, 29, 182)"
     },
     "netclass_assignments": {
-      "Net-(U22-TMDS_C+)": "HDMI",
-      "Net-(U22-TMDS_C-)": "HDMI",
-      "Net-(U22-TMDS_D0+)": "HDMI",
-      "Net-(U22-TMDS_D0-)": "HDMI",
-      "Net-(U22-TMDS_D1+)": "HDMI",
-      "Net-(U22-TMDS_D1-)": "HDMI",
-      "Net-(U22-TMDS_D2+)": "HDMI",
-      "Net-(U22-TMDS_D2-)": "HDMI"
+      "/ETH/ETH_RX+": "ETH",
+      "/ETH/ETH_RX-": "ETH",
+      "/ETH/ETH_TX+": "ETH",
+      "/ETH/ETH_TX-": "ETH",
+      "/GFX/TMDS_CLK+": "HDMI",
+      "/GFX/TMDS_CLK-": "HDMI",
+      "/GFX/TMDS_D0+": "HDMI",
+      "/GFX/TMDS_D0-": "HDMI",
+      "/GFX/TMDS_D1+": "HDMI",
+      "/GFX/TMDS_D1-": "HDMI",
+      "/GFX/TMDS_D2+": "HDMI",
+      "/GFX/TMDS_D2-": "HDMI",
+      "/MIO/USB_D-": "USB",
+      "/USB/USB_DN2_D+": "USB2",
+      "/USB/USB_DN2_D-": "USB2",
+      "/USB/USB_DN3_D+": "USB2",
+      "/USB/USB_DN3_D-": "USB2",
+      "/USB/USB_DN4_D+": "USB2",
+      "/USB/USB_DN4_D-": "USB2",
+      "/USB/USB_DN5_D+": "USB2",
+      "/USB/USB_DN5_D-": "USB2",
+      "/USB/USB_DN6_D+": "USB2",
+      "/USB/USB_DN6_D-": "USB2",
+      "/USB/USB_DN7_D+": "USB2",
+      "/USB/USB_DN7_D-": "USB2",
+      "/USB_MAIN_D+": "USB",
+      "/USB_MAIN_D-": "USB"
     },
-    "netclass_patterns": []
+    "netclass_patterns": [
+      {
+        "netclass": "USB",
+        "pattern": "/USB_MAIN*"
+      }
+    ]
   },
   "pcbnew": {
     "last_paths": {
