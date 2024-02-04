@@ -510,6 +510,7 @@
       "version": 3
     },
     "net_colors": {
+      "+3.3V": "rgb(250, 255, 79)",
       "+5V": "rgb(181, 255, 158)",
       "GND": "rgb(129, 29, 182)"
     },
@@ -526,7 +527,6 @@
       "/GFX/TMDS_D1-": "HDMI",
       "/GFX/TMDS_D2+": "HDMI",
       "/GFX/TMDS_D2-": "HDMI",
-      "/MIO/USB_D-": "USB",
       "/USB/USB_DN2_D+": "USB2",
       "/USB/USB_DN2_D-": "USB2",
       "/USB/USB_DN3_D+": "USB2",
