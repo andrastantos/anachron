@@ -3776,6 +3776,11 @@
     (effects (font (size 1.27 1.27)) (justify left bottom))
     (uuid b0567621-f2ef-4eab-8f4f-51d3f6aecbce)
   )
+  (text "TODO: should we add a couple of 16-bit slots, where the appropriate\nsignals are tied down to ensure that 16-bit cards don't accidentally\nassume 16-bit transactions just because of floating control pins?"
+    (at 355.6 87.63 0)
+    (effects (font (size 1.27 1.27)) (justify left bottom))
+    (uuid e1d4cf41-69a0-40e8-a914-e12aadd225c0)
+  )
   (text "The original PC supplied 0.3A on the -5V and 0.25 on the -12V rails.\nIt had 5 expansion slots. We provide about half of that current\nfor about half of the slots. However it is anticipated that\n-5V is not used at all and -12 is used by RS232 transceivers only."
     (at 421.64 246.38 0)
     (effects (font (size 1.27 1.27)) (justify left bottom))
