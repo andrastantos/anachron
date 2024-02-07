@@ -415,7 +415,7 @@
     "pinned_symbol_libs": []
   },
   "meta": {
-    "filename": "a1_mini.kicad_pro",
+    "filename": "a1_micro_atx.kicad_pro",
     "version": 1
   },
   "net_settings": {
@@ -526,7 +526,6 @@
       "/GFX/TMDS_D1-": "HDMI",
       "/GFX/TMDS_D2+": "HDMI",
       "/GFX/TMDS_D2-": "HDMI",
-      "/MIO/USB_D-": "USB",
       "/USB/USB_DN2_D+": "USB2",
       "/USB/USB_DN2_D-": "USB2",
       "/USB/USB_DN3_D+": "USB2",
