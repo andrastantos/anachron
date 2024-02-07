@@ -56,30 +56,74 @@ Pin Number Pin Name         Pin Direction   Description
 This pinout is highly notional. There's no way for instance that audio pins can be sandwiched between v-sync and video-clk. Honestly, it's highly questionable, if audio will work at any reasonable quality without a dedicated ground.
 
 
-Single-bank DRAM and HDMI
-=========================
+Dedicated VRAM
+==============
 
-Let's decide that we won't allow addressing both DRAM banks from the video chip. This puts some restrictions on what memory can be used for frame-buffers, but the payoff is rather large:
+Let's decide that we won't have a unified memory architecture: instead we have a dedicated bank of DRAM (one bank of the CPU). This has priority access from the Disco. The other CPU DRAM bank is dedicated to the CPU and Disco doesn't have access to it.
 
-1. We can have dedicated VRAM (if dual-bank memories are used).
-2. We can have shared DRAM in a single-bank (i.e. cheap computer) config.
+External isolators are used to make sure Disco accesses are not colliding with those of the CPU. These isolators are controlled by the **nBUSY** output.
 
-I'm not sure if it's possible to upgrade one config to the other yet, but that's not a huge issue.
+The CPU also gets it's nWAIT pulled whenever nBUSY is asserted as well as nRAS_B.
 
-In either case, the video controller needs to only access a single bank, something that's also smaller then what Espresso supports: up to 512k. (In the single-bank config, the to address bits need to be handled somehow, which might be annoying.)
+The CPU timing is quite a bit tight: after asserting nRAS, it assert nCAS within half a clock-cycle. We need to be able to signal nWAIT within that window. That's about 50ns. However, a single open-collector OR gate should be able to accomplish that even in LS logic.
 
-This means that only A0..A8 are needed, so the top 2 address bits can be removed. We would only have a single bank, so the second RAS can be removed as well.
+The handshake is working as follows:
 
-Hand-shaking with Espresso is very different in the two modes, but either way, need two pins:
+1. Espresso needs to monitor nWAIT during DRAM accesses **on the falling edge of the clock**. If asserted, it needs to stay put in the RAS-only cycle.
+   a. This doesn't apply to refresh cycles. Those can go forward.
+   b. If nWAIT is asserted, espresso re-samples it on every falling edge, unit it finds it de-asserted. It continues where it left off (i.e. asserting nCAS) after.
+   c. This means that nWAIT is combinatorially included in nCAS generation. We need to also combine in a registered version of nWAIT to ensure nCAS doesn't toggle uncontrollably at the end of nWAIT.
+2. Disco will have to keep nBUSY asserted all the way to the end of its DRAM burst **including** the precharge cycle at the end. This allows for proper timing for when nBUSY is de-asserted and Espresso gets control of the bus (and has it's nRAS signal already asserted)
+3. Disco will have to assert nBUSY on the rising edge of the clock.
 
-1. Dedicated VRAM:
-   a. nWAIT: we need to be able to hold off CPU access to registers when the bus is not accessible.
-   b. nBUSY: we need to prevent the CPU from accessing video ram when we need it.
-2. Shared memory:
-   a. nBRQ: request bus from the CPU
-   b. nBGNT: bus grant signal from the CPU
+How to resolve races?
+---------------------
+Let's say that Disco and Espresso decided to start a memory transfer on the same cycle! In this case as soon as nBUSY is asserted, the isolators step in, but it's possible that nRAS already went active from Espresso and the row-address is captured by the DRAM. This can be prevented by early-asserting nBUSY, but that brings up another problem: we might create an invalid nRAS cycle on the DRAM. From a logic perspective, this would look like a RAS-only refresh, but we don't respect timing and take nRAS away too early.
 
-Overall, we've saved 3 pins.
+This problem cannot be avoided easily. The best we can do is to flip Disco timing by half cycle: start cycles on the falling edge in general. This gives us an interesting option:
+
+Time 0 - falling edge of clock: Disco sample it's own nRAS. If it samples low, CPU access is in progress --> wait (this is a potential priority-inversion, but oh-well). If it samples high, Disco asserts nBUSY, isolating the bus
+Time 1 - half cycle after nBUSY got asserted, rising edge of the clock. At this point Disco doesn't do anything, but Espresso might start a new cycle. If it does, nWAIT gets immediately asserted on it, bit it's nRAS is already down.
+Time 2 - full cycle after nBUSY got asserted, falling edge of the clock: Disco drives nRAS low, Espresso detects nWAIT and stalls.
+Time N - last half-cycle of Disco access, falling edge of the clock: Disco nRAS goes high.
+Time N+2 - nBusy gets de-asserted. If at this point Espresso's nRAS was asserted, the isolators dis-engage, and a new falling-edge on nRAS for DRAM is generated. It's important that the addresses are driven by Espresso at this point **tricky timing on isolators**. Since a full clock-cycle has passed since any nRAS activity, precharge is observed. If of course Espresso doesn't drive the bus at this point, the DRAM remains idle.
+Time N+3 - this is a rising edge on Espresso. Disco does nothing, Espresso might start a DRAM cycle, if it haven't been waiting already, or it can do what it was doing before: driving nRAS low
+Time N+4 - falling edge of the clock: Espresso realizes that nWAIT got removed and continues with its cycle; At the same time Disco samples nRAS and sees the ongoing cycle, not asserting nBUSY.
+
+Quite a convoluted dance, but doable. The bus hand-over takes some time too, and I think it means Disco has to idle one extra cycle between bursts, but seems to be working otherwise.
+
+Except of course the priority inversion: what happens if Disco sees nRAS asserted? It re-samples it on every clock falling edge. Since there's at least one full cycle of idle (precharge really) from Espresso between bursts, it's guaranteed that Disco will see the bus go inactive. At that point it asserts nBUSY, preventing Espresso from starting another burst (to be more precise the burst can start but can't proceed). So really, the inversion only applies to a single burst, not for consecutive ones.
+
+Lastly, we can assume - at least for the more expensive setups - that Espresso doesn't **execute** out of VRAM thus, it's bursts are limited to 32-bit reads and writes, lasting 3 active clock-cycles (plus one for precharge).
+
+Bandwidth
+---------
+
+Discos cycles are:
+1. Check for bus-access
+2. N+1 active cycles
+3. Pre-charge
+
+So, if Disco runs on an 8MHz clock (125ns cycle-time), and a burst rate of 16 bytes, it can fetch those 16 bytes in 11 cycles, or 1375ns. That's a 86ns average access time per byte or 11.6MBps. With 32-byte bursts, this improves to 13.5MBps, with 8-byte bursts, it's only 9.1MBps.
+
+============  ===========================  ===========================  ===========================
+Burst size    Max data throughput (8MHz)   Max data throughput (10MHz)  Worst-case throughput (10MHz)
+============  ===========================  ===========================  ===========================
+8              9.1MBps                     11.4MBps                      6.6MBps
+16            11.6MBps                     14.5MBps                     10.0MBps
+32            13.5MBps                     16.8MBps                     13.3MBps
+============  ===========================  ===========================  ===========================
+
+Given that the VGA pixel clock is 25MHz, this still doesn't quite give us VGA (620x480@4bpp) performance. For that, we would need to run at 10MHz **and** 32-byte bursts to be comfortable. This one manages, even if in every burst it gets unlucky and first loses arbitration to Espresso.
+
+**So, it is decided: 10MHz clock, 32-byte burst-rate**
+
+NOTE: since we can make VGA at 4bpp, we can make QVGA at 8bpp without an internal scanline buffer. Or, with an internal scanline buffer, we can shoot for QVGA at 16bpp!
+
+Pinout
+------
+
+This change gives us quite a bit though: we can get rid of a number of pins, freeing up enough to only only support DVI, but an I2S interface (sans BCLK, but that's a copy of SYSCLK anyway) as well:
 
 ========== ================ =============== ===========
 Pin Number Pin Name         Pin Direction   Description
@@ -105,17 +149,17 @@ Pin Number Pin Name         Pin Direction   Description
 19         audio_sfrm       Output          I2S Audio output frame signal (clock is sys_clk)
 20         GND              GND             Ground input
 
-21         audio_sdata      Output          I2S Audio output data signal (clock is sys_clk)
-22         n_ras_a          Output          Active low row-select, bank A
-23         n_cas_0          I/O             Active low column select, byte 0
-24         n_cas_1          Output          Active low column select, byte 1
-25         n_reg_sel        Input           Active low chip-select for register accesses
-26         n_we             Output          Active low write-enable
-27         n_rst            Input           Active low reset input
-28         sys_clk          Input           System clock input
-29         n_int            Input           Active low interrupt input
-30         busy/brq         Output          Active high signal that VRAM is busy; bus request output
-31         n_wait/n_bgnt    I/O             Active low, open-drain signal to delay I/O transfer completion; bus grant input
+21         audio_sdata_out  Output          I2S Audio output data signal (clock is sys_clk)
+22         audio_sdata_in   Input           I2S Audio data input signal (clock is sys_clk)
+23         n_ras_a          Output          Active low row-select, bank A
+24         n_cas_0          I/O             Active low column select, byte 0
+25         n_cas_1          Output          Active low column select, byte 1
+26         n_reg_sel        Input           Active low chip-select for register accesses
+27         n_we             Output          Active low write-enable
+28         n_rst            Input           Active low reset input
+29         sys_clk          Input           System clock input
+30         n_int            Input           Active low interrupt input
+31         n_busy           Output          Active low signal that VRAM is busy
 32         d0               I/O             Data bus
 33         d1               I/O             Data bus
 34         d2               I/O             Data bus
@@ -132,21 +176,12 @@ NOTE: pinout is such that UnIC diff pairs are mapped to HDMI signals. Other vari
 NOTE: a 48-pin version would allow for:
 - I2S signals for a DAC (SCLK/SDATA_IN/SDATA_OUT/FRAME/MCLK) 5 pins (but saved 2), so +3
 - Adding back the lost address bits +2
-With this, HDMI output and mono Audio is possible, with an extra GND for audio.
 
-For digital audio, S/PDIF in/out could be used on the two audio pins - that's about 3Mbps for stereo 48kHz audio, so plenty. And easily over-sampled on the receiver end for a digital CDR.
-Overall the standard is rather simple, it seems as long we we won't bother ourselves with DRM. Resources:
+Memory use for audio
+--------------------
+How would one handle audio memory accesses? Those would need to go into the blanking periods. Since the horizontal sync-rate is ~15kHz for QVGA (worst case) and ~31kHz for VGA, we won't need more than 3 samples per channel per line. That's 12 bytes per scan-line, or a 15-cycle burst. We have about 100 cycles of blanking, so this is fine.
 
-https://www.st.com/resource/en/application_note/an5073-receiving-spdif-audio-stream-with-the-stm32f4f7h7-series-stmicroelectronics.pdf
-https://www.nti-audio.com/Portals/0/data/en/NTi-Audio-AppNote-AES3-AES-EBU.pdf
-https://opencores.org/websvn/filedetails?repname=spdif_interface&path=%2Fspdif_interface%2Ftrunk%2Fdoc%2Fspdif.pdf&rev=2
-https://inst.eecs.berkeley.edu/~cs150/fa01/labs/project/SPDIF_explanation.pdf
-
-Upon power-up, the chip would start in VRAM mode (i.e. busy/n_wait mode), but, crucially, it doesn't actually drive video. As such, it never asserts busy and doesn't drive n_wait low either.
-
-In either use-case, the chip will accept register reads/writes and will no interfere with the operation of Espresso. Through register writes, the appropriate mode can be configured, after which the proper handshaking will become activated.
-
-To be fair, HDMI is rather orthogonal to the problem of single-bank support.
+8 sprites (with 4 bytes each) would take another 40 cycles, still well within timing budget. We might have to be greedy and assert nBusy for the whole duration of sprite fetching, even though it's multiple bursts to make sure we don't incur too much penalty.
 
 The curious case of missing address bits
 ----------------------------------------

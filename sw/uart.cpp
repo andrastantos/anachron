@@ -1,7 +1,7 @@
 #include "uart.h"
 #include "platform.h"
 
-// Init UART to 9600 BAUD 8N1P5, based on a 50MHz system clock rate
+// Init UART to 9600 BAUD 8N1P5, based on a 40MHz system clock rate
 void uart_init(unsigned int baud_rate) {
 	uart1_base[uart_config1_reg_ofs] = uart_config1_stop_one_and_half | uart_config1_word_size_8 | uart_config1_flow_control_sw;
 	switch (baud_rate) {
