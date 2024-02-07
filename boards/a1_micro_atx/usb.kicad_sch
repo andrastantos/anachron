@@ -4,6 +4,12 @@
 
   (paper "A")
 
+  (title_block
+    (title "Anachron uATX USB HUB")
+    (date "2024-02-07")
+    (company "Modular Circuits")
+  )
+
   (lib_symbols
     (symbol "Connector:USB_A_Stacked" (pin_names (offset 1.016)) (in_bom yes) (on_board yes)
       (property "Reference" "J" (at 0 15.875 0)

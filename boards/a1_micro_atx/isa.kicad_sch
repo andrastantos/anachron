@@ -5,7 +5,9 @@
   (paper "B")
 
   (title_block
-    (title "Anachron ISA bus interface")
+    (title "Anachron ISA Bus Interface")
+    (date "2024-02-07")
+    (company "Modular Circuits")
   )
 
   (lib_symbols
@@ -5981,21 +5983,21 @@
       (effects (font (size 1.27 1.27)) hide)
     )
     (pin "12" (uuid c03266a1-e73f-4493-8c8b-dd12353cdb41))
-    (pin "8" (uuid f36b2060-0e90-4226-ac17-93d8da192f28))
+    (pin "8" (uuid f36b2060-0e90-4226-ac17-93d8da192f29))
     (pin "11" (uuid f3cff2bf-49a0-4fe5-8496-a86f36faf9f9))
-    (pin "5" (uuid b472348b-db05-4778-b41d-e02bc5179c0f))
-    (pin "6" (uuid fd376bfc-73bf-45b5-a62c-aab178042554))
-    (pin "3" (uuid 37d01d15-02f8-418c-9242-abebe0e40b2a))
-    (pin "7" (uuid 4b1428bf-a88f-4736-bec3-be0264a046ff))
+    (pin "5" (uuid b472348b-db05-4778-b41d-e02bc5179c10))
+    (pin "6" (uuid fd376bfc-73bf-45b5-a62c-aab178042555))
+    (pin "3" (uuid 37d01d15-02f8-418c-9242-abebe0e40b2b))
+    (pin "7" (uuid 4b1428bf-a88f-4736-bec3-be0264a04700))
     (pin "13" (uuid 671d818b-b430-4d0a-8efd-e7f7f56fc335))
     (pin "10" (uuid 80a16d81-f98e-4da4-aecd-1de967c810fd))
-    (pin "16" (uuid a06ed78f-e98f-46ba-816f-2891f0e10174))
-    (pin "1" (uuid eedd868f-5cac-40ba-8ed7-550dbc24a8d3))
+    (pin "16" (uuid a06ed78f-e98f-46ba-816f-2891f0e10175))
+    (pin "1" (uuid eedd868f-5cac-40ba-8ed7-550dbc24a8d4))
     (pin "15" (uuid 738833b2-19e9-47b3-af7e-118880d1c765))
     (pin "14" (uuid b26b3c36-32b8-44eb-bd1d-c2799131402c))
     (pin "9" (uuid e29b7b31-7ce4-4e85-ab20-051ca57d7b74))
-    (pin "4" (uuid 4b18c51e-a053-4ea3-9885-3b6a003607ed))
-    (pin "2" (uuid 60b9bcd2-ea19-4aec-acf3-1512baf10dae))
+    (pin "4" (uuid 4b18c51e-a053-4ea3-9885-3b6a003607ee))
+    (pin "2" (uuid 60b9bcd2-ea19-4aec-acf3-1512baf10daf))
     (instances
       (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/0c1f7d0b-482f-4d97-925a-18a42e0624c3"

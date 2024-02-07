@@ -5,7 +5,9 @@
   (paper "A")
 
   (title_block
-    (title "Anachron Graphics and Audio")
+    (title "Anachron uATX Graphics and Audio")
+    (date "2024-02-07")
+    (company "Modular Circuits")
   )
 
   (lib_symbols

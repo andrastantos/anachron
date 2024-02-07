@@ -5,7 +5,9 @@
   (paper "A")
 
   (title_block
-    (title "Anachron RAM bank")
+    (title "Anachron uATX RAM Bank")
+    (date "2024-02-07")
+    (company "Modular Circuits")
   )
 
   (lib_symbols

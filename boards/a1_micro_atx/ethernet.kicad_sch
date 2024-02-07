@@ -4,6 +4,12 @@
 
   (paper "A")
 
+  (title_block
+    (title "Anachron uATX Ethernet Interface")
+    (date "2024-02-07")
+    (company "Modular Circuits")
+  )
+
   (lib_symbols
     (symbol "Connector:RJ45_Amphenol_RJMG1BD3B8K1ANR" (in_bom yes) (on_board yes)
       (property "Reference" "J" (at 18.415 10.16 0)
