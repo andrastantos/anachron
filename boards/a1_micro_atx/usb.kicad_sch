@@ -2,7 +2,7 @@
 
   (uuid 71c2cd35-ceb4-4c08-8ea1-c3bb06678d01)
 
-  (paper "A4")
+  (paper "A")
 
   (lib_symbols
     (symbol "Connector:USB_A_Stacked" (pin_names (offset 1.016)) (in_bom yes) (on_board yes)
@@ -1705,7 +1705,7 @@
     )
     (pin "1" (uuid 8090659b-f4ab-4e35-bff1-036f1290b69d))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "#PWR0198") (unit 1)
         )
@@ -1769,7 +1769,7 @@
     (pin "12" (uuid ccc2f842-ba8e-4d75-8a30-acc4729d11c9))
     (pin "10" (uuid 63959f6f-94ac-49f9-b61f-c851c0b4995d))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "U28") (unit 1)
         )
@@ -1800,7 +1800,7 @@
     (pin "3" (uuid e8336eb4-1372-45bf-b75c-2cccf05537f9))
     (pin "2" (uuid 5a11c9d9-1991-49b1-becf-d13fbda9e4d7))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "CMC5") (unit 1)
         )
@@ -1829,7 +1829,7 @@
     (pin "2" (uuid 116a5fc9-e153-4bde-9f02-ced3dd7e96b0))
     (pin "1" (uuid 6321cb8e-626e-4e60-a98e-47709f0ea1af))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "FB17") (unit 1)
         )
@@ -1838,12 +1838,12 @@
   )
 
   (symbol (lib_id "Connector:USB_A_Stacked") (at 246.38 41.91 0) (mirror y) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
+    (in_bom yes) (on_board yes) (dnp no)
     (uuid 193fed8e-cfd1-4d09-b43f-57c705d2d853)
-    (property "Reference" "J16" (at 255.27 40.64 0)
+    (property "Reference" "J16" (at 238.76 25.4 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "USB_A_Stacked" (at 255.27 43.18 0)
+    (property "Value" "USB_A_Stacked" (at 238.76 27.94 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Footprint" "anachron:GCT_USB1035-XX-X-X-X-B_REVE" (at 242.57 55.88 0)
@@ -1865,7 +1865,7 @@
     (pin "8" (uuid fb3174a9-e6bf-431f-9179-24fec3685e06))
     (pin "7" (uuid 41d393dd-b626-431a-8288-c720f163da97))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "J16") (unit 1)
         )
@@ -1891,7 +1891,7 @@
     (pin "1" (uuid 9d1a17de-7186-4bb5-abd1-14a7c73b19aa))
     (pin "2" (uuid bd3a6d37-0f81-4b04-8339-3c5b089ecfd7))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "C46") (unit 1)
         )
@@ -1920,7 +1920,7 @@
     (pin "2" (uuid 233d5476-1783-4929-8cd7-1c2a9c4f5452))
     (pin "1" (uuid fe274c44-f124-4757-9923-95a5c2a28728))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "FB18") (unit 1)
         )
@@ -1949,7 +1949,7 @@
     (pin "2" (uuid 5b54d323-12b6-4d3b-8a90-6ad0910cfd9c))
     (pin "1" (uuid 24cd5faa-c7b8-4c8e-8d62-6f44963182f9))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "FB15") (unit 1)
         )
@@ -1980,7 +1980,7 @@
     (pin "3" (uuid b63f6a63-f330-43f5-8741-e616ba6972f0))
     (pin "2" (uuid dac69a46-d023-474d-b0d1-bda8898ccab9))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "CMC7") (unit 1)
         )
@@ -2005,7 +2005,7 @@
     )
     (pin "1" (uuid c549476c-18ae-4881-ae90-286b94197efd))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "#PWR0199") (unit 1)
         )
@@ -2034,7 +2034,7 @@
     (pin "2" (uuid 0b26ba09-631d-46a4-a519-1cf36f9cb2da))
     (pin "1" (uuid 99e09fe8-a5f1-4fc0-8a83-8854b8b1d925))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "FB16") (unit 1)
         )
@@ -2059,7 +2059,7 @@
     )
     (pin "1" (uuid ec365c27-2c7d-416d-b9f1-fa2cdc4ceb03))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "#PWR0196") (unit 1)
         )
@@ -2084,7 +2084,7 @@
     )
     (pin "1" (uuid f1e1640d-bbad-4087-b77b-c32cb2da9ef9))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "#PWR0193") (unit 1)
         )
@@ -2093,12 +2093,12 @@
   )
 
   (symbol (lib_id "Connector:USB_A_Stacked") (at 246.38 86.36 0) (mirror y) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
+    (in_bom yes) (on_board yes) (dnp no)
     (uuid 7ecc3a8a-428a-4c7d-80ea-4f832716cbef)
-    (property "Reference" "J17" (at 255.27 85.09 0)
+    (property "Reference" "J17" (at 238.76 69.85 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "USB_A_Stacked" (at 255.27 87.63 0)
+    (property "Value" "USB_A_Stacked" (at 238.76 72.39 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Footprint" "anachron:GCT_USB1035-XX-X-X-X-B_REVE" (at 242.57 100.33 0)
@@ -2120,7 +2120,7 @@
     (pin "8" (uuid 0c09fe2f-7dbb-431a-b435-3b8c72899823))
     (pin "7" (uuid 1a24cb5a-fd1c-446f-9463-a9a55755f833))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "J17") (unit 1)
         )
@@ -2151,7 +2151,7 @@
     (pin "3" (uuid 262a8ba8-c1f5-457f-bc2d-3c7df444960b))
     (pin "2" (uuid 9d983530-a4a4-4baa-a1d2-a9e0628d8fcd))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "CMC9") (unit 1)
         )
@@ -2177,7 +2177,7 @@
     (pin "1" (uuid 4aba9ce8-532c-4124-87c1-1a5c633820de))
     (pin "2" (uuid b5a2e2ba-8acc-4a15-bed0-190849e4ee2f))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "C47") (unit 1)
         )
@@ -2202,7 +2202,7 @@
     )
     (pin "1" (uuid dad1ceb8-c840-486a-84e7-1b41ea03a1c5))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "#PWR0197") (unit 1)
         )
@@ -2227,7 +2227,7 @@
     )
     (pin "1" (uuid 61105156-4fe1-4932-b5f8-8f66a2944b76))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "#PWR0194") (unit 1)
         )
@@ -2253,7 +2253,7 @@
     (pin "2" (uuid 2bcd89da-ae04-4170-b09a-071684359a09))
     (pin "1" (uuid 7ecb8e3d-f48d-4c9f-92c6-d0086fc7adc3))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "JP3") (unit 1)
         )
@@ -2278,7 +2278,7 @@
     )
     (pin "1" (uuid f17d72c0-de6f-4f54-b97c-e569530e1197))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "#PWR0195") (unit 1)
         )
@@ -2309,7 +2309,7 @@
     (pin "3" (uuid b112fead-98ab-4164-b64f-ec48595cb8af))
     (pin "2" (uuid 8fdc2aef-374c-42a9-a0d1-10c8cda09741))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "CMC6") (unit 1)
         )
@@ -2340,7 +2340,7 @@
     (pin "3" (uuid 2e04c422-3ff3-49e0-80de-99d1f2fdb9f0))
     (pin "2" (uuid 7dd4e7ed-4828-4365-81aa-11ecefc5acf9))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "CMC8") (unit 1)
         )
@@ -2366,7 +2366,7 @@
     (pin "1" (uuid 2a5c0b09-08be-4827-9767-719010f6db4b))
     (pin "2" (uuid 43df19c2-9d68-4ae3-80b0-f576f2159330))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "C48") (unit 1)
         )
@@ -2395,7 +2395,7 @@
     (pin "2" (uuid c3a48cba-001a-4c22-aa90-aaf044c3e437))
     (pin "1" (uuid 6153ba45-e597-4430-bbc0-77ea8d181b10))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "FB19") (unit 1)
         )
@@ -2424,7 +2424,7 @@
     (pin "2" (uuid 9db40ccc-df70-47b0-900a-177456fb7f51))
     (pin "1" (uuid c73cfd55-a560-45d6-9ea1-b77bf426ca2e))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "FB20") (unit 1)
         )
@@ -2450,7 +2450,7 @@
     (pin "1" (uuid 5ef6c03d-6279-49ca-80ab-ebcf87ae664c))
     (pin "2" (uuid 6b53a417-9ef8-411b-916a-dbc27b103d6b))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "C45") (unit 1)
         )
@@ -2481,7 +2481,7 @@
     (pin "3" (uuid e10ea4d4-8add-466e-869c-6aec1916dd27))
     (pin "2" (uuid 8e9c2fb6-43b9-4c63-9fef-70420e335550))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "CMC10") (unit 1)
         )
@@ -2490,12 +2490,12 @@
   )
 
   (symbol (lib_id "Connector:USB_A_Stacked") (at 245.11 130.81 0) (mirror y) (unit 1)
-    (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced)
+    (in_bom yes) (on_board yes) (dnp no)
     (uuid ddc1403d-446c-46bc-a36d-59b51254f51e)
-    (property "Reference" "J15" (at 254 129.54 0)
+    (property "Reference" "J15" (at 237.49 114.3 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
-    (property "Value" "USB_A_Stacked" (at 254 132.08 0)
+    (property "Value" "USB_A_Stacked" (at 237.49 116.84 0)
       (effects (font (size 1.27 1.27)) (justify right))
     )
     (property "Footprint" "anachron:GCT_USB1035-XX-X-X-X-B_REVE" (at 241.3 144.78 0)
@@ -2517,7 +2517,7 @@
     (pin "8" (uuid a7857bf7-d522-4eba-8b1d-7d78d5eb66a7))
     (pin "7" (uuid 74813d4a-a5aa-4bf4-9025-0e28fb934bbb))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "J15") (unit 1)
         )
@@ -2543,7 +2543,7 @@
     (pin "1" (uuid 4ff09bf8-874a-46bd-b4a4-4f0b7dbb4d8d))
     (pin "2" (uuid d9d0ca3d-5a8f-4f3c-9f8c-74d3a129b0ce))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "C49") (unit 1)
         )
@@ -2572,7 +2572,7 @@
     (pin "2" (uuid bc47725f-262e-4075-ab63-cb3b2d7aba86))
     (pin "1" (uuid 4c0fde6d-cf85-4969-8afd-7aa8657dcef8))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "C44") (unit 1)
         )
@@ -2597,7 +2597,7 @@
     )
     (pin "1" (uuid 92a65d42-2232-4f32-ab85-288e6066b361))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "#PWR0200") (unit 1)
         )
@@ -2623,7 +2623,7 @@
     (pin "1" (uuid a795b7d7-393e-4e7f-8dbc-65b1c55b2f51))
     (pin "2" (uuid 30052bfd-b97a-4770-af6c-32802ea19f14))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/77f1c88a-ea71-40c5-9918-dee285c676a1"
           (reference "C50") (unit 1)
         )

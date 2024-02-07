@@ -623,12 +623,12 @@
       "USB"
     ],
     [
-      "58d11f1c-6aae-4928-b318-2d07bb2e6df5",
-      "RAM_BANK1"
-    ],
-    [
       "0c1f7d0b-482f-4d97-925a-18a42e0624c3",
       "ISA"
+    ],
+    [
+      "58d11f1c-6aae-4928-b318-2d07bb2e6df5",
+      "RAM_BANK1"
     ]
   ],
   "text_variables": {}

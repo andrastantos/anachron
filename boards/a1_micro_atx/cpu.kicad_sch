@@ -848,7 +848,7 @@
     )
     (pin "1" (uuid 6de3fc46-9bf1-4700-8d16-2595f991241e))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/894d02d2-0889-4880-8f04-ac96b9bee43e"
           (reference "#PWR0108") (unit 1)
         )
@@ -873,7 +873,7 @@
     )
     (pin "1" (uuid d797d6b6-e36b-4fdc-9246-a848da53c017))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/894d02d2-0889-4880-8f04-ac96b9bee43e"
           (reference "#PWR0109") (unit 1)
         )
@@ -898,7 +898,7 @@
     )
     (pin "1" (uuid 18644696-9615-4115-aa4f-7835eb524cc9))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/894d02d2-0889-4880-8f04-ac96b9bee43e"
           (reference "#PWR0107") (unit 1)
         )
@@ -923,7 +923,7 @@
     )
     (pin "1" (uuid 06782967-4b89-477c-af47-733f9a4a7498))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/894d02d2-0889-4880-8f04-ac96b9bee43e"
           (reference "#PWR0110") (unit 1)
         )
@@ -987,7 +987,7 @@
     (pin "10" (uuid e132a3bb-72f8-4bd6-a32e-e1bb67fcc3d7))
     (pin "1" (uuid 8ecaef6a-7f01-4d2c-bda2-6f4b328ba9c5))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/894d02d2-0889-4880-8f04-ac96b9bee43e"
           (reference "U19") (unit 1)
         )
@@ -1016,7 +1016,7 @@
     (pin "2" (uuid 965cb0c6-b383-44dc-8b8c-929a25f3c709))
     (pin "1" (uuid 192b9aad-7c4b-449f-b64f-d6049a9b0eec))
     (instances
-      (project "a1_mini"
+      (project "a1_micro_atx"
         (path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/894d02d2-0889-4880-8f04-ac96b9bee43e"
           (reference "C20") (unit 1)
         )
