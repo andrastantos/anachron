@@ -23,7 +23,8 @@ The idea would be the following:
 
 I've ordered from these guys before: https://www.reactivemicro.com/product/lead-frame-pins/#lightbox/0/
 100 pins for $10, $0.1 per pin. Above 1000 pins, this drops to $0.07. TE seems to want to sell pins for $0.045 at very
-high volumes.
+high volumes. Their drawings on the page however don't match what they sell. Their description is closer to the truth.
+Their pins are for 1.6mm PCBs, while the Batten Allen ones are for 1.0mm PCBs.
 
 For larger packages (more pins), we would need machined pins to emulate PGA packages:
 https://www.hitachi-metals.co.jp/e/products/elec/di/p01_58.html
