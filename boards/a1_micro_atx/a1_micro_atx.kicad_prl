@@ -67,8 +67,14 @@
       39,
       40
     ],
-    "visible_layers": "0009120_80000001",
+    "visible_layers": "0009100_80000001",
     "zone_display_mode": 1
+  },
+  "git": {
+    "repo_password": "",
+    "repo_type": "",
+    "repo_username": "",
+    "ssh_key": ""
   },
   "meta": {
     "filename": "a1_micro_atx.kicad_prl",
