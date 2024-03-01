@@ -21292,7 +21292,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Package_DIP:CERDIP-14_W7.62mm_SideBrazed_LongPads"
+		(property "Footprint" "Package_DIP:DIP-14_W7.62mm_LongPads"
 			(at 387.35 222.25 0)
 			(effects
 				(font
@@ -21647,7 +21647,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Package_DIP:CERDIP-16_W7.62mm_SideBrazed_LongPads"
+		(property "Footprint" "Package_DIP:DIP-16_W7.62mm_LongPads"
 			(at 294.64 223.52 0)
 			(effects
 				(font
@@ -23191,7 +23191,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Package_DIP:CERDIP-14_W7.62mm_SideBrazed_LongPads"
+		(property "Footprint" "Package_DIP:DIP-14_W7.62mm_LongPads"
 			(at 27.94 245.11 0)
 			(effects
 				(font
@@ -25518,7 +25518,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Package_DIP:CERDIP-14_W7.62mm_SideBrazed_LongPads"
+		(property "Footprint" "Package_DIP:DIP-14_W7.62mm_LongPads"
 			(at 355.6 203.2 0)
 			(effects
 				(font
@@ -25766,7 +25766,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Package_DIP:CERDIP-14_W7.62mm_SideBrazed_LongPads"
+		(property "Footprint" "Package_DIP:DIP-14_W7.62mm_LongPads"
 			(at 383.54 200.66 0)
 			(effects
 				(font
@@ -26214,7 +26214,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Package_DIP:CERDIP-14_W7.62mm_SideBrazed_LongPads"
+		(property "Footprint" "Package_DIP:DIP-14_W7.62mm_LongPads"
 			(at 67.945 205.105 0)
 			(effects
 				(font
