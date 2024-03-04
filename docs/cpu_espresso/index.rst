@@ -43,3 +43,12 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+
+Change requests
+===============
+
+1. Need to add in support for nWAIT handshake with Disco (including for refresh and DMA cycles)
+2. Need to add ability to 'queue' refreshes in case they're held up by arbitration.
+3. I think I want push/pull instructions for fast context switches
+

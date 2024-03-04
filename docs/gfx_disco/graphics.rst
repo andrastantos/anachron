@@ -1,165 +1,149 @@
 Graphics
 ========
 
-According to http://tinyvga.com/vga-timing: VGA pixel clock is 25.175MHz for 640x480. For 320x240, it would be half, 12.5875MHz.
-
-VGA monitors though never really had a resolution of 320x240. The VGA controller instead doubled every scan-line (480 scan-lines) and each pixel (640 pixels). The refresh rate was 60Hz. Since devices at the time surely didn't have the internal memory to store the scan-line needed for doubling, they read it from memory twice. The end result of this is that the average datarate for 640x480 is 18.4Mpixel/s. For 320x240 it's only half of it, around 9.2Mpixel/s. In a modern implementation though we can cheat, and create the internal scan-line store needed for doubling. This would reduce 320x240 datarate to *4.6Mpixel/s*.
-
-Similar techniques can be used to create 256x192 and potentially 512x384 pixel resolutions as well from the VESA 768x576@60Hz or the 1024x768@60Hz base resolutions.
-
-NTSC or PAL TV was different: it used 60Hz (50Hz) field rate, but only 30Hz (25Hz) refresh rate. On top, NTSC only guaranteed 200 or so visible scan-lines. So, for TV it was either 320x200x60Hz or 320x240x50Hz. These both turn into the same, *3.84MPixel/s*.
-
-Given that we have, give-or-take, 16MBps memory bandwidth in the whole system, we can expect to support the following:
-
-1. VGA, 640x480 resolution at 4bpp -> ~9.2MBps bandwidth requirement.
-2. QGVA, 320x240 resolution at 8bpp, but *with* internal scan-line doubler -> ~4.6MBps
-3. TV resolution 320x200 at 8bpp -> ~3.84MBps
-
-The first resolution is going to slow the CPU to a crawl. It's OK for interactive, non-CPU intensive tasks, such as GUIs, but not for games, I don't think. The second and the third modes are roughly the same. The second one would not have been possible with the chip-technology of the time (the scan-line buffer is too large to fit, I'm afraid), but it's doable for an FPGA implementation. The third would have been the main way of using the machine originally, but pointless to implement today.
-
-So, the supported resolutions are the following:
-
-Based on 640x480@60Hz timing (12.5875MHz pixel clock):
-===================  =============  =============  =================  ==================  =========  ========  ====================
- Mode                Back Porch     Sync Pulse     Front Porch        Active Area         Total      Setup     Pixel replication
-===================  =============  =============  =================  ==================  =========  ========  ====================
-   640x480@60Hz  H     24             48              8                 320                 400         80        0.5
-                 V     33              2             10                 480                 525         45          1
-   320x240@60Hz  H     24             48              8                 320                 400         80          1
-                 V     33              2             10                 480                 525         45          2
-   Timing regs   H     11             35             39                                     199
-                 V    512            514                                479                 524
-===================  =============  =============  =================  ==================  =========  ========  ====================
-
-Based on 640x400@60Hz timing (12.5875MHz pixel clock):
-===================  =============  =============  =================  ==================  =========  ========  ====================
- Mode                Back Porch     Sync Pulse     Front Porch        Active Area         Total      Setup     Pixel replication
-===================  =============  =============  =================  ==================  =========  ========  ====================
-   640x400@60Hz  H     24             48              8                 320                 400         80        0.5
-                 V     35              2             12                 400                 449         49          1
-   320x200@60Hz  H     24             48              8                 320                 400         80          1
-                 V     35              2             12                 400                 449         49          2
-   Timing regs   H     11             35             39                                     199
-                 V    434            436                                399                 448
-===================  =============  =============  =================  ==================  =========  ========  ====================
-
-Based on 768x576@60Hz timing **not exact** (11.6773MHz pixel clock):
-===================  =============  =============  =================  ==================  =========  ========  ====================
- Mode                Back Porch     Sync Pulse     Front Porch        Active Area         Total      Setup     Pixel replication
-===================  =============  =============  =================  ==================  =========  ========  ====================
-   256x192@60Hz  H     36             26              8                 256                 326         70          1
-                 V     17              3              1                 576                 597         21          3
-   Timing regs   H     17             30             34                                     162
-                 V    592            595                                575                 596
-===================  =============  =============  =================  ==================  =========  ========  ====================
-
-Based on 1024x768@60Hz timing (16.25MHz pixel clock):
-===================  =============  =============  =================  ==================  =========  ========  ====================
- Mode                Back Porch     Sync Pulse     Front Porch        Active Area         Total      Setup     Pixel replication
-===================  =============  =============  =================  ==================  =========  ========  ====================
-   512x384@60Hz  H     40             34              6                 256                 336         80          0.5
-                 V     29              6              3                 768                 806         38          2
-   256x192@60Hz  H     40             34              6                 256                 336         80          1
-                 V     29              6              3                 768                 806         38          4
-   Timing regs   H     19             36             39                                     167
-                 V    796            802                                767                 805
-===================  =============  =============  =================  ==================  =========  ========  ====================
-
-Let's see where we end up in bus utilization!
-
-VGA@4bbp resolution needs 156,600 bytes for every refresh. Using 16-byte bursts, each burst would take 16/2+2=10 cycles. A frame takes 9600 such bursts, or 96,000 clock-cycles. At 60Hz refresh rate this turns into 5.76M clock cycles. If our system runs at an 8MHz clock rate, that's a whopping 72% of the available bus bandwidth.
-
-A QVGA@8bpp would need half the memory for a frame, thus half the clock cycles: only 48,000 per frame or 28.8M clock cycles every second. This is a 36% bus utilization.
-
-We certainly can't use shorter bursts, that would result in even worse bus utilization. Longer ones are problematic from a buffering perspective, but 32-byte bursts would result in a 65%/32.4% bus utilization respectively. Maybe worth it...
-
-Things of course get dramatically better with lower bit-depth.
-
-Sprites
+Preface
 -------
 
-If we wanted to support sprites, we would need scan-line buffers for them, probably around 64-bits worth each (16x16 and 4bpp). That would be 512 bits total.
+Today GPUs rule the world. The basic way of their operation - as far as screen compositing is concerned - is that they re-draw every frame every time. They take each vertex in the scene, project them, shade them, texture-map them, then draw them into the screen-buffer. Probably a lot of other things too. The point is: they read a ton of memory buffers and write the frame buffer many many times over for every screen. This of course needs tons of memory, but maybe even more importantly, it needs a ton of memory bandwidth. In the early '80s both came at a premium; Anachron and Disco simply can't afford this approach, just like none of their 'competitors' could. The alternative is online screen-compositing: creating the image one pixel (one scan-line maybe) at a time as we go, sending the pixels to the CRT output and forgetting about them. Sprites are a typical example of this: small patches of transparent overlays that can be composited with the main frame buffer content real-time, while the screen data was sent out.
 
-Disco would use several DMA channels to read video-data: one for the main screen buffer and one each for each sprite.
+Disco follows a similar method, albeit with somewhat more flexibility than usual. Disco is also a somewhat weird chimera beast: while it adheres to the limitations of early '80s tech, it also interfaces to modern monitors by providing HDMI (DVI really) output. This forces some features, most importantly scan-line and pixel replication that would not have been possible in earlier systems. These features require deep (by '80 standards) memories on-chip which are easily implemented today but would have been prohibitively expensive back then. Since they come with (and due to) HDMI support, I decided that such deviations are acceptable.
 
-Screen compositing
-------------------
+High level architecture
+-----------------------
 
-We might want to support several layers of screen data. For instance: overlay of two 320x240, 4bpp planes. This is the same memory bandwidth, but with supporting two independent smooth-scroll settings for each, a game can a foreground/background semi-3D illusion. Combined with scan-line interrupts, where registers can be reprogrammed, even more effects can be supported.
+.. svgbob::
 
-For each plane we would need to replicate the 2D DMA engines and pixel shifters. We could share the pixel buffers though. This will sacrifice some bus efficiency, but we're off-loading a ton of CPU work in screen composition, so it's probably the right call. Palette lookups are also more complicated, but potentially can be done after merging: the transparency color is not defined by the palette, it is simply hard-coded as index 0, for example. Having independent palettes for the layers is also solvable because of the reduced per-layer bit-width. We just need to carry over the layer selection so we can use the right section of the palette ram.
+    .-------------------------------------------------------------------------------.
+    |                               Register interface                              |
+    `-------+---------------------+--------------------+--------------------+-------'
+            |          :          |                    |                    |
+    .-------+-------.  :  .-------+-------.     .------+------.     .-------+-------.
+    |               |  :  |               |     |   Palette   |     |               |
+    |  DMA engine   |--:->|   Compositor  |     `------+------'     | Video timing  |
+    |               |--:->|               |            |            |      and      |     +-.
+    |               |--:->|               |     .------+------.     |    Upscaler   |     | |
+    |               |--:->|               |---->| RGB mapper  |---->|               |---->| | HDMI
+    |               |  :  |               |     `-------------'     |               |     | |
+    |               |--:->|               |                         |               |     +-'
+    |               |  :  |               |                         |               |
+    |               |  :  |               |                         |               |
+    `---------------'  :  `---------------'                         `---------------'
 
-Since we can't really expect to close timing beyond ~10MHz, we would certainly need to handle 2 VGA pixels in parallel, maybe even two QVGA pixels, which would mean up to 6 palette lookups per clock cycle.
+    \________________/   \__________________________________________________________/
+         sys_clk                                   video_clk
+         domain                                     domain
+
+
+The pipeline starts with the DMA engine. This is responsible for generating the appropriate read bursts to fill the various pixel queues full. There's a queue for each plane and a single queue for all sprites combined. The DMA engine is not aware of the meaning of the data (bit-depth for instance), only of it's memory layout. It is capable of 2D DMAs, which is to say that plane strides don't have to match screen width. Control signals between it and the compositor enure that the DMA memory pointers are advanced and reset at the appropriate times.
+
+.. todo:: should we have individual queues for sprites? Is there even a queue or are we just filling a buffer?
+
+The pixel queues are drained by the Compositor. This engine interprets the pixel data in each of the plane queues, maps them to palette indexes and composes a single pixel-stream. Composition involves overlaying the (enabled) planes with the (enabled) sprites in the right priority order while observing transparency settings. The compositor translates each stream into 8-bit palette indexes before composition; all planes and sprites share a single, 256-color palette. The resulting pixel stream is output to the RGB mapper.
+
+.. todo:: how to deal with high-resolution modes? In those cases we would want to output two pixels per clock, but then it would only be 4 bits per pixel. Or even less. How does the compositor work in that case?
+
+The RGB mapper performs palette lookups to male the 8-bit palette entry to a 24-bit RGB pixel. For 8-bit color modes, the palette is a interpolated one (i.e. we don't have a full 256x24-bit palette RAM, only a 32x24-bit one); this interpolation is also performed here. The mapped RGB pixel stream is output towards the video timing and upscaler module.
+
+The video timing and upsaceler module ensures that pixels are sent to the HDMI connector at the right time; that synchronization (horizontal and vertical) pulses are emitted at the right time and that the right amount of pixels are presented in each scan-line and frame. The module is also responsible for the TMDS signal generation.
+
+A set of registers control the operation of each of these modules. These registers are programmable from the bus interface, the same one that the DMA engine generates transactions on. A separate chip-select signal differentiates between the two uses of the bus interface.
 
 Clocks
 ------
 
-We have to independent clock inputs (and two internal clock-domains): one for the system clock to interface with the bus and the other for the video generation logic. We would need to transition from the :code:`sys_clk` to the :code:`video_clk` domain, the logical place to do that is the pixel buffer. This would need to become a CDC FIFO.
+The memory interface timing is determined by the speed of the DRAM memory used and is shared with Espresso. The timing of the HDMI output is determined by that standard and the resolution used. There's no reason to believe or assume that there is a nice relationship between the two clock requirements. Thus, Disco supports two independent clock inputs for these two functions. This in turn necessitates a clock-domain crossing somewhere within the timeline. This transition happens at the output of the DMA engine; the pixel queues are a natural point for a CDC.
 
 .. admonition:: Why?
 
-    Many computers of the era (maybe most) used a single clock source and derived their system clock from their video clock (the IBM PC is an obvious exception). I would not want to go that route. The strict division ratios (we couldn't have had fancy PLLs) would mean that we can't maximize system performance as :code:`sys_clk` would be slower than it could otherwise be. It would also have meant that PAL and NTSC versions would have run at different speed. So, I decided to eat the extra cost and include a second crystal oscillator. In fact, if we wanted to support the 256 and 512 pixel horizontal resolutions, a third clock source would need to be provided.
+    Many computers of the era (maybe most) used a single clock source and derived their system clock from their video clock (the IBM PC is an obvious exception). I would not want to go that route. The strict division ratios (we couldn't have had fancy PLLs) would mean that we can't maximize system performance as :code:`sys_clk` would be slower than it could otherwise be. It would also have meant that PAL and NTSC versions would have run at different speed. So, I decided to eat the extra cost and include a second crystal oscillator.
 
-Output signals
---------------
+The reality of modern output standards (HDMI) forces us to use several video_clk rates for various resolutions. This would not have been a huge issue in the old days (we would have needed a different clock for NTSC vs. PAL television sets, but no other variations would have been necessary). Luckily, the technology to implement Disco is based on FPGAs, which feature internal PLLs. So we can still generate (in fact we have to generate because HDMI pixel and bit-clocks are quite different in frequency) several clocks from a single externally supplied :code:`video_clk` source. This would not have been possible but nor would have been necessary in the '80s, so I think it's an acceptable creep of 'modernity'.
 
-R/G/B output would be analog signals, which of course we can't do on an FPGA: we would need to depend on external DACs.
-
-.. note::
-    The Amiga and the Atari ST depended on external resistor-network based DACs for video. In the A500, it became a 'hybrid', which is not much better...
-
-Pixel buffer
+Pixel queues
 ------------
 
-We have to have an internal buffer for a full burst from the DMA controller and then some to weather the latency-jitter: probably 16 to 32 bytes worth.
+We have to have an internal buffer for a full burst from the DMA controller and then some to weather the latency-jitter: minimum 32 bytes worth, probably higher. There's a big question if a single buffer shared by all queues is the way to go (more complicated logic, less resources) or individual buffers for each plane at least.
+
+.. todo:: do the queues share a memory buffer or are implemented individually?
+
+Bitmap planes
+-------------
+
+Disco supports up to 4 bitmap planes. Each plane can be set to different bit-widths, strides and X and Y offsets on the screen. Through the X offset the start-position within the final frame can be adjusted for each plane, however from that starting point the plane is visible through the remainder of the scan-line. Similarly, the Y offset can affect the starting scan-line for a plane, but from then on, the plane is going to be visible all the way to the bottom of the screen.
+
+This means that while the resolution of the planes need not be the same, the can't be set completely independently either: their X resolution and X offset must add up to the horizontal screen resolution; similarly their Y offset and resolution must add up to the vertical screen resolution.
+
+The drawing priority is fixed for all planes: plane 0 being drawn first, plane 3 being drawn last. The transparency palette index is fixed as index 0 for all planes. This means that palette index 0 on plane 0 reveals the screen background color; palette index 0. The corresponding color is programmable in the palette and will be used by the RBG mapper.
 
 Sprites
 -------
 
-If we wanted to support sprites, we would need scan-line buffers for them, probably around 64-bits worth each (16x16 and 4bpp). That would be 512 bits total.
+Disco supports up to 8 sprites, each being 32 pixels wide and 3 colors (plus transparency) for each pixel. The height of the sprites is programmable from one rows to full screen-height.
 
-We would have 8 DMA channels too: one for each sprite. These DMA channels would access their associated tiny frame-buffers during the horizontal blank period to fill the internal buffers. Since they read 8 bytes at a time, they use 4-beat bursts.
+Sprite data is stored in memory consecutively starting at a base address. Each row consists of 8 bytes of data. A row for a sprite is read by the DMA engine in one burst during horizontal retrace and stored in internal storage.
 
-Line-replication
-----------------
+Sprite positions are programmable both in the X and Y direction in pixel precision. They can be placed partially or completely outside the visible area in the horizontal direction. Vertically, the can be placed after the bottom of the screen, but if they are to be partially shown on the top, the base address register needs to be modified to hide the first few rows.
 
-320x240 screens were a 'hack' in the VGA standard. Or, to be more precise, the scan-lines would have been too far away from each other on a progressive-scan CRT. As a result, the display worked in 480 scan-line mode and each scan-line is painted twice to make the impression of a 240-pixel vertical resolution. If we were to work with these monitors, and timing, we would need to do the same.
+.. todo:: should we support 2D DMAs for spites with a post-increment register?
 
-Since VGA is a later standard, we won't have to be bother by how it would have been supported back in the day, but in our FPGA implementation, this is the only format that really matters. TV: who cares anymore.
+The drawing priority is fixed for all sprites: sprite 0 being drawn first, sprite 7 being drawn last.
 
-In the FPGA world, a scan-line buffer can easily be used to replicate the screen image. In fact, this buffer would be placed after the palette, so that all sprites and layers would get replicated properly.
+Sprite and plane interactions
+-----------------------------
 
-A second scan-line worth of buffer is added to stretch out the time the engines prior have two (VGA) scan-lines worth of time constructing the following one. This trick doesn't change the average datarate needed on the bus. It however lowers the burst data-rate, which not only helps with meeting DRAM timing, but allows for smoother CPU execution and closer actual bus behavior to what a TV outputting machine would have experienced.
+The priority of the planes and sprites is programmable; even though the drawing order within planes themselves and sprites themselves is fixed, sprites and planes can freely intermix in the drawing order. So for instance, both of the following drawing orders are valid:
 
-The fact that the scan-line buffers are after the palette means that they contain 18-bit pixel information. They are 2 scan-lines worth, at 320 pixels each, so a total of 11520 bits are needed. This is just a little over what a single (GoWin) BRAM can support, so we'll need 2 instances.
+================    ==============     ==============
+Drawing order       Example 1          Example 2
+================    ==============     ==============
+0                   plane 0            sprite 0
+1                   plane 1            plane 0
+2                   sprite 0           sprite 1
+3                   plane 2            sprite 2
+4                   sprite 1           sprite 3
+5                   plane 3            sprite 4
+================    ==============     ==============
 
-Interlace support
------------------
+.. todo:: should we support collision detection? It's rather easy to implement which plane or sprite collides (replacement of non-0 pixel value) but it's rather hard to know with what it collided with.
 
-If we wanted to do *more* than ~240 scan-lines on a TV screen, we would have had to implement interlaced mode. In that operating mode, even fields would end on a half-scan-line and odd fields would start with them. This way, the CRT would shift the fields half a scan-line from one another, creating the impression of double the vertical resolution.
+Line- and pixel replication (upscaler)
+--------------------------------------
 
-So, to support 640x480 screens on a TV (or a monitor supporting NTSC-style timings) we would need to support interlaced mode.
+https://images.anandtech.com/doci/12095/hdmitable.png
+https://onlinelibrary.wiley.com/doi/pdf/10.1002/9781119415572.app3
 
-.. note::
-    It's interesting to see how in the 'old world' 640x480 needed special treatment, while in the 'new world' it's the other, the 320x240 resolution that requires it.
+HDMI has no real 320x240 or anything similar. Neither did analog VGA for that matter. They were a 'hack'. Or, to be more precise, the scan-lines would have been too far away from each other on a progressive-scan CRT. As a result, the display worked in 480 scan-line mode and each scan-line is painted twice to make the impression of a 240-pixel vertical resolution. This got carried over to the digital standards such as HDMI.
 
-The problem with emulating interlace on a VGA monitor is the following: in interlace mode the frame-rate drops to 25/30Hz respectively. In VGA, being a progressive scan standard, the frame-rate is a constant 60Hz. To emulate the setup we would need to store a full frame worth of data on-chip and playing it back twice for each update. This is not really doable with small and cheap FPGAs, however the GoWin 1NR series, with it's built-in PSRAM might be up to the task. Actually, the PSRAM is an 8MB device, with a relatively simply interface and plenty of bandwidth: we can run it at 166MHz, 8-bit wide (but DDR), with 4-beat bursts. We can issue a 32-bit read/write every 6 clock cycles, so 221MBps data-rates are achievable. Even with 32-bit pixels, we get 55Mpixels/s of transfer rate. The VGA read-out would need 25Mpixels/s, so there's more than enough for writing the frame-buffer.
+A new twist in HDMI is that - due to the minimum pixel clock requirement of 25MHz) low resolution modes need to draw pixels multiple times even in the horizontal direction.
+
+In the FPGA world, a scan-line buffer can easily be used to replicate the screen image. Pixel doubling or quadrupling can be done on the fly, but two scan-lines worth of buffer is needed to support scan-line doubling. That is, unless we expect to re-read scan-lines multiple times, which not only wastes DRAM bandwidth but complicates DMA engine design.
+
+Placing this scan-line buffer after palette mapping is the logical place (that's the part of the system that is 'modern' and deals with HDMI), but it does mean that we have to store full RBG pixels, not just 8-bit palette indices.
+
+Using two scan-line buffers also allows for lowering the burst DRAM data-rate, which not only helps with meeting DRAM timing, but allows for smoother CPU execution and closer actual bus behavior to what a TV outputting machine would have experienced.
 
 Smooth-scrolling
 ----------------
 
 Smooth scrolling is a shared feature between the DMA and the graphics controller. The DMA can shift it's starting read-out position, but only by 32 bits. That's (depending on the bit-depth of the screen) somewhere between 4 and 32 pixels.
 
-The graphics controller will have to support the throwing away of the excess data at the beginning of the scan-line to implement pixel-level smooth scrolling. The DMA controller also needs to support a post-scan-line adjustment of the read pointer to align the reads with the next scan-line (i.e. screen buffer pitch is independent of screen resolution).
+.. todo:: is that true? Shouldn't we be able to shift it by 16-bits??
 
-The programmer would need to be careful to set the active portion of the 2D DMA in the fractional pixel cases to include these excess reads and to set the post-scan-line update amount appropriately as well.
+The compositor supports throwing away of excess data at the beginning of the scan-line to implement pixel-level smooth scrolling.
+
+The programmer would need to be careful to set the active portion of the 2D DMA in the fractional pixel cases to include these excess reads and to set the post_increment register appropriately as well.
 
 Vertical smooth scrolling of course is purely a function of the DMA controller by moving the address of the buffer-start.
 
-To allow for 'infinite' smooth horizontal (or vertical) scrolling, the DMA controller supports a wrap-around addressing mode. This way the whole transfer can be kept within a fixed region of memory independent of the start-address. This allows SW to keep scrolling to the left or right, and only ever needing to paint a small section of the screen: the few columns that newly became visible.
+To allow for 'infinite' smooth horizontal (or vertical) scrolling, the DMA controller supports wrap-around addressing mode. This way the whole transfer can be kept within a fixed region of memory independent of the start-address. The 'update_mask' register controls how many address bits participate in the incrementing of DMA addresses. The remaining top bits are fixed during the whole DMA operation.
+
+This allows SW to keep scrolling to the left or right, and only ever needing to paint a small section of the screen: the few columns that newly became visible.
+
+Registers
+---------
 
 2D DMA
-------
+~~~~~~~~~~
 
 There is a 2D DMA engine for each layer. The 2D DMA has the following registers:
 
