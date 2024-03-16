@@ -5711,7 +5711,7 @@
 	)
 	(wire
 		(pts
-			(xy 109.22 91.44) (xy 124.46 91.44)
+			(xy 109.22 91.44) (xy 135.89 91.44)
 		)
 		(stroke
 			(width 0)
@@ -6435,6 +6435,18 @@
 			(justify left)
 		)
 		(uuid "c3b591c3-999a-484b-a5bb-de1b979ec973")
+	)
+	(hierarchical_label "I2C_~{INT}"
+		(shape input)
+		(at 135.89 91.44 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "d2f9c038-0415-4e09-a837-1c74c5f810f9")
 	)
 	(hierarchical_label "~{WE}"
 		(shape input)
