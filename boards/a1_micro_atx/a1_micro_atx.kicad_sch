@@ -9527,10 +9527,6 @@
 		(color 0 0 0 0)
 		(uuid "fafe5213-6587-4aa9-b5b7-ca4877501911")
 	)
-	(no_connect
-		(at 513.08 302.26)
-		(uuid "f8aa1856-eb07-4876-a311-78dd7152c996")
-	)
 	(bus_entry
 		(at 280.035 308.61)
 		(size -2.54 -2.54)
@@ -22162,72 +22158,6 @@
 			(project "a1_micro_atx"
 				(path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a"
 					(reference "#PWR094")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:+5V")
-		(at 497.84 302.26 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "079acff8-4c4b-4763-974a-ba7db7e1d816")
-		(property "Reference" "#PWR0209"
-			(at 497.84 306.07 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "+5V"
-			(at 497.84 297.18 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 497.84 302.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 497.84 302.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 497.84 302.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "4dc1a3ee-15b3-4565-bf52-2c137ad701cd")
-		)
-		(instances
-			(project "a1_micro_atx"
-				(path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a"
-					(reference "#PWR0209")
 					(unit 1)
 				)
 			)
