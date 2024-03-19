@@ -18546,6 +18546,28 @@
 		)
 		(uuid "c977dc8c-6278-4405-a325-ebed7ce2611c")
 	)
+	(text "For ~{GFX_SEL} cycles: ~{WAIT} is driven; GFX_~{BUSY} must be high."
+		(exclude_from_sim no)
+		(at 15.24 104.14 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "0c6d3521-eaf5-41be-ac95-e1670aba72b2")
+	)
+	(text "For ~{NRAM} cycles: ~{WAIT} is not driven; GFX_~{BUSY} must be high."
+		(exclude_from_sim no)
+		(at 15.24 101.6 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "100eb65e-aaa8-43d1-ba55-f19576385dd1")
+	)
 	(text "Data is captured on the falling edge of nWE | nCAS by the DRAM.\nThus, buffering either of those will not cause write-setup\nviolations. At the same time, read responses are delayed, but\nthat can be handled by slowing the clock down.\n\nSo, all in all, we can buffer control and address signals to\nthe DRAM without too much worry. Buffering data hopefully is\nnot necessary as there's only 4 loads on the bus.\n\nTons of DRAM datasheets: https://minuszerodegrees.net/memory/ram.htm\n\nEssentially everything supported page mode, no worries there.\n"
 		(exclude_from_sim no)
 		(at 273.05 124.46 0)
@@ -18623,6 +18645,17 @@
 		)
 		(uuid "55ca75ca-98d1-4c99-80e7-1c105601446f")
 	)
+	(text "For ~{RAS_x} cycles: ~{WAIT} is driven"
+		(exclude_from_sim no)
+		(at 15.24 106.68 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "58898cc1-fe92-4a9c-adcd-231d635317a0")
+	)
 	(text "ACTIVITY\nLED"
 		(exclude_from_sim no)
 		(at 226.695 289.56 0)
@@ -18656,7 +18689,7 @@
 		)
 		(uuid "81df378c-be06-428c-9e0f-b2028d4af87d")
 	)
-	(text "We disable GFX~{BUSY} propagation to CPU_~{WAIT}\nwhen we do I/O or DMA cycles. This allows for\nperipherals to generate their own wait-states\nwithout the GFX chip interfering all the time.\nHowever, the control of the VRAM isolators from\nGFX_BUSY directly means we can't DMA into VRAM."
+	(text "We disable GFX~{BUSY} propagation to CPU_~{WAIT}\nwhen we do I/O or DMA cycles. This allows for\nperipherals to generate their own wait-states\nwithout the GFX chip interfering all the time.\n"
 		(exclude_from_sim no)
 		(at 55.88 93.98 0)
 		(effects
@@ -18667,18 +18700,16 @@
 		)
 		(uuid "afdb230b-dc8c-4bc4-b8c5-cdec3aa34330")
 	)
-	(text "Review: Goal is to enable wait states for RAS and GFX I/O cycles."
+	(text "For ~{DACK} cycles: ~{WAIT} is not driven; GFX_~{BUSY} must be high."
 		(exclude_from_sim no)
-		(at 78.74 118.364 0)
+		(at 15.24 99.06 0)
 		(effects
 			(font
-				(size 3 3)
-				(thickness 0.6)
-				(bold yes)
-				(color 255 45 0 1)
+				(size 1.27 1.27)
 			)
+			(justify left)
 		)
-		(uuid "b1d3988d-71d3-484c-99cd-91f5a180a741")
+		(uuid "b4987be8-de02-458e-8188-3728aad7e4e7")
 	)
 	(text "BOOT SELECT"
 		(exclude_from_sim no)

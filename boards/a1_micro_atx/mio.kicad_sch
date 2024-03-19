@@ -6148,7 +6148,7 @@
 		(uuid "c089344f-c56a-481c-904d-a09e9a9623ce")
 	)
 	(label "USB_D+"
-		(at 114.3 101.6 0)
+		(at 116.84 101.6 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -6181,7 +6181,7 @@
 		(uuid "e3f6fe25-b618-410f-8fc2-0a45a8c90ee6")
 	)
 	(label "USB_D-"
-		(at 114.3 104.14 0)
+		(at 116.84 104.14 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -6485,9 +6485,9 @@
 		(uuid "fb24a658-b763-4b99-9d52-d991b9cd70fa")
 	)
 	(netclass_flag ""
-		(length 2.54)
+		(length 1.27)
 		(shape round)
-		(at 114.3 104.14 0)
+		(at 110.49 104.14 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -6497,7 +6497,7 @@
 		)
 		(uuid "2030698a-9f06-4857-a8f5-03b8e12a3b30")
 		(property "Netclass" "USB"
-			(at 114.9985 101.6 0)
+			(at 111.1885 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -6508,9 +6508,9 @@
 		)
 	)
 	(netclass_flag ""
-		(length 2.54)
+		(length 1.27)
 		(shape round)
-		(at 111.76 101.6 0)
+		(at 110.49 101.6 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -6520,7 +6520,7 @@
 		)
 		(uuid "cd151985-70cc-48e6-910e-3388dda67cad")
 		(property "Netclass" "USB"
-			(at 112.4585 99.06 0)
+			(at 111.1885 100.33 0)
 			(effects
 				(font
 					(size 1.27 1.27)

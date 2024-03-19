@@ -1959,6 +1959,151 @@
 				)
 			)
 		)
+		(symbol "Diode:1N5817"
+			(pin_numbers hide)
+			(pin_names
+				(offset 1.016) hide)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "D"
+				(at 0 2.54 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "1N5817"
+				(at 0 -2.54 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal"
+				(at 0 -4.445 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "http://www.vishay.com/docs/88525/1n5817.pdf"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "20V 1A Schottky Barrier Rectifier Diode, DO-41"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "diode Schottky"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "D*DO?41*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "1N5817_0_1"
+				(polyline
+					(pts
+						(xy 1.27 0) (xy -1.27 0)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 1.27 1.27) (xy 1.27 -1.27) (xy -1.27 0) (xy 1.27 1.27)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.905 0.635) (xy -1.905 1.27) (xy -1.27 1.27) (xy -1.27 -1.27) (xy -0.635 -1.27) (xy -0.635 -0.635)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "1N5817_1_1"
+				(pin passive line
+					(at -3.81 0 0)
+					(length 2.54)
+					(name "K"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 3.81 0 180)
+					(length 2.54)
+					(name "A"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+		)
 		(symbol "Jumper:Jumper_2_Open"
 			(pin_names
 				(offset 0) hide)
@@ -6593,6 +6738,16 @@
 	)
 	(wire
 		(pts
+			(xy 238.76 31.75) (xy 238.76 34.29)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "fbe1c707-ba9c-42ba-946c-e4d2570c09ee")
+	)
+	(wire
+		(pts
 			(xy 129.54 186.69) (xy 132.08 186.69)
 		)
 		(stroke
@@ -6603,7 +6758,7 @@
 	)
 	(wire
 		(pts
-			(xy 238.76 30.48) (xy 238.76 34.29)
+			(xy 238.76 21.59) (xy 238.76 24.13)
 		)
 		(stroke
 			(width 0)
@@ -7296,9 +7451,9 @@
 		(uuid "c48b90d2-183a-4812-9856-5ab50d54dce8")
 	)
 	(netclass_flag ""
-		(length 2.54)
+		(length 1.27)
 		(shape round)
-		(at 165.1 60.96 0)
+		(at 158.75 60.96 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -7308,7 +7463,7 @@
 		)
 		(uuid "143e31c7-a9c1-45e4-925b-b6bff6ce0a72")
 		(property "Netclass" "HDMI"
-			(at 165.7985 58.42 0)
+			(at 159.4485 59.69 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7319,9 +7474,9 @@
 		)
 	)
 	(netclass_flag ""
-		(length 2.54)
+		(length 1.27)
 		(shape round)
-		(at 165.1 66.04 0)
+		(at 158.75 66.04 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -7331,7 +7486,7 @@
 		)
 		(uuid "262f21c3-2915-4d57-9cf1-2302cebd45a7")
 		(property "Netclass" "HDMI"
-			(at 165.7985 63.5 0)
+			(at 159.4485 64.77 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7342,7 +7497,7 @@
 		)
 	)
 	(netclass_flag ""
-		(length 2.54)
+		(length 1.27)
 		(shape round)
 		(at 158.75 76.2 0)
 		(fields_autoplaced yes)
@@ -7354,7 +7509,7 @@
 		)
 		(uuid "3310309e-45d3-45a5-8514-fb04f97ff475")
 		(property "Netclass" "HDMI"
-			(at 159.4485 73.66 0)
+			(at 159.4485 74.93 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7365,9 +7520,9 @@
 		)
 	)
 	(netclass_flag ""
-		(length 2.54)
+		(length 1.27)
 		(shape round)
-		(at 165.1 71.12 0)
+		(at 158.75 71.12 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -7377,7 +7532,7 @@
 		)
 		(uuid "3b2b5dd7-f5bd-4039-b6fc-a1ca089a576a")
 		(property "Netclass" "HDMI"
-			(at 165.7985 68.58 0)
+			(at 159.4485 69.85 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7388,7 +7543,7 @@
 		)
 	)
 	(netclass_flag ""
-		(length 2.54)
+		(length 1.27)
 		(shape round)
 		(at 158.75 68.58 0)
 		(fields_autoplaced yes)
@@ -7400,7 +7555,7 @@
 		)
 		(uuid "686468a9-a219-42be-93d8-2554c7080b34")
 		(property "Netclass" "HDMI"
-			(at 159.4485 66.04 0)
+			(at 159.4485 67.31 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7411,7 +7566,7 @@
 		)
 	)
 	(netclass_flag ""
-		(length 2.54)
+		(length 1.27)
 		(shape round)
 		(at 158.75 63.5 0)
 		(fields_autoplaced yes)
@@ -7423,7 +7578,7 @@
 		)
 		(uuid "ce794abd-10e1-4e6c-8f3e-af10af58604b")
 		(property "Netclass" "HDMI"
-			(at 159.4485 60.96 0)
+			(at 159.4485 62.23 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7434,7 +7589,7 @@
 		)
 	)
 	(netclass_flag ""
-		(length 2.54)
+		(length 1.27)
 		(shape round)
 		(at 158.75 58.42 0)
 		(fields_autoplaced yes)
@@ -7446,7 +7601,7 @@
 		)
 		(uuid "f68f4cb9-95db-44cc-97d2-f87e94a405c0")
 		(property "Netclass" "HDMI"
-			(at 159.4485 55.88 0)
+			(at 159.4485 57.15 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7457,9 +7612,9 @@
 		)
 	)
 	(netclass_flag ""
-		(length 2.54)
+		(length 1.27)
 		(shape round)
-		(at 165.1 78.74 0)
+		(at 158.75 78.74 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -7469,7 +7624,7 @@
 		)
 		(uuid "f9a74bf7-7e42-4777-b367-449b3dee33ab")
 		(property "Netclass" "HDMI"
-			(at 165.7985 76.2 0)
+			(at 159.4485 77.47 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7831,7 +7986,7 @@
 	)
 	(symbol
 		(lib_id "power:+5V")
-		(at 238.76 30.48 0)
+		(at 238.76 21.59 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -7840,7 +7995,7 @@
 		(fields_autoplaced yes)
 		(uuid "186123f2-239a-4ddd-a6b6-f6a8dc972107")
 		(property "Reference" "#PWR0150"
-			(at 238.76 34.29 0)
+			(at 238.76 25.4 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7849,7 +8004,7 @@
 			)
 		)
 		(property "Value" "+5V"
-			(at 238.76 25.4 0)
+			(at 238.76 16.51 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7857,7 +8012,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 238.76 30.48 0)
+			(at 238.76 21.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7866,7 +8021,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 238.76 30.48 0)
+			(at 238.76 21.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7875,7 +8030,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 238.76 30.48 0)
+			(at 238.76 21.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8156,6 +8311,76 @@
 			(project "a1_micro_atx"
 				(path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/ca3554d2-b22b-4135-824b-57937af5503f"
 					(reference "J11")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Diode:1N5817")
+		(at 238.76 27.94 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "2d080962-a219-4368-a0df-76d5e59f1faa")
+		(property "Reference" "D6"
+			(at 241.3 26.9874 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "1N5817"
+			(at 241.3 29.5274 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal"
+			(at 243.205 27.94 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "http://www.vishay.com/docs/88525/1n5817.pdf"
+			(at 238.76 27.94 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "20V 1A Schottky Barrier Rectifier Diode, DO-41"
+			(at 238.76 27.94 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "4309a86f-ddf2-4c1f-86a9-f4600d9f8b2d")
+		)
+		(pin "2"
+			(uuid "2b88fa0d-6f4b-437c-a7f8-ab9b1ab0eea8")
+		)
+		(instances
+			(project "a1_micro_atx"
+				(path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a/ca3554d2-b22b-4135-824b-57937af5503f"
+					(reference "D6")
 					(unit 1)
 				)
 			)
