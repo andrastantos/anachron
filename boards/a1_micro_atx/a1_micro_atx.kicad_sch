@@ -18489,25 +18489,6 @@
 		)
 		(uuid "94dff6be-fb61-4349-8fa6-919d3565da17")
 	)
-	(text_box "Spare gates"
-		(exclude_from_sim no)
-		(at 482.6 208.28 0)
-		(size 31.75 38.1)
-		(stroke
-			(width 0)
-			(type dot)
-		)
-		(fill
-			(type none)
-		)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left top)
-		)
-		(uuid "aa68ca97-73a3-4654-a7b6-3fab2409f8e0")
-	)
 	(text_box "I/O"
 		(exclude_from_sim no)
 		(at 15.24 208.28 0)
