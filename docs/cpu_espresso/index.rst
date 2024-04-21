@@ -30,6 +30,7 @@ Espresso Processor
    synthesis_results
    todo
    debug_sessions/index
+   ideas
 
 Todos
 =====

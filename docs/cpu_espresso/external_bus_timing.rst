@@ -166,6 +166,8 @@ DMA access timing
 
 DMA accesses follow the timing of non-DRAM accesses, but select DRAM instead of non-DRAM devices as their targets. Just like non-DRAM accesses, only non-burst, 8-bit accesses are supported.
 
+.. TODO:: These timings are incorrect! n_cas needs to be delayed until data is ready on the data-bus, as it gets latched in the falling edge. This probably means that n_cas will have to go down for the last half-cycle of the DMA, after n_wait is sampled high.
+
 .. wavedrom::
 
     {

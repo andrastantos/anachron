@@ -14,6 +14,23 @@ except ImportError:
     from synth import *
 
 """
+TODO:
+
+Changes needed to co-exist with Disco and fix DMA timing.
+
+Espresso should (when programmed to) delay the start of a DRAM/I/O/DMA cycle if dram.n_wait is asserted.
+Espresso should (when programmed to) back-off DRAM cycle, if dram.n_wait is asserted in the same cycle as dram.n_ras_X is. Then, wait until dram.n_wait is de-asserted and retry.
+Espresso should (when programmed to) delay asserting dram.n_dack until after dram.n_ras is asserted and confirmed not-interfering with dram.n_wait
+
+Espresso should delay asserting dram.n_cas_X during DMA cycles until dram.n_wait is de-asserted.
+
+Espresso should sample dram.n_wait on the falling edge of clk.
+
+Espresso should sample DMA requests on the falling edge of clk (this is in cpu_dma.py).
+
+"""
+
+"""
 Bus interface of the V1 pipeline.
 
 This module is not part of the main pipeline, it sits on the side.
@@ -472,6 +489,12 @@ class BusIf(GenericModule):
             (state == BusIfStates.non_dram_dual_first) | (state == BusIfStates.non_dram_first) | (state == BusIfStates.dma_first) |
             (waiting & ((state == BusIfStates.non_dram_dual_wait) | (state == BusIfStates.non_dram_wait) | (state == BusIfStates.dma_wait)))
         )
+        """
+        BUG BUG BUG
+        for DMA accesses, n_cas needs to be delayed until data is ready on the data-bus, as it gets latched in the falling edge.
+        This probably means that n_cas will have to go down for the last half-cycle of the DMA, after n_wait is sampled high.
+        BUG BUG BUG
+        """
         nr_cas_logic_0 = nr_cas_logic & (~two_cycle_nram_access | (state == BusIfStates.non_dram_first) | (state == BusIfStates.non_dram_wait) | (state == BusIfStates.dma_first) | (state == BusIfStates.dma_wait))
         nr_cas_logic_1 = nr_cas_logic & (~two_cycle_nram_access | (state == BusIfStates.non_dram_dual_first) | (state == BusIfStates.non_dram_dual_wait) | (state == BusIfStates.dma_first) | (state == BusIfStates.dma_wait))
         nr_n_cas_0 = Wire()
