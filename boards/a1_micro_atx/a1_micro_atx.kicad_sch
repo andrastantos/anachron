@@ -7426,6 +7426,150 @@
 				)
 			)
 		)
+		(symbol "Jumper:Jumper_2_Open"
+			(pin_names
+				(offset 0) hide)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "JP"
+				(at 0 2.794 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "Jumper_2_Open"
+				(at 0 -2.286 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Jumper, 2-pole, open"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "Jumper SPST"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "Jumper* TestPoint*2Pads* TestPoint*Bridge*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "Jumper_2_Open_0_0"
+				(circle
+					(center -2.032 0)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 2.032 0)
+					(radius 0.508)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "Jumper_2_Open_0_1"
+				(arc
+					(start 1.524 1.27)
+					(mid 0 1.778)
+					(end -1.524 1.27)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "Jumper_2_Open_1_1"
+				(pin passive line
+					(at -5.08 0 0)
+					(length 2.54)
+					(name "A"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 5.08 0 180)
+					(length 2.54)
+					(name "B"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+		)
 		(symbol "MCU_Microchip_ATtiny:ATtiny25-20P"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -9379,6 +9523,12 @@
 		)
 	)
 	(junction
+		(at 55.88 381)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "0684298c-87d0-4956-83ea-0e7f84be3864")
+	)
+	(junction
 		(at 171.45 383.54)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -11324,6 +11474,16 @@
 	)
 	(wire
 		(pts
+			(xy 55.88 381) (xy 69.85 381)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "01f2a496-0320-4ed7-8c3e-d4d60875a22b")
+	)
+	(wire
+		(pts
 			(xy 250.19 85.09) (xy 250.19 100.33)
 		)
 		(stroke
@@ -12124,16 +12284,6 @@
 	)
 	(wire
 		(pts
-			(xy 514.35 300.99) (xy 514.35 314.96)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "23e10097-d2b6-4d58-b721-cb5401353da2")
-	)
-	(wire
-		(pts
 			(xy 21.59 182.88) (xy 41.91 182.88)
 		)
 		(stroke
@@ -12384,7 +12534,7 @@
 	)
 	(wire
 		(pts
-			(xy 45.72 381) (xy 69.85 381)
+			(xy 45.72 381) (xy 55.88 381)
 		)
 		(stroke
 			(width 0)
@@ -13432,16 +13582,6 @@
 		)
 		(uuid "4f0ec650-73bd-45ef-afe5-9822f913bf90")
 	)
-	(wire
-		(pts
-			(xy 514.35 293.37) (xy 514.35 290.83)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "4f370e74-7e6d-4bf5-a172-bddf5ba4d916")
-	)
 	(bus
 		(pts
 			(xy 455.93 209.55) (xy 455.93 212.09)
@@ -14131,6 +14271,16 @@
 			(type default)
 		)
 		(uuid "6911be57-fd8b-4d07-bb7e-1b38d34a7357")
+	)
+	(wire
+		(pts
+			(xy 55.88 381) (xy 55.88 388.62)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6a66ba98-14f1-4da8-9df4-c43115785db3")
 	)
 	(bus
 		(pts
@@ -15492,6 +15642,16 @@
 		)
 		(uuid "9d1cf6b2-7223-4cd7-aab1-cf69667e5bfb")
 	)
+	(wire
+		(pts
+			(xy 55.88 396.24) (xy 55.88 397.51)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9dbf8415-8e06-4a35-b487-ede9b6ffedb3")
+	)
 	(bus
 		(pts
 			(xy 254 82.55) (xy 252.73 82.55)
@@ -15611,6 +15771,16 @@
 			(type default)
 		)
 		(uuid "a12688b6-8fc6-4365-ad4f-1820d66208a5")
+	)
+	(wire
+		(pts
+			(xy 514.35 300.99) (xy 514.35 314.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a1f1ae2e-474a-4048-b203-e6970ed61c21")
 	)
 	(wire
 		(pts
@@ -25908,6 +26078,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:GND")
+		(at 55.88 397.51 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "3a3811b6-30d5-4e4a-8668-6b7c0dff7d93")
+		(property "Reference" "#PWR048"
+			(at 55.88 403.86 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 55.88 402.59 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 55.88 397.51 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 55.88 397.51 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 55.88 397.51 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "a5314198-94ab-45c3-a92a-70cda6c709c0")
+		)
+		(instances
+			(project "a1_micro_atx"
+				(path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a"
+					(reference "#PWR048")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "74xx:74LS14")
 		(at 265.43 86.36 270)
 		(unit 4)
@@ -27355,7 +27591,7 @@
 	)
 	(symbol
 		(lib_id "Device:R_US")
-		(at 514.35 297.18 0)
+		(at 55.88 392.43 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -27363,7 +27599,7 @@
 		(dnp no)
 		(uuid "52c4cbfa-735c-42f2-82cf-0d3d1e815b3d")
 		(property "Reference" "R6"
-			(at 511.81 298.45 90)
+			(at 53.34 393.7 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27372,7 +27608,7 @@
 			)
 		)
 		(property "Value" "10k"
-			(at 516.89 298.45 90)
+			(at 58.42 393.7 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27381,7 +27617,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal"
-			(at 515.366 297.434 90)
+			(at 56.896 392.684 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27390,7 +27626,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 514.35 297.18 0)
+			(at 55.88 392.43 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27399,7 +27635,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 514.35 297.18 0)
+			(at 55.88 392.43 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -29411,6 +29647,75 @@
 				(path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a"
 					(reference "U1")
 					(unit 4)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Jumper:Jumper_2_Open")
+		(at 514.35 295.91 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "77a7ae44-0f45-4b00-b5cc-58fd6a7d524a")
+		(property "Reference" "JP6"
+			(at 508 294.64 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "Jumper_2_Bridged"
+			(at 494.03 297.18 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+			(at 514.35 295.91 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 514.35 295.91 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 514.35 295.91 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "57935c33-d622-4ab1-9e7b-a3f7f2b680cf")
+		)
+		(pin "1"
+			(uuid "23524589-65cb-48a8-905d-80c70112434f")
+		)
+		(instances
+			(project "a1_micro_atx"
+				(path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a"
+					(reference "JP6")
+					(unit 1)
 				)
 			)
 		)
