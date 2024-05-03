@@ -9385,6 +9385,12 @@
 		(uuid "07feb735-e41c-4b99-bcfa-6eb2a78e55ef")
 	)
 	(junction
+		(at 519.43 290.83)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "08b52168-440b-4388-9a31-85417976b810")
+	)
+	(junction
 		(at 69.85 373.38)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -9461,12 +9467,6 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "261844ac-e3fa-4358-b114-62d4a58aadfa")
-	)
-	(junction
-		(at 58.42 381)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "2af9b5af-58ae-4494-9cae-9720bdd18395")
 	)
 	(junction
 		(at 138.43 190.5)
@@ -11794,16 +11794,6 @@
 	)
 	(wire
 		(pts
-			(xy 58.42 396.24) (xy 58.42 397.51)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "191afd27-7e33-498b-a38a-d3661224689e")
-	)
-	(wire
-		(pts
 			(xy 151.13 85.09) (xy 151.13 100.33)
 		)
 		(stroke
@@ -12134,6 +12124,16 @@
 	)
 	(wire
 		(pts
+			(xy 514.35 300.99) (xy 514.35 314.96)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "23e10097-d2b6-4d58-b721-cb5401353da2")
+	)
+	(wire
+		(pts
 			(xy 21.59 182.88) (xy 41.91 182.88)
 		)
 		(stroke
@@ -12384,7 +12384,7 @@
 	)
 	(wire
 		(pts
-			(xy 45.72 381) (xy 58.42 381)
+			(xy 45.72 381) (xy 69.85 381)
 		)
 		(stroke
 			(width 0)
@@ -12641,6 +12641,16 @@
 			(type default)
 		)
 		(uuid "3771b34e-966c-40b8-a2e4-43b76bbc5379")
+	)
+	(wire
+		(pts
+			(xy 519.43 290.83) (xy 519.43 293.37)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "37820372-c3d1-4b5c-a1b9-a5b825c271f1")
 	)
 	(wire
 		(pts
@@ -12961,6 +12971,16 @@
 			(type default)
 		)
 		(uuid "3fda2e4e-b6ce-4ff4-863c-e0bde551fd0f")
+	)
+	(wire
+		(pts
+			(xy 519.43 288.29) (xy 519.43 290.83)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3ff253b0-48ef-49be-bd0f-272d8ad51d9e")
 	)
 	(wire
 		(pts
@@ -13412,6 +13432,16 @@
 		)
 		(uuid "4f0ec650-73bd-45ef-afe5-9822f913bf90")
 	)
+	(wire
+		(pts
+			(xy 514.35 293.37) (xy 514.35 290.83)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4f370e74-7e6d-4bf5-a172-bddf5ba4d916")
+	)
 	(bus
 		(pts
 			(xy 455.93 209.55) (xy 455.93 212.09)
@@ -13471,16 +13501,6 @@
 			(type default)
 		)
 		(uuid "5157fd6f-34d2-400d-8729-a08bcafe87e2")
-	)
-	(wire
-		(pts
-			(xy 58.42 381) (xy 58.42 388.62)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "51b40c7a-28dc-4586-95ec-e6a0b4ccc68a")
 	)
 	(wire
 		(pts
@@ -13904,7 +13924,7 @@
 	)
 	(wire
 		(pts
-			(xy 496.57 314.96) (xy 511.81 314.96)
+			(xy 496.57 314.96) (xy 514.35 314.96)
 		)
 		(stroke
 			(width 0)
@@ -15214,16 +15234,6 @@
 	)
 	(wire
 		(pts
-			(xy 58.42 381) (xy 69.85 381)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "94794b9e-fb12-4eaa-8a86-e30ead874387")
-	)
-	(wire
-		(pts
 			(xy 228.6 306.07) (xy 193.04 306.07)
 		)
 		(stroke
@@ -16481,6 +16491,16 @@
 			(type default)
 		)
 		(uuid "bd1b7964-0302-4770-b2d7-f5b3c3831638")
+	)
+	(wire
+		(pts
+			(xy 514.35 290.83) (xy 519.43 290.83)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bda116c6-12f0-4a71-8f05-8f2b44217c88")
 	)
 	(wire
 		(pts
@@ -27335,7 +27355,7 @@
 	)
 	(symbol
 		(lib_id "Device:R_US")
-		(at 58.42 392.43 180)
+		(at 514.35 297.18 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -27343,7 +27363,7 @@
 		(dnp no)
 		(uuid "52c4cbfa-735c-42f2-82cf-0d3d1e815b3d")
 		(property "Reference" "R6"
-			(at 60.96 391.16 90)
+			(at 511.81 298.45 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27352,7 +27372,7 @@
 			)
 		)
 		(property "Value" "10k"
-			(at 55.88 391.16 90)
+			(at 516.89 298.45 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27361,7 +27381,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal"
-			(at 57.404 392.176 90)
+			(at 515.366 297.434 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27370,7 +27390,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 58.42 392.43 0)
+			(at 514.35 297.18 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -27379,7 +27399,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 58.42 392.43 0)
+			(at 514.35 297.18 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -29810,7 +29830,7 @@
 	)
 	(symbol
 		(lib_id "power:+5VL")
-		(at 519.43 293.37 0)
+		(at 519.43 288.29 0)
 		(mirror y)
 		(unit 1)
 		(exclude_from_sim no)
@@ -29820,7 +29840,7 @@
 		(fields_autoplaced yes)
 		(uuid "7d1266b6-9509-4ba5-99d2-9d3434604ccf")
 		(property "Reference" "#PWR0280"
-			(at 519.43 297.18 0)
+			(at 519.43 292.1 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -29829,7 +29849,7 @@
 			)
 		)
 		(property "Value" "+5V_STB"
-			(at 519.43 288.29 0)
+			(at 519.43 283.21 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -29837,7 +29857,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 519.43 293.37 0)
+			(at 519.43 288.29 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -29846,7 +29866,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 519.43 293.37 0)
+			(at 519.43 288.29 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -29855,7 +29875,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+5V_STB\""
-			(at 519.43 293.37 0)
+			(at 519.43 288.29 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -31853,72 +31873,6 @@
 			(project "a1_micro_atx"
 				(path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a"
 					(reference "U8")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 58.42 397.51 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "9dc1eca8-c95b-4995-8d89-a4f3577b49d3")
-		(property "Reference" "#PWR048"
-			(at 58.42 403.86 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 58.42 402.59 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 58.42 397.51 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 58.42 397.51 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 58.42 397.51 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "912197cd-7297-4a3d-92b6-d212c4cd6514")
-		)
-		(instances
-			(project "a1_micro_atx"
-				(path "/3257e1ae-50a8-410a-87c3-a39d96a2c51a"
-					(reference "#PWR048")
 					(unit 1)
 				)
 			)
