@@ -10,4 +10,6 @@ i_*/*
 **/*work/*
 **/output_files/*
 **/*.qws
-
+**/.qsys_edit/**
+**/greybox_tmp/**
+**/modelsim.ini

@@ -11,4 +11,4 @@ Copy them over to anachron_fpga.
 
 There, you'll find the 'run' script that will execute the simulator.
 
-Except of course things don't quite work... But why????
+
