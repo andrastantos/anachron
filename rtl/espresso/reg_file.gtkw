@@ -1,19 +1,21 @@
 [*]
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Sat Feb  4 21:20:20 2023
+[*] Sun May 19 21:11:00 2024
 [*]
-[dumpfile] "/home/tantos/brew/rtl/v1/reg_file.vcd"
-[dumpfile_mtime] "Sat Feb  4 21:19:50 2023"
-[dumpfile_size] 107599
-[savefile] "/home/tantos/brew/rtl/v1/reg_file.gtkw"
-[timestart] 2
+[dumpfile] "/home/tantos/anachron/rtl/espresso/reg_file.vcd"
+[dumpfile_mtime] "Sun May 19 21:10:51 2024"
+[dumpfile_size] 46429
+[savefile] "/home/tantos/anachron/rtl/espresso/reg_file.gtkw"
+[timestart] 0
 [size] 1920 990
 [pos] -1 -1
-*-7.423877 781 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-7.423877 930 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
-[sst_width] 233
-[signals_width] 330
+[treeopen] top.dut.mem1.
+[treeopen] top.dut.mem1.real_mem.
+[sst_width] 273
+[signals_width] 378
 [sst_expanded] 1
 [sst_vpaned_height] 300
 @28
@@ -40,29 +42,39 @@ top.dut.read_req_rsv_valid
 -READ_REQ
 @800200
 -READ_RSP
-@24
+@22
 top.dut.read_rsp_read1_data[31:0]
-@25
 top.dut.read_rsp_read2_data[31:0]
 @28
 top.dut.read_rsp_ready
 top.dut.read_rsp_valid
 @1000200
 -READ_RSP
+@22
+top.dut.buf_write_addr[3:0]
+top.dut.buf_read_req_read1_addr[3:0]
+@28
+top.dut.buf_write_valid
+top.dut.buf_write_data_en
+@22
+top.dut.buf_write_data[31:0]
 @800200
 -WRITE
+@28
+top.dut.write_valid
 @22
 top.dut.write_addr[3:0]
-@24
 top.dut.write_data[31:0]
-@22
-top.dut.write_data_d[31:0]
 @28
 top.dut.write_data_en
-top.dut.write_valid
 @1000200
 -WRITE
-@c00022
+@28
+top.dut.all_ready
+top.dut.rsv_board_read1_ready
+top.dut.rsv_board_read2_ready
+top.dut.rsv_board_rsv_ready
+@c00028
 top.dut.rsv_board[14:0]
 @28
 (0)top.dut.rsv_board[14:0]
@@ -83,28 +95,32 @@ top.dut.rsv_board[14:0]
 @1401200
 -group_end
 @28
-top.dut.req_advance
-top.dut.rsp_advance
+top.dut.rsv_clr_mask[14:0]
+top.dut.read1_mask[14:0]
+@200
+-RAM1
 @22
-top.dut.write_data_d[31:0]
+top.dut.mem1.port1_addr[3:0]
+top.dut.mem1.port1_data_in[31:0]
 @28
-top.dut.read1_valid
-top.dut.read2_valid
+top.dut.mem1.port1_write_en
 @22
-top.dut.read1_addr[3:0]
-top.dut.read2_addr[3:0]
-@28
-top.dut.wait_for_write
-top.dut.out_buf_full
-top.dut.rsv_clr_valid
-top.dut.rsv_set_valid
-top.dut.rsv_valid
-top.dut.rsv_rsv_bit
+top.dut.mem1.port2_addr[3:0]
+top.dut.mem1.port2_data_out[31:0]
+top.dut.mem1.real_mem.inner_mem.addr_0_port[3:0]
+@23
+top.dut.mem1.real_mem.inner_mem.addr_1_port[3:0]
 @22
-top.dut.rsv_addr[3:0]
+top.dut.mem1.real_mem.inner_mem.data_out_1_port[31:0]
+@200
+-RAM2
+@22
+top.dut.mem2.port1_addr[3:0]
+top.dut.mem2.port1_data_in[31:0]
 @28
-top.dut.wait_for_read1
-top.dut.wait_for_rsv
-top.dut.wait_for_read2
+top.dut.mem2.port1_write_en
+@22
+top.dut.mem2.port2_addr[3:0]
+top.dut.mem2.port2_data_out[31:0]
 [pattern_trace] 1
 [pattern_trace] 0

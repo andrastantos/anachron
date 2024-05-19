@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
@@ -15,7 +15,7 @@
         },
         {
             "name": "Python: Espresso BCT",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/rtl/v1/test/test_cpu_bct.py",
             "console": "integratedTerminal",
@@ -24,7 +24,7 @@
         },
         {
             "name": "Python: gen_anacron_fpga",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/rtl/v1/gen_anacron_fpga.py",
             "console": "integratedTerminal",
@@ -33,7 +33,7 @@
         },
         {
             "name": "CPU DOCUMENTATION",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "module": "sphinx.cmd.build",
             "console": "integratedTerminal",
@@ -43,7 +43,7 @@
         },
         {
             "name": "BREW DOCUMENTATION",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "module": "sphinx.cmd.build",
             "console": "integratedTerminal",
@@ -53,11 +53,20 @@
         },
         {
             "name": "BREW ISA check",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "check_isa.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/../brew/docs/cpu",
+            "justMyCode": false,
+        },
+        {
+            "name": "ESPRESSO reg_file TB",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "reg_file_tb.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/rtl/espresso",
             "justMyCode": false,
         },
     ]
