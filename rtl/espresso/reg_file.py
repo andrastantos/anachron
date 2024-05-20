@@ -17,13 +17,28 @@ except ImportError:
 
 
 """
-The register file for Brew consists of a single write and two read ports.
+ESPRESSO REGISTER FILE IMPLEMENTATION
 
-The V1 version doesn't implement types, so only values are provided.
+The register file supports two read and a single write ports. No type support
+is provided.
 
-For FPGAs, BRAMs can be used to implement the register file.
+For FPGAs, BRAMs are inferred for the register file.
 
-The register file also implements the score-board for the rest of the pipeline to handle reservations
+The register file also implements the score-board for the rest of the pipeline
+to handle reservations.
+
+In case of branches, pending requests are dropped on the floor and any pending
+reservations are ignored. Existing reservations are not cleared though: those
+are for instructions prior to the branch which is to say, their value needs to
+be committed back into the register file.
+
+For branches, no response is given for pending requests: it is the
+responsibility of the requestor (the decode stage) to not care
+
+Due to BRAM behavior, the register file has a single-cycle latency: responses
+are returned at least one cycle later then requests are submitted, given there
+are no conflicts. If there are, responses are delayed and further requests are
+blocked.
 """
 
 class RegFile(Module):
@@ -142,7 +157,7 @@ class RegFile(Module):
         read2_mask =   Select(buf_read_req.valid & buf_read_req.read2_valid, 0, to_one_hot(buf_read_req.read2_addr))
         rsv_set_mask = Select(buf_read_req.valid & buf_read_req.rsv_valid,   0, to_one_hot(buf_read_req.rsv_addr))
 
-        rsv_board_next = rsv_board & ~rsv_clr_mask | Select(buf_read_req.ready, 0, rsv_set_mask)
+        rsv_board_next = rsv_board & ~rsv_clr_mask | Select(buf_read_req.ready | self.do_branch, 0, rsv_set_mask)
         rsv_board <<= Reg(rsv_board_next)
 
         # Handshake
@@ -165,7 +180,7 @@ class RegFile(Module):
         )
 
         all_ready = rsv_board_read1_ready & rsv_board_read2_ready & rsv_board_rsv_ready
-        buf_read_req.ready <<= all_ready & self.read_rsp.ready
+        buf_read_req.ready <<= (all_ready & self.read_rsp.ready) | self.do_branch
         self.read_rsp.valid <<= all_ready & buf_read_req.valid
 
 
