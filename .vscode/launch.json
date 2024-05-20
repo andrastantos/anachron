@@ -69,5 +69,14 @@
             "cwd": "${workspaceFolder}/rtl/espresso",
             "justMyCode": false,
         },
+        {
+            "name": "ESPRESSO reg_file_cmp TB",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "reg_file_cmp_tb.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/rtl/espresso/test",
+            "justMyCode": false,
+        },
     ]
 }

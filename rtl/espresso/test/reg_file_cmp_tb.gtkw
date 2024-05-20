@@ -1,0 +1,80 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Mon May 20 23:16:38 2024
+[*]
+[dumpfile] "/home/tantos/anachron/rtl/espresso/test/reg_file_cmp_tb.vcd"
+[dumpfile_mtime] "Mon May 20 23:16:00 2024"
+[dumpfile_size] 111759
+[savefile] "/home/tantos/anachron/rtl/espresso/test/reg_file_cmp_tb.gtkw"
+[timestart] 0
+[size] 1920 1097
+[pos] -27 -58
+*-7.947557 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] top.
+[sst_width] 382
+[signals_width] 230
+[sst_expanded] 1
+[sst_vpaned_height] 718
+@28
+top.dut.clk
+top.dut.rst
+@800200
+-REF_READ_REQ
+@22
+top.reference.read_req_read1_addr[3:0]
+@28
+top.reference.read_req_read1_valid
+@22
+top.reference.read_req_read2_addr[3:0]
+@28
+top.reference.read_req_read2_valid
+top.reference.read_req_ready
+@22
+top.reference.read_req_rsv_addr[3:0]
+@28
+top.reference.read_req_rsv_valid
+top.reference.read_req_valid
+@1000200
+-REF_READ_REQ
+@800200
+-REF_READ_RSP
+@22
+top.reference.read_rsp_read1_data[31:0]
+top.reference.read_rsp_read2_data[31:0]
+@28
+top.reference.read_rsp_valid
+top.reference.read_rsp_ready
+@1000200
+-REF_READ_RSP
+@800200
+-DUT_READ_REQ
+@22
+top.dut.read_req_read1_addr[3:0]
+@28
+top.dut.read_req_read1_valid
+@22
+top.dut.read_req_read2_addr[3:0]
+@28
+top.dut.read_req_read2_valid
+top.dut.read_req_ready
+top.dut.read_req_reg_en
+@22
+top.dut.read_req_rsv_addr[3:0]
+@28
+top.dut.read_req_rsv_valid
+top.dut.read_req_valid
+@1000200
+-DUT_READ_REQ
+@800200
+-DUT_READ_RSP
+@22
+top.dut.read_rsp_read1_data[31:0]
+top.dut.read_rsp_read2_data[31:0]
+@29
+top.dut.read_rsp_ready
+@28
+top.dut.read_rsp_valid
+@1000200
+-DUT_READ_RSP
+[pattern_trace] 1
+[pattern_trace] 0
