@@ -78,5 +78,14 @@
             "cwd": "${workspaceFolder}/rtl/espresso/test",
             "justMyCode": false,
         },
+        {
+            "name": "ESPRESSO decode GEN",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "decode.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/rtl/espresso",
+            "justMyCode": false,
+        },
     ]
 }

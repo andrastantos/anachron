@@ -27,34 +27,97 @@ except ImportError:
 """
 Decode logic
 
-We have two read ports to the register-file, plus one to reserve our output register.
+Decode takes a single instruction from the fetch unit. It is just 3 bytes, a length and an 'av' flag.
 
-The score-board and forwarding logic is all in the register-file, so we don't have
-to be bothered with that. All we cared are the 'response' signals that let us
-know that our requests are honored.
+Decode generates a bunch of logic signals for Execute. It also deals with the register file, and thus
+reservations.
 
-We can repeat reads as many times as needed, there's no state-change associated with them.
+Decode is ready to issue an instruction to Execute if all reservations are met.
 
-We have to be a bit careful with the result reservation though: while it's fine to reserve
-the same register in multiple cycles, it's response will only come once. So we'll have to
-remember that...
+Since the register file has a single-cycle latency, we'll have to start the reservation process
+before we knew if Execute is going to be able to accept the results. Because of that, we'll have
+to remember the results of a read result if Execute is not ready for us.
 
-In general we're ready to execute an instruction, when read1, read2 got a response (if we cared),
-when we've seen or see a rsv_response (if we cared) and when exec is ready to accept the next instruction.
+TODO: DIET DIET DIET: there's another way of dealing with this, but I will not do it right now
+as it requires an interface change: we could change the interface in some way to ensure that
+the RF keeps it's output reliable even if a new request isn't sent in, or change things so
+that we can keep re-issuing the same request again and again (we can't at this point due
+to reservations)
 
 In case of a fetch AV, we pretend to get an instruction with no dependencies and no reservation and push it as
 the next instruction. There's no harm in using the instruction fields: while they're invalid, or may even
 contain some sensitive info, they don't produce side-effects: all they do is to generate some mux changes
 that then will be ignored in execute. However, we *have* to make sure that the output register enable is
-de-asserted, so no matter what, no write-back will occur. Execute assume assumes that.
+de-asserted, so no matter what, no write-back will occur. Execute assumes that.
 
 HW interrupts are dealt with in the execute stage.
 """
-"""
-TODO: things to test:
-- fetch_av
-"""
 
+"""
+If we were to do the decoding using ROMs, this is how things would transpire:
+
+On clock 0:
+    - we detect a valid input (fetch.valid & fetch.ready).
+    - we need to do some pre-decode to come up with the ROM address;
+      this would be in the same logic cone as the output of the fetch, unfortunately.
+On clock 1:
+    - we get the result of decode, which is the RF addresses and their their reservations;
+      this we feed to the RF
+    - we register all the rest of the outputs from the ROM as those will need to go to
+      execute
+    - the RF starts processing the request
+On clock 2:
+    - We get the results from the RF, which we feed to execute with the rest of the 
+      control signals
+
+In other words: we're extending decode latency to two.
+
+If we were to forgo the decode ROM and stayed with the current logic, we could:
+
+On clock 0:
+    - we detect a valid input (fetch.valid & fetch.ready)
+    - we decode RF addresses and reservations; feed them to RF
+      all this logic is within the logic cones of fetch, unfortunately
+    - RF starts working on our request
+On clock 1:
+    - we decode the rest of the control signals <== this can still be done using a ROM
+    - we get the result from RF
+
+So, overall, the following logic will have to happen front-loaded:
+
+- RegA address;needed selection
+- RegB address;needed selection
+- Rsv  address;needed selection
+- ROM  address creation
+
+As far as the ROM is concerned, currently the following bit-counts are needed (I think):
+
+    EXEC_UNIT:     3         
+    ALU_OP:        3              
+    SHIFTER_OP:    2
+    BRANCH_OP:     4
+    LDST_OP:       2
+    RD1_ADDR:      2 --> needs async decode
+    RD2_ADDR:      2 --> needs async decode
+    RES_ADDR:      1 --> needs async decode
+    OP_A:          3
+    OP_B:          3
+    OP_C:          2
+    MEM_LEN:       2
+    BSE:           1
+    WSE:           1
+    BZE:           1
+    WZE:           1
+    WOI:           1
+    ----------------
+    TOTAL:        34
+
+So, if I'm not mistaken, we would need 31-bit wide memories; something that most FPGAs support. GoWin gets there
+with 9 address bits. So, with the right compression we should be able to get away with a single ROM.
+
+There seems to be about 40 compression groups, which can be decoded in 5 bits. Each group is no longer than 16 instructions,
+so group+ins is 9 bits. Soo... a single ROM would do it?
+"""
 class DecodeStage(GenericModule):
     clk = ClkPort()
     rst = RstPort()
@@ -76,20 +139,25 @@ class DecodeStage(GenericModule):
         self.use_mini_table = use_mini_table
 
     def body(self):
-        field_d = self.fetch.inst_0[15:12]
-        field_c = self.fetch.inst_0[11:8]
-        field_b = self.fetch.inst_0[7:4]
-        field_a = self.fetch.inst_0[3:0]
+        # We're not being very nice with Silicons' type system: we have a bunch of unsigned types
+        # here that we want do sign-extension on. Silicon will not help us (it would do zero-extend)
+        # so let's introduce a quick function
+        def sign_extend_to(a, size, *, num_bits = None):
+            if num_bits == None:
+                num_bits = a.get_num_bits()
+            return concat(*(a[num_bits-1], )* (size-num_bits), a)
+
+        buf_fetch = Wire(FetchDecodeIf)
+        buf_fetch <<= ForwardBuf(self.fetch)
+
+        field_d = buf_fetch.inst_0[15:12]
+        field_c = buf_fetch.inst_0[11:8]
+        field_b = buf_fetch.inst_0[7:4]
+        field_a = buf_fetch.inst_0[3:0]
         field_e = Select(
-            self.fetch.inst_len == inst_len_48,
-            concat(
-                self.fetch.inst_1[15], self.fetch.inst_1[15], self.fetch.inst_1[15], self.fetch.inst_1[15],
-                self.fetch.inst_1[15], self.fetch.inst_1[15], self.fetch.inst_1[15], self.fetch.inst_1[15],
-                self.fetch.inst_1[15], self.fetch.inst_1[15], self.fetch.inst_1[15], self.fetch.inst_1[15],
-                self.fetch.inst_1[15], self.fetch.inst_1[15], self.fetch.inst_1[15], self.fetch.inst_1[15],
-                self.fetch.inst_1
-            ),
-            concat(self.fetch.inst_2, self.fetch.inst_1)
+            buf_fetch.inst_len == inst_len_48,
+            sign_extend_to(buf_fetch.inst_1, 32),
+            concat(buf_fetch.inst_2, buf_fetch.inst_1)
         )
 
         field_a_is_f = field_a == 0xf
@@ -98,24 +166,14 @@ class DecodeStage(GenericModule):
         field_d_is_f = field_d == 0xf
 
         tiny_ofs = Wire(Unsigned(32))
-        tiny_ofs <<= concat(*(self.fetch.inst_0[7], )*23, self.fetch.inst_0[7:1], "2'b0")
-        tiny_field_a = 12 | self.fetch.inst_0[0]
+        tiny_ofs <<= sign_extend_to(concat(buf_fetch.inst_0[7:1], "2'b0"), 32, num_bits = 9)
+        tiny_field_a = 12 | buf_fetch.inst_0[0]
 
-        field_a_plus_one = Wire()
-        field_a_plus_one <<= (field_a+1)[3:0]
+        # Convert field_a from ones-complement to twos complement for certain instructions that use that encoding
         ones_field_a = Select(
             field_a[3],
             field_a,
-            concat(
-                field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3],
-                field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3],
-                field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3],
-                field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3],
-                field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3],
-                field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3],
-                field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3], field_a_plus_one[3],
-                field_a_plus_one
-            )
+            sign_extend_to((field_a+1)[3:0], 32, num_bits=4)
         )
         ones_field_a_2x = concat(ones_field_a[30:0], "1'b0")
 
@@ -152,6 +210,49 @@ class DecodeStage(GenericModule):
         a32 = access_len_32
         a16 = access_len_16
         a8  = access_len_8
+        # Compression groups have '0..f' for exact match, '.' for non-f match and 'X' for match non-F and retain.
+        # There could be at most one X in a group
+        # Any instruction should match exactly one compression group. This is checked during group
+        # generation. Group IDs are just indices into the 'compression_groups' array
+        compression_groups = (
+            ("  .X..", "_12345678ab____"),
+            ("  .X.f", "_12345678______"),
+            ("  .Xf.", "_12345678______"),
+            ("  X000", "0123456789a____"),
+            ("  .00X", "_12345_________"),
+            ("  .0X.", "_123456789__cde"),
+            ("  .00f", "_______________"),
+            ("  20ef", "_______________"),
+            ("  30ef", "_______________"),
+            ("  40ef", "_______________"),
+            ("  .0f0", "_______________"),
+            ("  20fe", "_______________"),
+            ("  30fe", "_______________"),
+            ("  40fe", "_______________"),
+            ("  f0X.", "0123456789abcd_"),
+            ("  fX..", "_123456789abcde"),
+            ("  f.f.", "_______________"),
+            ("  f..f", "_______________"),
+            ("  .c**", "_______________"),
+            ("  .d**", "_______________"),
+            ("  .eX.", "____456789abcd_"),
+            ("  1ee.", "_______________"),
+            ("  2ee.", "_______________"),
+            ("  3ee.", "_______________"),
+            ("  4ee.", "_______________"),
+            ("  .fX.", "____456789abcd_"),
+            ("  1fe.", "_______________"),
+            ("  2fe.", "_______________"),
+            ("  3fe.", "_______________"),
+            ("  4fe.", "_______________"),
+            ("  .0f8", "_______________"),
+            ("  .0f9", "_______________"),
+            ("  .fXf", "____456789abcd_"),
+            ("  1fef", "_______________"),
+            ("  2fef", "_______________"),
+            ("  3fef", "_______________"),
+            ("  4fef", "_______________"),
+        )
         #      CODE                                  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B          OP_C        MEM_LEN BSE WSE BZE WZE WOI
         #invalid_instruction =                        (oc.branch,   None,         None,        bo.unknown,  None,      None,       None,           None,      None,            None,         None,       None,   0,  0,  0,  0,  0 )
         if self.has_shift:
@@ -195,8 +296,16 @@ class DecodeStage(GenericModule):
         full_inst_table = (
             *shift_ops,
             *mult_ops,
+            #  Number of bits needed:                     3         3              2            4           2          2            2               1          3               3                2            2     1   1   1   1   1
             #  Exception group                       EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B             OP_C        MEM_LEN BSE WSE BZE WZE WOI
-            ( "$<8000: SWI",                          oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      field_d,         None,            None,       None,   0,  0,  0,  0,  0 ),
+            ( "$ 0000: SWI_0",                        oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      field_d,         None,            None,       None,   0,  0,  0,  0,  0 ),
+            ( "$ 1000: SWI_1",                        oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      field_d,         None,            None,       None,   0,  0,  0,  0,  0 ),
+            ( "$ 2000: SWI_2",                        oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      field_d,         None,            None,       None,   0,  0,  0,  0,  0 ),
+            ( "$ 3000: SWI_3",                        oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      field_d,         None,            None,       None,   0,  0,  0,  0,  0 ),
+            ( "$ 4000: SWI_4",                        oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      field_d,         None,            None,       None,   0,  0,  0,  0,  0 ),
+            ( "$ 5000: SWI_5",                        oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      field_d,         None,            None,       None,   0,  0,  0,  0,  0 ),
+            ( "$ 6000: SWI_6",                        oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      field_d,         None,            None,       None,   0,  0,  0,  0,  0 ),
+            ( "$ 7000: SWI_7",                        oc.branch,   None,         None,        bo.swi,      None,      None,       None,           None,      field_d,         None,            None,       None,   0,  0,  0,  0,  0 ),
             ( "  8000: STM",                          oc.branch,   None,         None,        bo.stm,      None,      None,       None,           None,      None,            None,            None,       None,   0,  0,  0,  0,  0 ),
             ( "  9000: WOI",                          oc.branch,   ao.a_minus_b, None,        bo.cb_eq,    None,      field_a,    field_b,        None,      "REG",           "REG",           0,          None,   0,  0,  0,  0,  1 ), # Decoded as 'if $0 == $0 $pc <- $pc'
             ( "  a000: PFLUSH",                       oc.branch,   ao.a_minus_b, None,        bo.cb_ne,    None,      field_a,    field_b,        None,      "REG",           "REG",           0,          None,   0,  0,  0,  0,  0 ), # Decoded as 'if $0 != $0 $pc <- $pc'
@@ -336,6 +445,21 @@ class DecodeStage(GenericModule):
             ( "  4fef: call MEM32[FIELD_E]",          oc.branch_ind, None,       None,        bo.pc_w_ind, lo.load,   None,       None,           14,        None,            0,               field_e,    a32,    0,  0,  0,  0,  0 ),
         )
 
+        def optimize_selector(selectors, selector_name, name_prefix="group_"):
+            # Here, we look through all the selected items and group the selectors into as few groups as possible.
+            groups = dict()
+            for (selector, selected) in zip(selectors[::2],selectors[1::2]):
+                if selected not in groups:
+                    groups[selected] = []
+                groups[selected].append(selector)
+            # Re-create a new list by combining all the selectors for a given group
+            final_list = []
+            for idx, (selected, selector_list) in enumerate(groups.items()):
+                group_selector = or_gate(*selector_list)
+                setattr(self, f"{name_prefix}{idx+1}_for_{selector_name}", group_selector)
+                final_list += (group_selector, selected)
+            return final_list
+
         def is_mini_set(full_mask:str) -> bool:
             return full_mask.strip()[0] == "$"
 
@@ -429,6 +553,31 @@ class DecodeStage(GenericModule):
         print("Available instructions:")
         for inst in inst_table:
             print(f"    {inst[0]}")
+        # Generate check that all instructions belong to exactly one compression group
+        def is_inst_in_group(instrunction: str, grp: str, x_match: str):
+            grp = grp.strip()
+            instrunction = instrunction.split(':')[0].replace("$","").strip()
+            for (digit, g_digit) in zip(instrunction, grp):
+                if g_digit == "." and digit in "0123456789abcde.*": continue
+                if g_digit == "X" and digit in "0123456789abcde.*":
+                    if digit in x_match: continue
+                    if digit in ".*": continue
+                    return False
+                if g_digit != digit:
+                    if digit == "." and g_digit == "f": return False
+                    if digit == "*": continue
+                    return False
+            return True
+        inst_to_grp = []
+        for inst in inst_table:
+            found = False
+            for idx, (grp, x_match) in enumerate(compression_groups):
+                if is_inst_in_group(inst[0], grp, x_match):
+                    if found:
+                        print(f"Instruction {inst[0]} matches group {compression_groups[inst_to_grp[-1]]} and {grp}")
+                    inst_to_grp.append(idx)
+                    found = True
+
         mask_expressions = []
         mask_expression_names = set()
         for expr, name in (parse_bit_mask(line[CODE]) for line in inst_table):
@@ -443,6 +592,70 @@ class DecodeStage(GenericModule):
 
         # At this point we have all the required selections for the various control lines in 'inst_table' and their selection expressions in 'mask_expressions'.
         # All we need to do is to create the appropriate 'SelectOne' expressions.
+
+        # We start by creating the group selector expressions
+        group_selectors = []
+
+        for grp_idx, (mask, x_match) in enumerate(compression_groups):
+            idx = 0
+            selector_terms = []
+            selected = 0
+            mask = mask.split(':')[0].replace("$","").strip()
+            for field, field_is_f in zip((field_d, field_c, field_b, field_a), (field_d_is_f, field_c_is_f, field_b_is_f, field_a_is_f)):
+                do_gt = mask[idx] == '>'
+                do_lt = mask[idx] == '<'
+                if do_gt or do_lt: idx += 1
+                digit = mask[idx]
+
+                if digit == '.':
+                    selector_terms.append(~field_is_f)
+                elif digit == '*':
+                    pass
+                elif digit in ('0123456789abcdef'):
+                    value = int(digit, 16)
+                    if do_gt:
+                        selector_terms.append((field > value) & ~field_is_f)
+                    elif do_lt:
+                        selector_terms.append(field < value)
+                    else:
+                        selector_terms.append(field == value)
+                elif digit == 'X':
+                    options = 0
+                    for option in x_match:
+                        if option == '_': continue
+                        options = options | (field == int(option,base=16))
+                    selector_terms.append(options)
+                    selected = field
+                else:
+                    raise SyntaxErrorException(f"Unknown digit {digit} in decode mask {mask}")
+                selector = and_gate(*selector_terms)
+                group_selectors += (selector, concat(f"6'b{grp_idx:05b}", selected))
+                idx += 1
+
+        self.decode_rom_addr = Wire(Unsigned(10))
+        #self.decode_rom_addr <<= SelectOne(*group_selectors)
+        self.decode_rom_addr <<= SelectOne(*optimize_selector(group_selectors, "decoder_rom", "inst_group_"))
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         select_list_exec_unit  = []
         select_list_alu_op     = []
@@ -484,9 +697,11 @@ class DecodeStage(GenericModule):
             select_list_int_en,
         )
 
+
         for line, mask_expr in zip(inst_table, mask_expressions):
             for idx, (select_list, value) in enumerate(zip(select_lists, line[EXEC_UNIT:])):
                 idx += 1 # We are skipping the first column, so we have to accommodate it here
+
                 # OP_A and OP_B are somewhat special to hide the read-latency of the register file:
                 # We do two-stage muxing: We mux all non-reg-file outputs, then register them, then
                 # do a post-mux to swap in the register file outputs
@@ -516,21 +731,6 @@ class DecodeStage(GenericModule):
             for select_list, value in zip((select_list_read1_needed, select_list_read2_needed, select_list_rsv_needed), line[RD1_ADDR:RES_ADDR+1]):
                 if value is not None: select_list += (mask_expr, 1)
 
-        def optimize_selector(selectors, selector_name):
-            # Here, we look through all the selected items and group the selectors into as few groups as possible.
-            groups = dict()
-            for (selector, selected) in zip(selectors[::2],selectors[1::2]):
-                if selected not in groups:
-                    groups[selected] = []
-                groups[selected].append(selector)
-            # Re-create a new list by combining all the selectors for a given group
-            final_list = []
-            for idx, (selected, selector_list) in enumerate(groups.items()):
-                group_selector = or_gate(*selector_list)
-                setattr(self, f"group_{idx+1}_for_{selector_name}", group_selector)
-                final_list += (group_selector, selected)
-            return final_list
-
 
 
         # Now that we have the selection lists, we can compose the muxes
@@ -555,9 +755,9 @@ class DecodeStage(GenericModule):
         wze        = SelectOne(*optimize_selector(select_list_wze,        "wze"), default_port = 0)                             if len(select_list_wze) > 0 else 0
         woi        = SelectOne(*optimize_selector(select_list_int_en,     "woi"), default_port = 0)                             if len(select_list_int_en) > 0 else 0
 
-        read1_needed = Select(self.fetch.av, SelectOne(*optimize_selector(select_list_read1_needed, "read1_needed"), default_port=0) if len(select_list_read1_needed) > 0 else 0, 0)
-        read2_needed = Select(self.fetch.av, SelectOne(*optimize_selector(select_list_read2_needed, "read2_needed"), default_port=0) if len(select_list_read2_needed) > 0 else 0, 0)
-        rsv_needed   = Select(self.fetch.av, SelectOne(*optimize_selector(select_list_rsv_needed,   "rsv_needed"),   default_port=0) if len(select_list_rsv_needed)   > 0 else 0, 0)
+        read1_needed = Select(buf_fetch.av, SelectOne(*optimize_selector(select_list_read1_needed, "read1_needed"), default_port=0) if len(select_list_read1_needed) > 0 else 0, 0)
+        read2_needed = Select(buf_fetch.av, SelectOne(*optimize_selector(select_list_read2_needed, "read2_needed"), default_port=0) if len(select_list_read2_needed) > 0 else 0, 0)
+        rsv_needed   = Select(buf_fetch.av, SelectOne(*optimize_selector(select_list_rsv_needed,   "rsv_needed"),   default_port=0) if len(select_list_rsv_needed)   > 0 else 0, 0)
 
         # We let the register file handle the hand-shaking for us. We just need to implement the output buffers
         self.fetch.ready <<= self.reg_file_req.ready
@@ -598,312 +798,15 @@ class DecodeStage(GenericModule):
         #self.break_fetch_burst <<= register_outputs & ((exec_unit == op_class.branch))
         self.break_fetch_burst <<= register_outputs & (exec_unit == op_class.ld_st)
 
-
-def sim():
-    class RegFileEmulator(Module):
-        clk = ClkPort()
-        rst = RstPort()
-
-        # Interface to the register file
-        reg_file_req = Input(RegFileReadRequestIf)
-        reg_file_rsp = Output(RegFileReadResponseIf)
-
-        def construct(self):
-            self.wait_range = 0
-
-        def set_wait_range(self, wait_range):
-            self.wait_range = wait_range
-
-        def simulate(self, simulator: Simulator) -> TSimEvent:
-            self.out_buf_full = False
-
-            def wait_clk():
-                yield (self.clk, self.reg_file_rsp.ready, self.reg_file_rsp.valid)
-                while self.clk.get_sim_edge() != EdgeType.Positive:
-                    if not self.out_buf_full or (self.reg_file_rsp.ready and self.reg_file_rsp.valid):
-                        self.reg_file_req.ready <<= 1
-                    else:
-                        self.reg_file_req.ready <<= 0
-                    yield (self.clk, self.reg_file_rsp.ready, self.reg_file_rsp.valid)
-
-
-            self.reg_file_rsp.valid <<= 0
-            self.reg_file_req.ready <<= 1
-
-            while True:
-                yield from wait_clk()
-
-                if (self.reg_file_rsp.valid & self.reg_file_rsp.ready) == 1:
-                    self.out_buf_full = False
-                    self.reg_file_rsp.read1_data <<= None
-                    self.reg_file_rsp.read2_data <<= None
-                    self.reg_file_rsp.valid <<= 0
-
-                if (self.reg_file_req.valid & self.reg_file_req.ready) == 1:
-                    self.reg_file_rsp.read1_data <<= None
-                    self.reg_file_rsp.read2_data <<= None
-                    self.reg_file_rsp.valid <<= 0
-
-                    rd_addr1 = copy(self.reg_file_req.read1_addr.sim_value) if self.reg_file_req.read1_valid == 1 else None
-                    rd_addr2 = copy(self.reg_file_req.read2_addr.sim_value) if self.reg_file_req.read2_valid == 1 else None
-                    rsv_addr = copy(self.reg_file_req.rsv_addr.sim_value  ) if self.reg_file_req.rsv_valid == 1   else None
-
-                    if rd_addr1 is not None:
-                        rd_data1 = 0x100+rd_addr1
-                        simulator.log(f"RF reading $r{rd_addr1:x} with value {rd_data1}")
-                    else:
-                        rd_data1 = None
-                    if rd_addr2 is not None:
-                        rd_data2 = 0x100+rd_addr2
-                        simulator.log(f"RF reading $r{rd_addr2:x} with value {rd_data2}")
-                    else:
-                        rd_data2 = None
-                    if rsv_addr is not None:
-                        simulator.log(f"RF reserving $r{rsv_addr:x}")
-                    self.out_buf_full = True
-                    for _ in range(randint(0,self.wait_range)):
-                        self.reg_file_req.ready <<= 0
-                        self.reg_file_rsp.valid <<= 0
-                        simulator.log("RF waiting")
-                        yield from wait_clk()
-                    self.reg_file_rsp.read1_data <<= rd_data1
-                    self.reg_file_rsp.read2_data <<= rd_data2
-                    self.reg_file_rsp.valid <<= 1
-                #else:
-                #    self.reg_file_rsp.read1_data <<= None
-                #    self.reg_file_rsp.read2_data <<= None
-                #    self.reg_file_rsp.valid <<= 0
-
-
-    class FetchEmulator(GenericModule):
-        clk = ClkPort()
-        rst = RstPort()
-
-        fetch = Output(FetchDecodeIf)
-
-        def construct(self, exp_queue: List['DecodeExpectations'], set_exec_wait_range: Callable, set_reg_file_wait_range: Callable):
-            self.exp_queue = exp_queue
-            self.set_exec_wait_range = set_exec_wait_range
-            self.set_reg_file_wait_range = set_reg_file_wait_range
-
-        def simulate(self, simulator) -> TSimEvent:
-            def wait_clk():
-                yield (self.clk, )
-                while self.clk.get_sim_edge() != EdgeType.Positive:
-                    yield (self.clk, )
-
-            def wait_rst():
-                yield from wait_clk()
-                while self.rst == 1:
-                    yield from wait_clk()
-
-            def wait_transfer():
-                self.fetch.valid <<= 1
-                yield from wait_clk()
-                while (self.fetch.valid & self.fetch.ready) != 1:
-                    yield from wait_clk()
-                self.fetch.valid <<= 0
-
-            def issue(inst, exp: DecodeExpectations, av = False, ):
-                if len(inst) == 1:
-                    self.fetch.inst_0 <<= inst[0]
-                    self.fetch.inst_1 <<= None
-                    self.fetch.inst_2 <<= None
-                elif len(inst) == 2:
-                    self.fetch.inst_0 <<= inst[0]
-                    self.fetch.inst_1 <<= inst[1]
-                    self.fetch.inst_2 <<= None
-                elif len(inst) == 3:
-                    self.fetch.inst_0 <<= inst[0]
-                    self.fetch.inst_1 <<= inst[1]
-                    self.fetch.inst_2 <<= inst[2]
-                else:
-                    assert False
-                exp.fetch_av = av
-                self.exp_queue.append(exp)
-                self.fetch.inst_len <<= len(inst) - 1
-                self.fetch.av <<= av
-                yield from wait_transfer()
-
-            self.fetch.valid <<= 0
-            yield from wait_rst()
-            for i in range(4):
-                yield from wait_clk()
-
-
-            """
-            $<8000: SWI
-            $ .002: $pc <- $rD
-            $ .004: $rD <- $pc
-            $ .01.: $rD <- tiny FIELD_A
-            $ .04.: $rD <- ~$rA
-            $ .2..: $rD <- $rA | $rB
-            $ .00f: $rD <- VALUE
-            $ .3.f: $rD <- FIELD_E & $rB
-            $ .0f0: $rD <- short VALUE
-            $ .4f.: $rD <- FIELD_E + $rA
-            $ .c**: MEM[$rA+tiny OFS*4] <- $rD
-            $ .d**: $rD <- MEM[$rA+tiny OFS*4]
-            $ .e4.: $rD <- MEM8[$rA]
-            $ .e8.: MEM8[$rA] <- $rD
-            """
-            test_inst_table = [
-                "swi",
-                "pc_eq_r",
-                "r_eq_pc",
-                "r_eq_t",
-                "r_eq_not_r",
-                "r_eq_r_or_r",
-                "r_eq_I",
-                "r_eq_I_and_r",
-                "r_eq_i",
-                "r_eq_i_plus_r",
-                "mem32_r_plus_t_eq_r",
-                "r_eq_mem32_r_plus_t",
-                "r_eq_mem8_r",
-                "mem8_r_eq_r"
-            ]
-            a = BrewAssembler()
-            de = DecodeExpectations()
-            def _i(method, *args, **kwargs):
-                nonlocal a, de, simulator
-                asm_fn = getattr(a, method)
-                decode_fn = getattr(de, method)
-                words = asm_fn(*args, **kwargs)
-                words_str = ":".join(f"{i:04x}" for i in words)
-                simulator.log(f"ISSUING {method} {words_str}")
-                return words, decode_fn(*args, **kwargs)
-
-            yield from issue(*_i("r_eq_r_or_r", 0,2,3), av=True)
-            #yield from issue(a.r_eq_I(4, 0xdeadbeef))
-            #yield from issue(a.mem8_r_eq_r(4,5))
-            for i in range(4):
-                yield from wait_clk()
-            pass
-
-            def test_cycle(cycle_count, exec_wait, reg_file_wait):
-                simulator.log(f"====== {'NO' if exec_wait == 0 else f'random {exec_wait}'} exec wait, {'NO' if reg_file_wait == 0 else f'random {reg_file_wait}'} reg file wait")
-                self.set_exec_wait_range(exec_wait)
-                self.set_reg_file_wait_range(reg_file_wait)
-                for i in range(cycle_count):
-                    inst = test_inst_table[randint(0,len(test_inst_table)-1)]
-                    yield from issue(*_i(inst))
-
-                for i in range(4):
-                    yield from wait_clk()
-
-            cycle_count = 50
-            yield from test_cycle(cycle_count, 0, 0)
-            yield from test_cycle(cycle_count, 0, 4)
-            yield from test_cycle(cycle_count, 4, 0)
-            yield from test_cycle(cycle_count, 4, 4)
-
-
-    class ExecEmulator(GenericModule):
-        clk = ClkPort()
-        rst = RstPort()
-
-        input_port = Input(DecodeExecIf)
-
-        def set_wait_range(self, wait_range):
-            self.wait_range = wait_range
-
-        def construct(self, exp_queue: List[DecodeExpectations]):
-            self.exp_queue = exp_queue
-            self.wait_range = 0
-
-        def simulate(self, simulator) -> TSimEvent:
-            def wait_clk():
-                yield (self.clk, )
-                while self.clk.get_sim_edge() != EdgeType.Positive:
-                    yield (self.clk, )
-
-            def wait_rst():
-                yield from wait_clk()
-                while self.rst == 1:
-                    yield from wait_clk()
-
-            def wait_transfer():
-                self.input_port.ready <<= 1
-                yield from wait_clk()
-                while (self.input_port.valid & self.input_port.ready) != 1:
-                    yield from wait_clk()
-                self.input_port.ready <<= 0
-
-
-            self.input_port.ready <<= 0
-            yield from wait_rst()
-            while True:
-                yield from wait_transfer()
-                exp = self.exp_queue.pop(0)
-                simulator.log(f"EXEC got something {exp.fn_name}")
-                exp.check(self.input_port, simulator)
-                for _ in range(randint(0,self.wait_range)):
-                    simulator.log("EXEC waiting")
-                    yield from wait_clk()
-
-
-
-    class top(Module):
-        clk = ClkPort()
-        rst = RstPort()
-
-        def body(self):
-            exec_exp_queue = []
-            self.reg_file_emulator = RegFileEmulator()
-            self.exec_emulator = ExecEmulator(exec_exp_queue)
-            self.fetch_emulator = FetchEmulator(exec_exp_queue, self.exec_emulator.set_wait_range, self.reg_file_emulator.set_wait_range)
-
-            self.dut = DecodeStage(use_mini_table=True)
-
-            self.dut.fetch <<= self.fetch_emulator.fetch
-
-            self.exec_emulator.input_port <<= self.dut.output_port
-
-            self.dut.do_branch <<= 0
-
-            self.reg_file_emulator.reg_file_req <<= self.dut.reg_file_req
-            self.dut.reg_file_rsp <<= self.reg_file_emulator.reg_file_rsp
-
-
-
-
-        def simulate(self) -> TSimEvent:
-            seed(0)
-
-            def clk() -> int:
-                yield 10
-                self.clk <<= ~self.clk & self.clk
-                yield 10
-                self.clk <<= ~self.clk
-                yield 0
-
-            print("Simulation started")
-
-            self.rst <<= 1
-            self.clk <<= 1
-            yield 10
-            for i in range(5):
-                yield from clk()
-            self.rst <<= 0
-
-            for i in range(1000):
-                yield from clk()
-            now = yield 10
-            print(f"Done at {now}")
-
-    Build.simulation(top, "decode.vcd", add_unnamed_scopes=True)
-
 def gen():
     def top():
         return ScanWrapper(DecodeStage, {"clk", "rst"})
 
     netlist = Build.generate_rtl(top, "decode.sv")
-    top_level_name = netlist.get_module_class_name(netlist.top_level)
-    flow = QuartusFlow(target_dir="q_decode", top_level=top_level_name, source_files=("decode.sv",), clocks=(("clk", 10), ("top_clk", 100)), project_name="decode", no_timing_report_clocks="clk")
-    flow.generate()
-    flow.run()
+    #top_level_name = netlist.get_module_class_name(netlist.top_level)
+    #flow = QuartusFlow(target_dir="q_decode", top_level=top_level_name, source_files=("decode.sv",), clocks=(("clk", 10), ("top_clk", 100)), project_name="decode", no_timing_report_clocks="clk")
+    #flow.generate()
+    #flow.run()
 
 if __name__ == "__main__":
-    #gen()
-    sim()
+    gen()
