@@ -4,7 +4,6 @@ from pathlib import Path
 from random import *
 from typing import *
 from silicon import *
-from silicon.memory import SimpleDualPortMemory
 from silicon.utils import TSimEvent
 
 sys.path.append(str(Path(__file__).parent / ".." ))
