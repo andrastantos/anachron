@@ -20,6 +20,7 @@ class QuartusFlow(object):
         constraint_files: Optional[Sequence[str]] = None,
         clocks: Sequence[Tuple[str, int]],
         device: str,
+        family: str,
         target_dir="quartus",
         project_name=None,
         no_timing_report_clocks: Sequence[str] = None
@@ -34,6 +35,7 @@ class QuartusFlow(object):
         self.project_file_name = self.target_dir / f"{self.project_name}.qpf"
         self.no_timing_report_clocks = (no_timing_report_clocks, ) if isinstance(no_timing_report_clocks, str) else no_timing_report_clocks
         self.device = device
+        self.family = family
         self.constraint_files = constraint_files
         self.pin_assignments: Dict[str, QuartusFlow.IoAssignment] = {}
         self.custom_settings = []
@@ -75,7 +77,7 @@ class QuartusFlow(object):
         output_directory = "output_files"
         qsf_file_name = self.target_dir / f"{file_base_name}.qsf"
         with open(qsf_file_name, "wt") as project_file:
-            project_file.write(f"set_global_assignment -name FAMILY \"MAX 10\"\n")
+            project_file.write(f"set_global_assignment -name FAMILY \"{self.family}\"\n")
             project_file.write(f"set_global_assignment -name DEVICE {self.device}\n")
             project_file.write(f"set_global_assignment -name TOP_LEVEL_ENTITY {self.top_level}\n")
             project_file.write(f"set_global_assignment -name ORIGINAL_QUARTUS_VERSION 21.1.0\n")
