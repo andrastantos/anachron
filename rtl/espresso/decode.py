@@ -133,10 +133,12 @@ class DecodeStage(GenericModule):
 
     break_fetch_burst = Output(logic)
 
-    def construct(self, has_multiply: bool = True, has_shift: bool = True, use_mini_table: bool = False):
+    def construct(self, has_multiply: bool = True, has_shift: bool = True, use_mini_table: bool = False, use_decode_rom: bool = False, register_mask_signals: bool = False):
         self.has_multiply = has_multiply
         self.has_shift = has_shift
         self.use_mini_table = use_mini_table
+        self.use_decode_rom = use_decode_rom
+        self.register_mask_signals = register_mask_signals
 
     def body(self):
         # We're not being very nice with Silicons' type system: we have a bunch of unsigned types
@@ -477,8 +479,13 @@ class DecodeStage(GenericModule):
             ins_name = ins_name.replace('!=', 'ne')
             ins_name = ins_name.replace(' ', '_')
             ins_name = ins_name.lower()
-            field_sets      = ((buf_field_d,      buf_field_c,      buf_field_b,      buf_field_a     ), (pre_field_d,      pre_field_c,      pre_field_b,      pre_field_a))
-            field_is_f_sets = ((buf_field_d_is_f, buf_field_c_is_f, buf_field_b_is_f, buf_field_a_is_f), (pre_field_d_is_f, pre_field_c_is_f, pre_field_b_is_f, pre_field_a_is_f))
+            # If we're creating the buffered decode signals by simply registering the unbuffered ones, we only need to generate the 'pre' versions.
+            if self.register_mask_signals:
+                field_sets      = ((pre_field_d,      pre_field_c,      pre_field_b,      pre_field_a),      )
+                field_is_f_sets = ((pre_field_d_is_f, pre_field_c_is_f, pre_field_b_is_f, pre_field_a_is_f), )
+            else:
+                field_sets      = ((pre_field_d,      pre_field_c,      pre_field_b,      pre_field_a),      (buf_field_d,      buf_field_c,      buf_field_b,      buf_field_a)     )
+                field_is_f_sets = ((pre_field_d_is_f, pre_field_c_is_f, pre_field_b_is_f, pre_field_a_is_f), (buf_field_d_is_f, buf_field_c_is_f, buf_field_b_is_f, buf_field_a_is_f))
             expressions = []
             for fields, field_is_fs in zip(field_sets, field_is_f_sets):
                 idx = 0
@@ -505,6 +512,10 @@ class DecodeStage(GenericModule):
                         raise SyntaxErrorException(f"Unknown digit {digit} in decode mask {full_mask}")
                     idx += 1
                 expressions.append(expr)
+            # Generate the registered version, if that's the way we want to go
+            if self.register_mask_signals:
+                assert len(expressions) == 1
+                expressions.append(Reg(expressions[0], clock_en=buf_en))
             return *expressions, ins_name
 
         # Field and their mapping to output signals:
@@ -542,7 +553,7 @@ class DecodeStage(GenericModule):
         buf_mask_expressions = []
         pre_mask_expressions = []
         mask_expression_names = set()
-        for buf_expr, pre_expr, name in (parse_bit_mask(line[CODE]) for line in inst_table):
+        for pre_expr, buf_expr, name in (parse_bit_mask(line[CODE]) for line in inst_table):
             idx = 1
             base_name = name
             while name in mask_expression_names:
@@ -554,119 +565,118 @@ class DecodeStage(GenericModule):
             setattr(self, f"mask_for_pre_{name}", pre_expr)
             pre_mask_expressions.append(pre_expr)
 
-        """
-        # Compression groups have '0..f' for exact match, '.' for non-f match and 'X' for match non-F and retain.
-        # There could be at most one X in a group
-        # Any instruction should match exactly one compression group. This is checked during group
-        # generation. Group IDs are just indices into the 'compression_groups' array
-        compression_groups = (
-            ("  .X..", "_12345678ab____"),
-            ("  .X.f", "_12345678______"),
-            ("  .Xf.", "_12345678______"),
-            ("  X000", "0123456789a____"),
-            ("  .00X", "_12345_________"),
-            ("  .0X.", "_123456789__cde"),
-            ("  .00f", "_______________"),
-            ("  20ef", "_______________"),
-            ("  30ef", "_______________"),
-            ("  40ef", "_______________"),
-            ("  .0f0", "_______________"),
-            ("  20fe", "_______________"),
-            ("  30fe", "_______________"),
-            ("  40fe", "_______________"),
-            ("  f0X.", "0123456789abcd_"),
-            ("  fX..", "_123456789abcde"),
-            ("  f.f.", "_______________"),
-            ("  f..f", "_______________"),
-            ("  .c**", "_______________"),
-            ("  .d**", "_______________"),
-            ("  .eX.", "____456789abcd_"),
-            ("  1ee.", "_______________"),
-            ("  2ee.", "_______________"),
-            ("  3ee.", "_______________"),
-            ("  4ee.", "_______________"),
-            ("  .fX.", "____456789abcd_"),
-            ("  1fe.", "_______________"),
-            ("  2fe.", "_______________"),
-            ("  3fe.", "_______________"),
-            ("  4fe.", "_______________"),
-            ("  .0f8", "_______________"),
-            ("  .0f9", "_______________"),
-            ("  .fXf", "____456789abcd_"),
-            ("  1fef", "_______________"),
-            ("  2fef", "_______________"),
-            ("  3fef", "_______________"),
-            ("  4fef", "_______________"),
-        )
-        # Generate check that all instructions belong to exactly one compression group
-        def is_inst_in_group(instrunction: str, grp: str, x_match: str):
-            grp = grp.strip()
-            instrunction = instrunction.split(':')[0].replace("$","").strip()
-            for (digit, g_digit) in zip(instrunction, grp):
-                if g_digit == "." and digit in "0123456789abcde.*": continue
-                if g_digit == "X" and digit in "0123456789abcde.*":
-                    if digit in x_match: continue
-                    if digit in ".*": continue
-                    return False
-                if g_digit != digit:
-                    if digit == "." and g_digit == "f": return False
-                    if digit == "*": continue
-                    return False
-            return True
-        inst_to_grp = []
-        for inst in inst_table:
-            found = False
-            for idx, (grp, x_match) in enumerate(compression_groups):
-                if is_inst_in_group(inst[0], grp, x_match):
-                    if found:
-                        print(f"Instruction {inst[0]} matches group {compression_groups[inst_to_grp[-1]]} and {grp}")
-                    inst_to_grp.append(idx)
-                    found = True
+        if self.use_decode_rom:
+            # Compression groups have '0..f' for exact match, '.' for non-f match and 'X' for match non-F and retain.
+            # There could be at most one X in a group
+            # Any instruction should match exactly one compression group. This is checked during group
+            # generation. Group IDs are just indices into the 'compression_groups' array
+            compression_groups = (
+                ("  .X..", "_12345678ab____"),
+                ("  .X.f", "_12345678______"),
+                ("  .Xf.", "_12345678______"),
+                ("  X000", "0123456789a____"),
+                ("  .00X", "_12345_________"),
+                ("  .0X.", "_123456789__cde"),
+                ("  .00f", "_______________"),
+                ("  20ef", "_______________"),
+                ("  30ef", "_______________"),
+                ("  40ef", "_______________"),
+                ("  .0f0", "_______________"),
+                ("  20fe", "_______________"),
+                ("  30fe", "_______________"),
+                ("  40fe", "_______________"),
+                ("  f0X.", "0123456789abcd_"),
+                ("  fX..", "_123456789abcde"),
+                ("  f.f.", "_______________"),
+                ("  f..f", "_______________"),
+                ("  .c**", "_______________"),
+                ("  .d**", "_______________"),
+                ("  .eX.", "____456789abcd_"),
+                ("  1ee.", "_______________"),
+                ("  2ee.", "_______________"),
+                ("  3ee.", "_______________"),
+                ("  4ee.", "_______________"),
+                ("  .fX.", "____456789abcd_"),
+                ("  1fe.", "_______________"),
+                ("  2fe.", "_______________"),
+                ("  3fe.", "_______________"),
+                ("  4fe.", "_______________"),
+                ("  .0f8", "_______________"),
+                ("  .0f9", "_______________"),
+                ("  .fXf", "____456789abcd_"),
+                ("  1fef", "_______________"),
+                ("  2fef", "_______________"),
+                ("  3fef", "_______________"),
+                ("  4fef", "_______________"),
+            )
+            # Generate check that all instructions belong to exactly one compression group
+            def is_inst_in_group(instrunction: str, grp: str, x_match: str):
+                grp = grp.strip()
+                instrunction = instrunction.split(':')[0].replace("$","").strip()
+                for (digit, g_digit) in zip(instrunction, grp):
+                    if g_digit == "." and digit in "0123456789abcde.*": continue
+                    if g_digit == "X" and digit in "0123456789abcde.*":
+                        if digit in x_match: continue
+                        if digit in ".*": continue
+                        return False
+                    if g_digit != digit:
+                        if digit == "." and g_digit == "f": return False
+                        if digit == "*": continue
+                        return False
+                return True
+            inst_to_grp = []
+            for inst in inst_table:
+                found = False
+                for idx, (grp, x_match) in enumerate(compression_groups):
+                    if is_inst_in_group(inst[0], grp, x_match):
+                        if found:
+                            print(f"Instruction {inst[0]} matches group {compression_groups[inst_to_grp[-1]]} and {grp}")
+                        inst_to_grp.append(idx)
+                        found = True
 
-        # We start by creating the group selector expressions
-        group_selectors = []
+            # We start by creating the group selector expressions
+            group_selectors = []
 
-        for grp_idx, (mask, x_match) in enumerate(compression_groups):
-            idx = 0
-            selector_terms = []
-            selected = 0
-            mask = mask.split(':')[0].replace("$","").strip()
-            for field, field_is_f in zip((buf_field_d, buf_field_c, buf_field_b, buf_field_a), (buf_field_d_is_f, buf_field_c_is_f, buf_field_b_is_f, buf_field_a_is_f)):
-                do_gt = mask[idx] == '>'
-                do_lt = mask[idx] == '<'
-                if do_gt or do_lt: idx += 1
-                digit = mask[idx]
+            for grp_idx, (mask, x_match) in enumerate(compression_groups):
+                idx = 0
+                selector_terms = []
+                selected = 0
+                mask = mask.split(':')[0].replace("$","").strip()
+                for field, field_is_f in zip((buf_field_d, buf_field_c, buf_field_b, buf_field_a), (buf_field_d_is_f, buf_field_c_is_f, buf_field_b_is_f, buf_field_a_is_f)):
+                    do_gt = mask[idx] == '>'
+                    do_lt = mask[idx] == '<'
+                    if do_gt or do_lt: idx += 1
+                    digit = mask[idx]
 
-                if digit == '.':
-                    selector_terms.append(~field_is_f)
-                elif digit == '*':
-                    pass
-                elif digit in ('0123456789abcdef'):
-                    value = int(digit, 16)
-                    if do_gt:
-                        selector_terms.append((field > value) & ~field_is_f)
-                    elif do_lt:
-                        selector_terms.append(field < value)
+                    if digit == '.':
+                        selector_terms.append(~field_is_f)
+                    elif digit == '*':
+                        pass
+                    elif digit in ('0123456789abcdef'):
+                        value = int(digit, 16)
+                        if do_gt:
+                            selector_terms.append((field > value) & ~field_is_f)
+                        elif do_lt:
+                            selector_terms.append(field < value)
+                        else:
+                            selector_terms.append(field == value)
+                    elif digit == 'X':
+                        options = 0
+                        for option in x_match:
+                            if option == '_': continue
+                            options = options | (field == int(option,base=16))
+                        selector_terms.append(options)
+                        selected = field
                     else:
-                        selector_terms.append(field == value)
-                elif digit == 'X':
-                    options = 0
-                    for option in x_match:
-                        if option == '_': continue
-                        options = options | (field == int(option,base=16))
-                    selector_terms.append(options)
-                    selected = field
-                else:
-                    raise SyntaxErrorException(f"Unknown digit {digit} in decode mask {mask}")
-                selector = and_gate(*selector_terms)
-                group_selectors += (selector, concat(f"6'b{grp_idx:05b}", selected))
-                idx += 1
+                        raise SyntaxErrorException(f"Unknown digit {digit} in decode mask {mask}")
+                    selector = and_gate(*selector_terms)
+                    group_selectors += (selector, concat(f"6'b{grp_idx:05b}", selected))
+                    idx += 1
 
-        self.decode_rom_addr = Wire(Unsigned(10))
-        #self.decode_rom_addr <<= SelectOne(*group_selectors)
-        self.decode_rom_addr <<= SelectOne(*optimize_selector(group_selectors, "decoder_rom", "inst_group_"))
+            self.decode_rom_addr = Wire(Unsigned(10))
+            #self.decode_rom_addr <<= SelectOne(*group_selectors)
+            self.decode_rom_addr <<= SelectOne(*optimize_selector(group_selectors, "decoder_rom", "inst_group_"))
 
-        """
 
         select_list_exec_unit  = []
         select_list_alu_op     = []
@@ -806,7 +816,7 @@ class DecodeStage(GenericModule):
 def gen():
     def top():
         #return ScanWrapper(DecodeStage, {"clk", "rst"})
-        return DecodeStage()
+        return DecodeStage(use_decode_rom = False)
 
     netlist = Build.generate_rtl(top, "decode.sv")
     top_level_name = netlist.get_module_class_name(netlist.top_level)

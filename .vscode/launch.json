@@ -87,5 +87,14 @@
             "cwd": "${workspaceFolder}/rtl/espresso",
             "justMyCode": false,
         },
+        {
+            "name": "ESPRESSO decode TB",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "decode_tb.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/rtl/espresso/test",
+            "justMyCode": false,
+        },
     ]
 }

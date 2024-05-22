@@ -2,9 +2,12 @@
 from random import *
 from typing import *
 from copy import copy
+import sys
+from pathlib import Path
 
 from silicon import *
 from silicon.utils import TSimEvent
+
 
 sys.path.append(str(Path(__file__).parent / ".." ))
 
@@ -23,6 +26,7 @@ except ImportError:
     from assembler import *
     from decode import *
 
+from expectations import *
 
 def sim():
     class RegFileEmulator(Module):
