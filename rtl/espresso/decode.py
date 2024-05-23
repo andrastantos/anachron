@@ -490,24 +490,17 @@ class DecodeStage(GenericModule):
             for fields, field_is_fs in zip(field_sets, field_is_f_sets):
                 idx = 0
                 expr = 1
+                bitmask = ""
                 for field, field_is_f in zip(fields, field_is_fs):
-                    do_gt = mask[idx] == '>'
-                    do_lt = mask[idx] == '<'
-                    if do_gt or do_lt: idx += 1
                     digit = mask[idx]
-
+                    bitmask += digit
                     if digit == '.':
                         expr = expr & ~field_is_f
                     elif digit == '*':
                         pass
                     elif digit in ('0123456789abcdef'):
                         value = int(digit, 16)
-                        if do_gt:
-                            expr = expr & (field > value) & ~field_is_f
-                        elif do_lt:
-                            expr = expr & (field < value)
-                        else:
-                            expr = expr & (field == value)
+                        expr = expr & (field == value)
                     else:
                         raise SyntaxErrorException(f"Unknown digit {digit} in decode mask {full_mask}")
                     idx += 1
@@ -516,7 +509,7 @@ class DecodeStage(GenericModule):
             if self.register_mask_signals:
                 assert len(expressions) == 1
                 expressions.append(Reg(expressions[0], clock_en=buf_en))
-            return *expressions, ins_name
+            return *expressions, bitmask, ins_name
 
         # Field and their mapping to output signals:
         CODE       =  0    #
@@ -552,8 +545,9 @@ class DecodeStage(GenericModule):
 
         buf_mask_expressions = []
         pre_mask_expressions = []
+        mask_bitmasks = []
         mask_expression_names = set()
-        for pre_expr, buf_expr, name in (parse_bit_mask(line[CODE]) for line in inst_table):
+        for pre_expr, buf_expr, bitmask, name in (parse_bit_mask(line[CODE]) for line in inst_table):
             idx = 1
             base_name = name
             while name in mask_expression_names:
@@ -564,6 +558,7 @@ class DecodeStage(GenericModule):
             buf_mask_expressions.append(buf_expr)
             setattr(self, f"mask_for_pre_{name}", pre_expr)
             pre_mask_expressions.append(pre_expr)
+            mask_bitmasks.append(bitmask)
 
         if self.use_decode_rom:
             # Compression groups have '0..f' for exact match, '.' for non-f match and 'X' for match non-F and retain.
@@ -688,8 +683,6 @@ class DecodeStage(GenericModule):
         pre_select_list_res_addr   = []
         select_list_op_a       = []
         select_list_op_b       = []
-        select_list_use_reg_a  = []
-        select_list_use_reg_b  = []
         select_list_op_c       = []
         select_list_mem_len    = []
         select_list_bse        = []
@@ -718,21 +711,71 @@ class DecodeStage(GenericModule):
             select_list_int_en,
         )
 
-        for line, pre_mask_expr, buf_mask_expr in zip(inst_table, pre_mask_expressions, buf_mask_expressions):
-            for idx, (select_list, value) in enumerate(zip(select_lists, line[EXEC_UNIT:])):
+        bitmask_list_exec_unit  = OrderedDict()
+        bitmask_list_alu_op     = OrderedDict()
+        bitmask_list_shifter_op = OrderedDict()
+        bitmask_list_branch_op  = OrderedDict()
+        bitmask_list_ldst_op    = OrderedDict()
+        pre_bitmask_list_rd1_addr   = OrderedDict()
+        pre_bitmask_list_rd2_addr   = OrderedDict()
+        pre_bitmask_list_res_addr   = OrderedDict()
+        bitmask_list_op_a       = OrderedDict()
+        bitmask_list_op_b       = OrderedDict()
+        bitmask_list_op_c       = OrderedDict()
+        bitmask_list_mem_len    = OrderedDict()
+        bitmask_list_bse        = OrderedDict()
+        bitmask_list_wse        = OrderedDict()
+        bitmask_list_bze        = OrderedDict()
+        bitmask_list_wze        = OrderedDict()
+        bitmask_list_int_en     = OrderedDict()
+
+        bitmask_lists = (
+            bitmask_list_exec_unit,
+            bitmask_list_alu_op,
+            bitmask_list_shifter_op,
+            bitmask_list_branch_op,
+            bitmask_list_ldst_op,
+            pre_bitmask_list_rd1_addr,
+            pre_bitmask_list_rd2_addr,
+            pre_bitmask_list_res_addr,
+            bitmask_list_op_a,
+            bitmask_list_op_b,
+            bitmask_list_op_c,
+            bitmask_list_mem_len,
+            bitmask_list_bse,
+            bitmask_list_wse,
+            bitmask_list_bze,
+            bitmask_list_wze,
+            bitmask_list_int_en,
+        )
+
+
+        for line, pre_mask_expr, buf_mask_expr, bitmask in zip(inst_table, pre_mask_expressions, buf_mask_expressions, mask_bitmasks):
+            for idx, (select_list, bitmask_list, value) in enumerate(zip(select_lists, bitmask_lists, line[EXEC_UNIT:])):
                 idx += 1 # We are skipping the first column, so we have to accommodate it here
 
                 # RF drive signals are generated from pre-buffer expresisons
                 if idx in (RD1_ADDR, RD2_ADDR, RES_ADDR):
                     assert not isinstance(value, str)
                     select_list += (pre_mask_expr, value)
-
+                    if value not in bitmask_list: bitmask_list[value] = []
+                    bitmask_list[value].append(bitmask)
                 else:
                     # Remove all the 0-s from the selectors for these fields and rely on default_ports to restore them
                     if idx in (BSE, WSE, BZE, WZE, WOI) and value == 0:
                         value = None
-                    assert not isinstance(value, str)
-                    if value is not None: select_list += (buf_mask_expr, value)
+                    if value is not None:
+                        select_list += (buf_mask_expr, value)
+                        if value not in bitmask_list: bitmask_list[value] = []
+                        bitmask_list[value].append(bitmask)
+
+        #### DEBUG ####
+        # Dump the selectors into a file
+        #with open("masklist.csv", "wt") as masklist_file:
+        #    for bitmask in bitmask_lists:
+        #        for masklist in bitmask.values():
+        #            masklist_file.write(",".join(masklist)+"\n")
+
 
         # ... actually a little more than that: we have to also generate the reservation logic. So let's start with that.
         pre_select_list_read1_needed = []
@@ -816,23 +859,23 @@ class DecodeStage(GenericModule):
 def gen():
     def top():
         #return ScanWrapper(DecodeStage, {"clk", "rst"})
-        return DecodeStage(use_decode_rom = False)
+        return DecodeStage(use_mini_table = False, use_decode_rom = False)
 
     netlist = Build.generate_rtl(top, "decode.sv")
     top_level_name = netlist.get_module_class_name(netlist.top_level)
     #top_level_name = "DecodeStage"
-    flow = QuartusFlow(
-        target_dir="q_decode",
-        top_level=top_level_name,
-        source_files=("decode.sv",),
-        clocks=(("clk", 10),),# ("top_clk", 100)),
-        project_name="decode",
-        no_timing_report_clocks="clk",
-        family="MAX 10",
-        device="10M50DAF672C7G" # Something large with a ton of pins
-    )
-    flow.generate()
-    flow.run()
+    #flow = QuartusFlow(
+    #    target_dir="q_decode",
+    #    top_level=top_level_name,
+    #    source_files=("decode.sv",),
+    #    clocks=(("clk", 10),),# ("top_clk", 100)),
+    #    project_name="decode",
+    #    no_timing_report_clocks="clk",
+    #    family="MAX 10",
+    #    device="10M50DAF672C7G" # Something large with a ton of pins
+    #)
+    #flow.generate()
+    #flow.run()
 
 if __name__ == "__main__":
     gen()
