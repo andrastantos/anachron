@@ -1,0 +1,109 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Thu May 23 22:22:41 2024
+[*]
+[dumpfile] "/home/tantos/anachron/rtl/espresso/masklist/comp.vcd"
+[dumpfile_mtime] "Thu May 23 22:22:41 2024"
+[dumpfile_size] 19333120
+[savefile] "/home/tantos/anachron/rtl/espresso/masklist/comp.gtkw"
+[timestart] 0
+[size] 1920 1097
+[pos] -1 -1
+*-17.536791 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] top.
+[sst_width] 278
+[signals_width] 158
+[sst_expanded] 1
+[sst_vpaned_height] 362
+@28
+top.clk
+@22
+top.field_a[3:0]
+@28
+top.field_a_is_not_f
+@22
+top.field_b[3:0]
+@28
+top.field_b_is_not_f
+@22
+top.field_c[3:0]
+@28
+top.field_c_is_not_f
+@22
+top.field_d[3:0]
+@28
+top.field_d_is_not_f
+@29
+top.dut.selector2_54
+top.dut.selector2_52
+@28
+top.comparison_0
+top.comparison_0
+top.comparison_1
+top.comparison_2
+top.comparison_3
+top.comparison_4
+top.comparison_5
+top.comparison_6
+top.comparison_7
+top.comparison_8
+top.comparison_9
+top.comparison_10
+top.comparison_11
+top.comparison_12
+top.comparison_13
+top.comparison_14
+top.comparison_15
+top.comparison_16
+top.comparison_17
+top.comparison_18
+top.comparison_19
+top.comparison_20
+top.comparison_21
+top.comparison_22
+top.comparison_23
+top.comparison_24
+top.comparison_25
+top.comparison_26
+top.comparison_27
+top.comparison_28
+top.comparison_29
+top.comparison_30
+top.comparison_31
+top.comparison_32
+top.comparison_33
+top.comparison_34
+top.comparison_35
+top.comparison_36
+top.comparison_37
+top.comparison_38
+top.comparison_39
+top.comparison_40
+top.comparison_41
+top.comparison_42
+top.comparison_43
+top.comparison_44
+top.comparison_45
+top.comparison_46
+top.comparison_47
+top.comparison_48
+top.comparison_49
+top.comparison_50
+top.comparison_51
+top.comparison_52
+top.comparison_53
+top.comparison_54
+top.comparison_55
+top.comparison_56
+top.comparison_57
+top.comparison_58
+top.comparison_59
+top.comparison_60
+top.comparison_61
+top.comparison_62
+top.comparison_63
+top.comparison_64
+top.comparison_65
+top.comparison_66
+[pattern_trace] 1
+[pattern_trace] 0

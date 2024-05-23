@@ -1,0 +1,4 @@
+#!/bin/sh
+iverilog -g2012 comp.sv	comp_tb.sv -o comp.bin || exit 1
+./comp.bin
+
