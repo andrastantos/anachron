@@ -1,0 +1,93 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Thu May 23 01:23:17 2024
+[*]
+[dumpfile] "/home/tantos/anachron/rtl/espresso/test/decode.vcd"
+[dumpfile_mtime] "Thu May 23 01:20:22 2024"
+[dumpfile_size] 1048791
+[savefile] "/home/tantos/anachron/rtl/espresso/test/decode.gtkw"
+[timestart] 0
+[size] 1920 990
+[pos] -1 -1
+*-11.345229 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] top.
+[sst_width] 233
+[signals_width] 294
+[sst_expanded] 1
+[sst_vpaned_height] 269
+@28
+top.dut.rst
+top.dut.clk
+@800200
+-FETCH_IF
+@28
+top.dut.fetch_ready
+top.dut.fetch_valid
+top.dut.fetch_av
+@22
+top.dut.fetch_inst_0[15:0]
+top.dut.fetch_inst_1[15:0]
+top.dut.fetch_inst_2[15:0]
+@28
+top.dut.fetch_inst_len[1:0]
+@1000200
+-FETCH_IF
+@800200
+-REG_FILE_REQ
+@28
+top.dut.reg_file_req_ready
+top.dut.reg_file_req_valid
+@22
+top.dut.reg_file_req_read1_addr[3:0]
+@28
+top.dut.reg_file_req_read1_valid
+@22
+top.dut.reg_file_req_read2_addr[3:0]
+@28
+top.dut.reg_file_req_read2_valid
+@22
+top.dut.reg_file_req_rsv_addr[3:0]
+@28
+top.dut.reg_file_req_rsv_valid
+@1000200
+-REG_FILE_REQ
+@800200
+-REG_FILE_RSP
+@28
+top.dut.reg_file_rsp_ready
+top.dut.reg_file_rsp_valid
+@22
+top.dut.reg_file_rsp_read1_data[31:0]
+top.dut.reg_file_rsp_read2_data[31:0]
+@1000200
+-REG_FILE_RSP
+@800200
+-OUTPUT_PORT
+@29
+top.dut.output_port_ready
+@28
+top.dut.output_port_valid
+top.dut.output_port_alu_op
+top.dut.output_port_branch_op
+top.dut.output_port_do_bse
+top.dut.output_port_do_bze
+top.dut.output_port_do_wse
+top.dut.output_port_do_wze
+top.dut.output_port_exec_unit
+top.dut.output_port_fetch_av
+top.dut.output_port_inst_len[1:0]
+top.dut.output_port_ldst_op
+top.dut.output_port_mem_access_len[1:0]
+@22
+top.dut.output_port_op_a[31:0]
+top.dut.output_port_op_b[31:0]
+top.dut.output_port_op_c[31:0]
+top.dut.output_port_result_reg_addr[3:0]
+@28
+top.dut.output_port_result_reg_addr_valid
+top.dut.output_port_shifter_op
+top.dut.output_port_woi
+@1000200
+-OUTPUT_PORT
+[pattern_trace] 1
+[pattern_trace] 0
