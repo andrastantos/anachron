@@ -1,4 +1,4 @@
-comp/**
-optimized/**
-unoptimized/**
+**/comp/**
+**/optimized/**
+**/unoptimized/**
 comp.bin
