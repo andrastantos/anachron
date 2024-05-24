@@ -1,3 +1,20 @@
+"""
+It really seems that this optimization process buys us about 10%
+improvement in logic synthesis. The (commented-out) trivial CSE
+where the comparisons are broken out into their separate wires
+generated 0 difference in Quartus and a single LUT savings in
+GoWin. This indicates that CSE is rather effective in the existing
+synthesis tools, so not worth bothering with.
+
+I also am running low on ideas as to how to squeeze more out
+of the synthesis tools, so I think I'll give up and concentrate
+instead on the integration into the Decode stage.
+
+The idea is that - even if it doesn't help tremendously with area,
+it can still help a lot with elaboration and simulation times if
+the whole decode logic is abstracted into a single 'Module' instance.
+"""
+
 from silicon import *
 
 import sys
@@ -17,6 +34,7 @@ def mask_to_verilog(mask: str) -> str:
             pass
         else:
             terms.append(f"(field_{field} == 4'h{digit})")
+            #terms.append(f"field_{field}_is_{digit}")
     verilog = " & ".join(terms)
     if len(terms) > 1:
         verilog = "(" + verilog + ")"
@@ -51,6 +69,14 @@ def write_selectors(file, selectors, module_name):
         file.write(f"    output logic {selector_name},\n")
     file.write("    input logic clk\n")
     file.write(");\n")
+    #for field in "abcd":
+    #    for test in "0123456879abcdef":
+    #        file.write(f"    logic field_{field}_is_{test};\n")
+    #file.write("\n")
+    #for field in "abcd":
+    #    for test in "0123456879abcdef":
+    #        file.write(f"    assign field_{field}_is_{test} = field_{field} == 4'h{test};\n")
+    #file.write("\n\n")
 
     for selector_name, selector in zip(selector_names, selectors):
         vselect = create_selector_verilog(selector)
@@ -75,6 +101,15 @@ def write_comparison_verilog(file, selectors1, selectors2, module_name):
         file.write(f"    output logic {name},\n")
     file.write("    input logic clk\n")
     file.write(");\n")
+
+    #for field in "abcd":
+    #    for test in "0123456879abcdef":
+    #        file.write(f"    logic field_{field}_is_{test};\n")
+    #file.write("\n")
+    #for field in "abcd":
+    #    for test in "0123456879abcdef":
+    #        file.write(f"    assign field_{field}_is_{test} = field_{field} == 4'h{test};\n")
+    #file.write("\n\n")
 
     for name in selector_names1:
         file.write(f"    logic {name};\n")
