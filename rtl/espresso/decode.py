@@ -138,6 +138,104 @@ class SelectorGroup:
     default_value: JunctionBase = None
 
 
+def replace_char(s: str, idx: int, c: str) -> str:
+    s = list(s)
+    s[idx] = c
+    return "".join(s)
+
+# Return a new selector that's grouped into as few terms as possible.
+#    This is a recursive algorithm
+def optimize_once(selector: OrderedDict[str, OrderedDict]) -> OrderedDict[str, OrderedDict]:
+    if len(selector) == 1: return selector
+    # 1. Find the most common digit in all the 'key' masks
+    counts = OrderedDict()
+    digits = "*.0123456789abcdef_"
+    for digit in digits:
+        counts[digit] = [0,0,0,0]
+
+    for key in selector.keys():
+        for position in range(4):
+            counts[key[position]][position] += 1
+
+    selected_digit = None
+    selected_position = None
+    max_count = -1
+    for digit, count_for_pos in counts.items():
+        if digit == "_": continue
+        if digit == "*": continue
+        for idx, count in enumerate(count_for_pos):
+            if count > max_count:
+                max_count = count
+                selected_digit = digit
+                selected_position = idx
+
+    # There's nothing to be optimized
+    if max_count == -1:
+        return selector
+    if max_count == 1:
+        return selector
+
+    assert max_count != 0
+    assert selected_position is not None
+    assert selected_position is not None
+
+    # 2. Create a group of all the terms that match the selected digit at the selected position
+    optimized_selector = OrderedDict()
+    optimized_term = replace_char("____", selected_position, selected_digit)
+    optimized_sub_terms = OrderedDict()
+    optimized_selector[optimized_term] = optimized_sub_terms
+    for term, sub_terms in selector.items():
+        if term[selected_position] == selected_digit:
+            term = replace_char(term, selected_position, "_")
+            optimized_sub_terms[term] = sub_terms
+        else:
+            optimized_selector[term] = sub_terms
+
+    return optimized_selector
+
+def optimize_recursively(selector: OrderedDict[str, OrderedDict]) -> OrderedDict[str, OrderedDict]:
+    if selector is None: return None
+    while True:
+        optimized_selector = optimize_once(selector)
+        if optimized_selector is selector:
+            break
+        selector = optimized_selector
+    optimized_selector = OrderedDict()
+    for term, sub_selectors in selector.items():
+        optimized_selector[term] = optimize_recursively(sub_selectors)
+    return optimized_selector
+
+def merge_recursively(selector: OrderedDict[str, OrderedDict]) -> OrderedDict[str, OrderedDict]:
+    if selector is None: return None
+
+    # If a term has a single sub_selector, we can merge the two
+    if len(selector) == 1:
+        merged_selector = OrderedDict()
+        term, sub_selectors = first(selector.items())
+        if len(sub_selectors) == 1:
+            term2, sub_selectors = first(sub_selectors.items())
+            for digit in range(4):
+                assert term2[digit] == "_" or term[digit] == "_"
+                if term2[digit] != "_":
+                    term = replace_char(term, digit, term2[digit])
+            merged_selector[term] = sub_selectors
+            changed = True
+        else:
+            merged_selector[term] = sub_selectors
+    else:
+        merged_selector = selector
+
+    final_selector = OrderedDict()
+    for term, sub_selectors in merged_selector.items():
+        final_selector[term] = merge_recursively(sub_selectors)
+    return final_selector
+
+def optimize_masks(selector: OrderedDict[str, OrderedDict]) -> OrderedDict[str, OrderedDict]:
+    optimized_selector = optimize_recursively(deepcopy(selector))
+    #optimized_selector = merge_recursively(optimized_selector)
+    return optimized_selector
+
+
 class DecodeLogic(GenericModule):
     field_a = Input()
     field_b = Input()
@@ -798,6 +896,11 @@ class DecodeStage(GenericModule):
                     setattr(self, selector_desc.buf_port, buf_port)
                     selector_desc.buf_port = buf_port
                     buf_port <<= Reg(local_port, clock_en=buf_en)
+
+        # Now we're ready to optimize the selectors
+        for output_selector in output_selectors:
+            for selector_key, selector_desc in output_selector.selectors.items():
+                selector_desc.masks = optimize_masks(selector_desc.masks)
 
         # Hook up the decode logic instance
         decode_logic = DecodeLogic(output_selectors)
