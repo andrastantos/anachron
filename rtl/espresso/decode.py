@@ -258,7 +258,51 @@ class DecodeLogic(GenericModule):
         pass
 
     def simulate(self):
-        pass
+        def mask_match(mask: str, fields: Sequence[int], field_is_fs: Sequence[bool]) -> bool:
+            def mask_char_match(mask_char: str, field: int, field_is_f: bool) -> bool:
+                if mask_char in "*_":
+                    return True
+                if mask_char == ".":
+                    return not field_is_f
+                return field == int(mask_char, base=16)
+
+            return all(mask_char_match(mask_char, field, field_is_f) for field, field_is_f, mask_char in zip(fields, field_is_fs, mask))
+
+        while True:
+            yield self.get_inputs().values()
+
+            try:
+                fields = tuple(int(f.sim_value) for f in (self.field_d, self.field_c, self.field_b, self.field_a))
+                field_is_fs = tuple(bool(f.sim_value) for f in (self.field_d_is_f, self.field_c_is_f, self.field_b_is_f, self.field_a_is_f))
+            except TypeError:
+                # We have Nones --> set all outputs to None
+                for output in self.get_outputs().values(): output <<= None
+                continue
+
+            #bp = ".*"
+            #print(f">>>>>>>>>>>>>>>> GOT: {''.join(f'{a:01x}' for a in fields)}; {''.join(f'{bp[a]}' for a in field_is_fs)}")
+
+            # Recurse through a selector hierarchy and test against the supplied fields
+            def test_masks(selector: OrderedDict[str, OrderedDict], fields, field_is_fs) -> bool:
+                for mask, sub_selector in selector.items():
+                    if (
+                        mask_match(mask, fields, field_is_fs) and  # Match the predicate
+                        (sub_selector is None or test_masks(sub_selector, fields, field_is_fs)) # And match any of the sub-selectors
+                    ): return True
+                return False
+
+            for output in self.get_outputs().values():
+                try:
+                    masks = output.masks
+                except AttributeError:
+                    continue
+                output <<= test_masks(masks, fields, field_is_fs)
+
+    def is_combinational(self) -> bool:
+        """
+        Returns True if the module is purely combinational, False otherwise
+        """
+        return True
 
     def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
         assert back_end.language == "SystemVerilog", "Unknown back-end specified: {}".format(back_end.language)
