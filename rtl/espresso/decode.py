@@ -27,97 +27,224 @@ except ImportError:
 """
 Decode logic
 
-Decode takes a single instruction from the fetch unit. It is just 3 bytes, a length and an 'av' flag.
+Decode takes a single instruction from the fetch unit. It is just 3 bytes,
+a length and an 'av' flag.
 
-Decode generates a bunch of logic signals for Execute. It also deals with the register file, and thus
-reservations.
+Decode generates a bunch of logic signals for Execute. It also deals with
+the register file, and thus reservations.
 
-Decode is ready to issue an instruction to Execute if all reservations are met.
+All handshaking is deputized to the register file, we're just going on a ride.
 
-Since the register file has a single-cycle latency, we'll have to start the reservation process
-before we knew if Execute is going to be able to accept the results. Because of that, we'll have
-to remember the results of a read result if Execute is not ready for us.
+Most of the logic is table-driven: The variable 'full_inst_table' contains a
+mask for every instruction and a set of values, one for each output. These
+values could be constants (True, False, 3 or similar), could be parts of the
+instruction code (field_a or field_e for instance) or a wire, such as the
+result of a register read.
 
-TODO: DIET DIET DIET: there's another way of dealing with this, but I will not do it right now
-as it requires an interface change: we could change the interface in some way to ensure that
-the RF keeps it's output reliable even if a new request isn't sent in, or change things so
-that we can keep re-issuing the same request again and again (we can't at this point due
-to reservations)
+The job of decode is the following:
 
-In case of a fetch AV, we pretend to get an instruction with no dependencies and no reservation and push it as
-the next instruction. There's no harm in using the instruction fields: while they're invalid, or may even
-contain some sensitive info, they don't produce side-effects: all they do is to generate some mux changes
-that then will be ignored in execute. However, we *have* to make sure that the output register enable is
-de-asserted, so no matter what, no write-back will occur. Execute assumes that.
+1. Generate the right read and reservation addresses for the register file
+2. Generate the right driving signals for the execute stage
 
-HW interrupts are dealt with in the execute stage.
+To generate any of the outputs, we must 'transpose' the above table and
+answer the following question: for what inputs can the selected execution be
+the ALU, for instance?
+
+We need to generate a 'selector' signal, based on the incoming instruction code
+that's high if and only if we should output ALU as the selected execution unit.
+Same for all possible output values for all generated outputs.
+
+The generation of these 'selectors' is done in the 'DecodeLogic' module. This
+is a purely combinational block that matches the incoming instruction code
+to all the possible 'masks' and drives the 'selectors' accordingly.
+
+A second step is to actually generate an output signal, to use the previous
+example, the 'exec_unit' output. This can have several values: ALU, SHIFTER,
+etc. There's a selector for each of the possible output values, but we
+need to implement a mux that drives the appropriate value to this output.
+
+This latter part is handled within 'DecodeStage'.
+
+Because the register file has a single-cycle latency, we need to be careful
+about buffering or registering signals:
+
+1. All selectors (whether they end up contributing to signals for the execute
+stage) or the register file, are generated combinatorially straight from the
+input signals. This in effect means that the content of 'DecodeLogic' is
+part of the 'fetch' stage timing-wise. You can think of it as a pre-decode
+stage.
+
+2. Muxes generating the register read and reservation addresses are also
+generated straight from the inputs, so they also are part of pre-decode.
+
+3. All other execution unit muxes are driven from registered (buffered)
+signals. This includes both the selectors (so they need to go through a buffer
+stage) and the selected values. Of course register values, as they are part of
+the register file are coming already buffered. In practice this means that
+the decode stage purely contains these muxes from a timing perspective.
+
+It's hard to say at this point what does this do for timing closure but
+synthesis runs show that about half of the LUTs reside before and half after
+the buffers. So hopefully this is not too bad; plus instruction assembly that
+happens in the last stage of fetch is not terribly deep in logic.
+
+Most of the code is auto-generated, very little is actual, hard-coded logic.
+Most of the little pieces that are, are related to how register write-back
+addresses are forwarded to execute as well as how to deal with fetch-AVs:
+
+In case of a fetch AV, we pretend to get an instruction with no dependencies
+and no reservation and push it as the next instruction. There's no harm in
+using the instruction fields: while they're invalid, or may even contain some
+sensitive info, they don't produce side-effects: all they do is to generate
+some mux changes that then will be ignored in execute. However, we *have* to
+make sure that the output register enable is de-asserted, so no matter what,
+no write-back will occur. Execute assumes that.
+
+HW interrupts and other exception types are dealt with in the execute stage.
+
+A little more about selectors and their encoding:
+
+A single instruction has a four-character mask, such as: .5.f This mask encodes
+all the possible instruction codes that match this instruction. Each digit
+corresponds to a nibble of the instruction code. '.' matches anything but 0xf,
+'*' or '_' matches anything and a single number or letter matches exactly the
+denoted value.
+
+However - again - we're not interested in what combinations encode a single
+instruction. We ask the question: which combinations need 'register read port A
+to be selected as operand A for execute'?
+
+There are a lot of instructions that can do that, thus a lot of possible masks.
+The corresponding selector thus can be described as 'selector shall be asserted
+if the instruction code matches any of the masks in the list ...'.
+
+One such mask-list could be the following:
+
+    [.01.][.05.][.06.][.2..][.00f][.2.f][.0f0][.2f.]
+
+however, the most optimal way is not simply checking each digit against
+all allowed values one-by-one. One could say things, like: if the first
+digit is 0xf, none of these masks can match, don't even bother. Otherwise,
+if the second digit is 0, the third must be zero, one, five, six or fifteen.
+
+Given these, can we create a more optimal (if not the most optimal) set of
+checks?
+
+There's a heuristics implemented in 'optimize_masks', but before we get there
+let's discuss how such mask tests are represented!
+
+The list above could be simply stored as ... well, a list. But really what we
+want to represent is an and-or tree. In this tree, we say that a tree is true
+if the head of the (sub)tree is true *and* *any* of the sub-branches
+(recursively) true. So, the representation is a nested dictionary, where
+each node contains a key (this is the mask that guards the sub-tree) and the
+value is a whole other dictionary of the same nature. Leaf nodes only have a
+key (the final mask) and the value is set to None. To illustrate, the list
+above can be represented as a single dictionary:
+
+    {
+        [.01.]: None,
+        [.05.]: None,
+        [.06.]: None,
+        [.2..]: None,
+        [.00f]: None,
+        [.2.f]: None,
+        [.0f0]: None,
+        [.2f.]: None,
+    }
+
+To represent our intuition that 'the first digit must be non-f', we can
+re-write this as a two-level tree:
+
+    {
+        [.___]: {
+            [_01.]: None,
+            [_05.]: None,
+            [_06.]: None,
+            [_2..]: None,
+            [_00f]: None,
+            [_2.f]: None,
+            [_0f0]: None,
+            [_2f.]: None,
+        }
+    }
+
+Now, the test for the first digit only needs to be done once: if that results
+in 'False', the whole and-or expression is 'False', the evaluation can be
+short-circuited.
+
+To illustrate one one step, let's consider the case when the second digit is 0:
+we've observed that the third digit must be of a certain sub-set. This can be
+represented as follows:
+
+    {
+        [.___]: {
+            [_0__]: {
+                [__1.]: None,
+                [__5.]: None,
+                [__6.]: None,
+                [__0f]: None,
+                [__f0]: None,
+            }
+            [_2..]: None,
+            [_2.f]: None,
+            [_2f.]: None,
+        }
+    }
+
+Of course there are other simplifications that can be made as well, but let's
+stop here.
+
+The 'optimize_masks' routine manipulates this tree hierarchy and tries to come
+up with a more optimal representation. It's not fool-proof, but does a decent
+job.
+
+Everywhere in the code, mask-sets are stored in this tree hierarchy to allow
+for such transformations.
+
+Finally, let's look at the DecodeLogic module. This is special in that it
+doesn't create the logic gates needed to evaluate such a decision tree. Instead
+it stores and manipulates these end-or trees directly. It has it's own
+'simulate' method that simulates the whole decision-process in one go as well
+as it's own 'generate' method that knows how to turn these and-or trees into
+SystemVerilog. The reason for this choice (it could have - and at some point
+have been - done using instantiated logic gates) is speed: a ton of logic is
+replaced by a single python function. All three steps: elaboration, simulation
+and synthesis is greatly sped up by this implementation.
+
+DECODER ROMs
+------------
+
+A note on using ROMs for decoding: there are some code-fragments below to
+partially support this. The trouble is that ROMs also have a single-cycle
+latency and that we can't simply use the full instruction word as an address:
+16 bits is too big a decode space. So, the instruction code must be compressed
+into a much smaller word, and such compression must be done in the pre-decode
+stage. It's unclear that this logic would be any smaller than what we have
+at the moment.
+
+The 'mux' stage, that now resides after the buffers, would still need to exist,
+the ROM would only produce the selectors. So none of that logic can be saved,
+worse, now they would be in line with the logic cone of the ROM outputs, being
+in the same stage.
+
+Finally, any signal that drives the register file would still need to be
+generated the same was as it is done now: they can't take the extra latency of
+the decode ROM.
+
+All in all, it's not clear that such an implementation would be any smaller or
+faster then the current one.
+
+For the curious, the piece of code, generating a ROM address is guarded by the
+following statement: `if self.use_decode_rom:` what's missing is the generation
+of the ROM content, the instantiation of the ROM and the proper hooking-up of
+the selectors.
+
+If this piece of code is to ever be resurrected, the group descriptors can
+probably be re-written in the same hierarchical form as used by the other
+pieces, and thus the same machinery can be used for manipulating it.
 """
 
-"""
-If we were to do the decoding using ROMs, this is how things would transpire:
-
-On clock 0:
-    - we detect a valid input (fetch.valid & fetch.ready).
-    - we need to do some pre-decode to come up with the ROM address;
-      this would be in the same logic cone as the output of the fetch, unfortunately.
-On clock 1:
-    - we get the result of decode, which is the RF addresses and their their reservations;
-      this we feed to the RF
-    - we register all the rest of the outputs from the ROM as those will need to go to
-      execute
-    - the RF starts processing the request
-On clock 2:
-    - We get the results from the RF, which we feed to execute with the rest of the
-      control signals
-
-In other words: we're extending decode latency to two.
-
-If we were to forgo the decode ROM and stayed with the current logic, we could:
-
-On clock 0:
-    - we detect a valid input (fetch.valid & fetch.ready)
-    - we decode RF addresses and reservations; feed them to RF
-      all this logic is within the logic cones of fetch, unfortunately
-    - RF starts working on our request
-On clock 1:
-    - we decode the rest of the control signals <== this can still be done using a ROM
-    - we get the result from RF
-
-So, overall, the following logic will have to happen front-loaded:
-
-- RegA address;needed selection
-- RegB address;needed selection
-- Rsv  address;needed selection
-- ROM  address creation
-
-As far as the ROM is concerned, currently the following bit-counts are needed (I think):
-
-    EXEC_UNIT:     3
-    ALU_OP:        3
-    SHIFTER_OP:    2
-    BRANCH_OP:     4
-    LDST_OP:       2
-    RD1_ADDR:      2 --> needs async decode
-    RD2_ADDR:      2 --> needs async decode
-    RSV_ADDR:      1 --> needs async decode
-    OP_A:          3
-    OP_B:          3
-    OP_C:          2
-    MEM_LEN:       2
-    BSE:           1
-    WSE:           1
-    BZE:           1
-    WZE:           1
-    WOI:           1
-    ----------------
-    TOTAL:        34
-
-So, if I'm not mistaken, we would need 31-bit wide memories; something that most FPGAs support. GoWin gets there
-with 9 address bits. So, with the right compression we should be able to get away with a single ROM.
-
-There seems to be about 40 compression groups, which can be decoded in 5 bits. Each group is no longer than 16 instructions,
-so group+ins is 9 bits. Soo... a single ROM would do it?
-"""
 from copy import deepcopy
 
 @dataclass
@@ -382,6 +509,7 @@ class DecodeStage(GenericModule):
         self.has_multiply = has_multiply
         self.has_shift = has_shift
         self.use_mini_table = use_mini_table
+        assert not use_decode_rom, "ROM decoders are not supported at the moment. See notes at the top of decode.py"
         self.use_decode_rom = use_decode_rom
         self.register_mask_signals = register_mask_signals
 
@@ -672,21 +800,6 @@ class DecodeStage(GenericModule):
             ( "  4fef: call MEM32[FIELD_E]",          oc.branch_ind, None,       None,        bo.pc_w_ind, lo.load,       None,           None,               REG_SP,        None,            0,                   buf_field_e,      a32,    0,  0,  0,  0,  0 ),
         )
 
-        def optimize_selector(selectors, selector_name, name_prefix="group_"):
-            # Here, we look through all the selected items and group the selectors into as few groups as possible.
-            groups = dict()
-            for (selector, selected) in zip(selectors[::2],selectors[1::2]):
-                if selected not in groups:
-                    groups[selected] = []
-                groups[selected].append(selector)
-            # Re-create a new list by combining all the selectors for a given group
-            final_list = []
-            for idx, (selected, selector_list) in enumerate(groups.items()):
-                group_selector = or_gate(*selector_list)
-                setattr(self, f"{name_prefix}{idx+1}_for_{selector_name}", group_selector)
-                final_list += (group_selector, selected)
-            return final_list
-
         def is_mini_set(full_mask:str) -> bool:
             return full_mask.strip()[0] == "$"
 
@@ -769,6 +882,22 @@ class DecodeStage(GenericModule):
                 ("  3fef", "_______________"),
                 ("  4fef", "_______________"),
             )
+
+            def optimize_group_selector(selectors, selector_name, name_prefix="group_"):
+                # Here, we look through all the selected items and group the selectors into as few groups as possible.
+                groups = dict()
+                for (selector, selected) in zip(selectors[::2],selectors[1::2]):
+                    if selected not in groups:
+                        groups[selected] = []
+                    groups[selected].append(selector)
+                # Re-create a new list by combining all the selectors for a given group
+                final_list = []
+                for idx, (selected, selector_list) in enumerate(groups.items()):
+                    group_selector = or_gate(*selector_list)
+                    setattr(self, f"{name_prefix}{idx+1}_for_{selector_name}", group_selector)
+                    final_list += (group_selector, selected)
+                return final_list
+
             # Generate check that all instructions belong to exactly one compression group
             def is_inst_in_group(instrunction: str, grp: str, x_match: str):
                 grp = grp.strip()
@@ -835,7 +964,7 @@ class DecodeStage(GenericModule):
 
             self.decode_rom_addr = Wire(Unsigned(10))
             #self.decode_rom_addr <<= SelectOne(*group_selectors)
-            self.decode_rom_addr <<= SelectOne(*optimize_selector(group_selectors, "decoder_rom", "inst_group_"))
+            self.decode_rom_addr <<= SelectOne(*optimize_group_selector(group_selectors, "decoder_rom", "inst_group_"))
 
         # What we care about is this: which instruction (masks) result in the ALU to perform an addition (as an example).
         # For that, for each column of the above table, we collect all the masks that result the same outcome.
