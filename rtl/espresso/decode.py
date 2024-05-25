@@ -99,7 +99,7 @@ As far as the ROM is concerned, currently the following bit-counts are needed (I
     LDST_OP:       2
     RD1_ADDR:      2 --> needs async decode
     RD2_ADDR:      2 --> needs async decode
-    RES_ADDR:      1 --> needs async decode
+    RSV_ADDR:      1 --> needs async decode
     OP_A:          3
     OP_B:          3
     OP_C:          2
@@ -118,6 +118,109 @@ with 9 address bits. So, with the right compression we should be able to get awa
 There seems to be about 40 compression groups, which can be decoded in 5 bits. Each group is no longer than 16 instructions,
 so group+ins is 9 bits. Soo... a single ROM would do it?
 """
+from copy import deepcopy
+
+@dataclass
+class SelectorDesc:
+    local_port: JunctionBase
+    buf_port: JunctionBase
+    decoder_port_name: str
+    masks: OrderedDict
+
+@dataclass
+class SelectorGroup:
+    selectors: OrderedDict[str, SelectorDesc]
+    name_base: str
+    for_rf: bool
+    valid_generator: bool
+    output_port: JunctionBase
+    intermediate_port: JunctionBase
+    default_value: JunctionBase = None
+
+
+class DecodeLogic(GenericModule):
+    field_a = Input()
+    field_b = Input()
+    field_c = Input()
+    field_d = Input()
+    field_a_is_f = Input()
+    field_b_is_f = Input()
+    field_c_is_f = Input()
+    field_d_is_f = Input()
+
+    def construct(self, selector_groups: Sequence[SelectorGroup]):
+        for selector_group in selector_groups:
+            for selector in selector_group.selectors.values():
+                port = Output(logic)
+                setattr(self, selector.decoder_port_name, port)
+                # Attach the mask-set to the port
+                port.masks = deepcopy(selector.masks)
+
+    def body(self):
+        pass
+
+    def simulate(self):
+        pass
+
+    def generate(self, netlist: 'Netlist', back_end: 'BackEnd') -> str:
+        assert back_end.language == "SystemVerilog", "Unknown back-end specified: {}".format(back_end.language)
+
+        rtl_header = self._impl.generate_module_header(back_end)
+
+        rtl_body =  ""
+
+        #field_a_expr, _ = self.field_a.get_rhs_expression(back_end, target_namespace)
+        #field_b_expr, _ = self.field_b.get_rhs_expression(back_end, target_namespace)
+        #field_c_expr, _ = self.field_c.get_rhs_expression(back_end, target_namespace)
+        #field_d_expr, _ = self.field_d.get_rhs_expression(back_end, target_namespace)
+        #field_a_is_f_expr, _ = self.field_a_is_f.get_rhs_expression(back_end, target_namespace)
+        #field_b_is_f_expr, _ = self.field_b_is_f.get_rhs_expression(back_end, target_namespace)
+        #field_c_is_f_expr, _ = self.field_c_is_f.get_rhs_expression(back_end, target_namespace)
+        #field_d_is_f_expr, _ = self.field_d_is_f.get_rhs_expression(back_end, target_namespace)
+
+        def mask_to_verilog(mask: str) -> str:
+            fields = "dcba"
+            terms = []
+            for digit, field in zip(mask, fields):
+                if (digit == "."):
+                    terms.append(f"~field_{field}_is_f")
+                elif (digit in "_*"):
+                    pass
+                else:
+                    terms.append(f"(field_{field} == 4'h{digit})")
+                    #terms.append(f"field_{field}_is_{digit}")
+            verilog = " & ".join(terms)
+            if len(terms) > 1:
+                verilog = "(" + verilog + ")"
+            return verilog
+
+        def create_selector_verilog(selector: OrderedDict[str, OrderedDict], indent = 1):
+            assert selector is not None
+            terms = []
+            for mask, sub_selectors in selector.items():
+                vmask = "\t" * indent + mask_to_verilog(mask)
+                if sub_selectors is not None:
+                    and_terms = create_selector_verilog(sub_selectors, indent + 1)
+                    vmask = vmask + " & (\n" + and_terms + "\n" + "\t" * indent + ")"
+                terms.append(vmask)
+            joiner = " |\n"
+            selector = joiner.join(terms)
+            return selector
+
+        for out_port_name, out_port in self.get_outputs().items():
+            vselect = create_selector_verilog(out_port.masks)
+            rtl_body += "//" + " ".join(f"[{x}]" for x in out_port.masks.keys()) + "\n"
+            rtl_body += f"assign {out_port_name} =\n{vselect};\n\n"
+
+        with back_end.indent_block():
+            ret_val = (
+                str_block(rtl_header, "", "\n\n") +
+                str_block(back_end.indent(rtl_body), "", "") +
+                "endmodule"
+            )
+        return ret_val
+
+        return rtl_body
 class DecodeStage(GenericModule):
     clk = ClkPort()
     rst = RstPort()
@@ -232,11 +335,11 @@ class DecodeStage(GenericModule):
         a8  = access_len_8
         REG_SP = 14
 
-        #      CODE                                  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RES_ADDR   OP_A             OP_B          OP_C        MEM_LEN BSE WSE BZE WZE WOI
+        #      CODE                                  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR    RD2_ADDR        RSV_ADDR   OP_A             OP_B          OP_C        MEM_LEN BSE WSE BZE WZE WOI
         #invalid_instruction =                        (oc.branch,   None,         None,        bo.unknown,  None,      None,       None,           None,      None,            None,         None,       None,   0,  0,  0,  0,  0 )
         if self.has_shift:
             shift_ops = (
-                #  CODE                                  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR        RD2_ADDR        RES_ADDR       OP_A             OP_B          OP_C        MEM_LEN BSE WSE BZE WZE WOI
+                #  CODE                                  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR        RD2_ADDR        RSV_ADDR       OP_A             OP_B          OP_C        MEM_LEN BSE WSE BZE WZE WOI
                 ( "  .6..: $rD <- $rA << $rB",            oc.shift,    None,         so.shll,     None,        None,      pre_field_a,    pre_field_b,    pre_field_d,   reg_val_a,       reg_val_b,    None,       None,   0,  0,  0,  0,  0 ),
                 ( "  .7..: $rD <- $rA >> $rB",            oc.shift,    None,         so.shlr,     None,        None,      pre_field_a,    pre_field_b,    pre_field_d,   reg_val_a,       reg_val_b,    None,       None,   0,  0,  0,  0,  0 ),
                 ( "  .8..: $rD <- $rA >>> $rB",           oc.shift,    None,         so.shar,     None,        None,      pre_field_a,    pre_field_b,    pre_field_d,   reg_val_a,       reg_val_b,    None,       None,   0,  0,  0,  0,  0 ),
@@ -261,7 +364,7 @@ class DecodeStage(GenericModule):
             )
         if self.has_multiply:
             mult_ops = (
-                #  CODE                                  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR        RD2_ADDR        RES_ADDR       OP_A             OP_B          OP_C        MEM_LEN BSE WSE BZE WZE WOI
+                #  CODE                                  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP    RD1_ADDR        RD2_ADDR        RSV_ADDR       OP_A             OP_B          OP_C        MEM_LEN BSE WSE BZE WZE WOI
                 ( "  .9..: $rD <- $rA * $rB",             oc.mult,     None,         None,        None,        None,      pre_field_a,    pre_field_b,    pre_field_d,   reg_val_a,       reg_val_b,    None,       None,   0,  0,  0,  0,  0 ),
                 ( "  .9.f: $rD <- FIELD_E * $rB",         oc.mult,     None,         None,        None,        None,      None,           pre_field_b,    pre_field_d,   buf_field_e,     reg_val_b,    None,       None,   0,  0,  0,  0,  0 ),
                 ( "  .9f.: $rD <- FIELD_E * $rA",         oc.mult,     None,         None,        None,        None,      None,           pre_field_a,    pre_field_d,   buf_field_e,     reg_val_b,    None,       None,   0,  0,  0,  0,  0 ),
@@ -272,11 +375,14 @@ class DecodeStage(GenericModule):
                 #( "  .9.f: $rD <- FIELD_E * $rB",         *invalid_instruction),
                 #( "  .9f.: $rD <- FIELD_E * $rA",         *invalid_instruction),
             )
+        #      Exception group                       EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+        # These names MUST match that of the signals in DecodeExecIf or RegFileRequestIf
+        selector_name_bases = (                     "exec_unit", "alu_op",     "shifter_op","branch_op", "ldst_op",     "read1_addr",   "read2_addr",       "rsv_addr",    "op_a",          "op_b",              "op_c",           "mem_access_len","do_bse","do_wse","do_bze","do_wze","woi")
         full_inst_table = (
             *shift_ops,
             *mult_ops,
             #  Number of bits needed:                     3         3              2            4           2              2                2                   1              3               3                    2                  2     1   1   1   1   1
-            #  Exception group                       EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            #  Exception group                       EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "$ 0000: SWI_0",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_field_d,     None,                None,             None,   0,  0,  0,  0,  0 ),
             ( "$ 1000: SWI_1",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_field_d,     None,                None,             None,   0,  0,  0,  0,  0 ),
             ( "$ 2000: SWI_2",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_field_d,     None,                None,             None,   0,  0,  0,  0,  0 ),
@@ -288,13 +394,13 @@ class DecodeStage(GenericModule):
             ( "  8000: STM",                          oc.branch,   None,         None,        bo.stm,      None,          None,           None,               None,          None,            None,                None,             None,   0,  0,  0,  0,  0 ),
             ( "  9000: WOI",                          oc.branch,   ao.a_minus_b, None,        bo.cb_eq,    None,          pre_field_a,    pre_field_b,        None,          reg_val_a,       reg_val_b,           0,                None,   0,  0,  0,  0,  1 ), # Decoded as 'if $0 == $0 $pc <- $pc'
             ( "  a000: PFLUSH",                       oc.branch,   ao.a_minus_b, None,        bo.cb_ne,    None,          pre_field_a,    pre_field_b,        None,          reg_val_a,       reg_val_b,           0,                None,   0,  0,  0,  0,  0 ), # Decoded as 'if $0 != $0 $pc <- $pc'
-            #  PC manipulation group                 EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            #  PC manipulation group                 EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  .001: FENCE",                        oc.alu,      None,         None,        None,        None,          None,           None,               None,          None,            None,                None,             None,   0,  0,  0,  0,  0 ), # Decoded as a kind of NOP
             ( "$ .002: $pc <- $rD",                   oc.branch,   None,         None,        bo.pc_w,     None,          pre_field_d,    None,               None,          reg_val_a,       None,                None,             None,   0,  0,  0,  0,  0 ),
             ( "  .003: $tpc <- $rD",                  oc.branch,   None,         None,        bo.tpc_w,    None,          pre_field_d,    None,               None,          reg_val_a,       None,                None,             None,   0,  0,  0,  0,  0 ),
             ( "$ .004: $rD <- $pc",                   oc.alu,      ao.pc_plus_b, None,        None,        None,          None,           None,               pre_field_d,   None,            0,                   None,             None,   0,  0,  0,  0,  0 ),
             ( "  .005: $rD <- $tpc",                  oc.alu,      ao.tpc,       None,        None,        None,          None,           None,               pre_field_d,   None,            None,                None,             None,   0,  0,  0,  0,  0 ),
-            # Unary group                            EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Unary group                            EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "$ .01.: $rD <- tiny FIELD_A",          oc.alu,      ao.a_or_b,    None,        None,        None,          None,           None,               pre_field_d,   0,               buf_ones_field_a,    None,             None,   0,  0,  0,  0,  0 ),
             ( "  .02.: $rD <- $pc + FIELD_A*2",       oc.alu,      ao.pc_plus_b, None,        None,        None,          None,           None,               pre_field_d,   None,            buf_ones_field_a_2x, None,             None,   0,  0,  0,  0,  0 ),
             ( "  .03.: $rD <- -$rA",                  oc.alu,      ao.a_minus_b, None,        None,        None,          None,           pre_field_a,        pre_field_d,   0,               reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
@@ -307,7 +413,7 @@ class DecodeStage(GenericModule):
             #( "  .0c.: $rD <- type $rD <- $rA",       ),
             #( "  .0d.: $rD <- $rD <- type $rA",       ),
             #( "  .0e.: $rD <- type $rD <- FIELD_A",   ),
-            ## Binary ALU group                      EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            ## Binary ALU group                      EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  .1..: $rD <- $rA ^ $rB",             oc.alu,      ao.a_xor_b,   None,        None,        None,          pre_field_a,    pre_field_b,        pre_field_d,   reg_val_a,       reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
             ( "$ .2..: $rD <- $rA | $rB",             oc.alu,      ao.a_or_b,    None,        None,        None,          pre_field_a,    pre_field_b,        pre_field_d,   reg_val_a,       reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
             ( "  .3..: $rD <- $rA & $rB",             oc.alu,      ao.a_and_b,   None,        None,        None,          pre_field_a,    pre_field_b,        pre_field_d,   reg_val_a,       reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
@@ -315,31 +421,31 @@ class DecodeStage(GenericModule):
             ( "  .5..: $rD <- $rA - $rB",             oc.alu,      ao.a_minus_b, None,        None,        None,          pre_field_a,    pre_field_b,        pre_field_d,   reg_val_a,       reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
             #( "  .a..: $rD <- TYPE_NAME $rB",         ),
             ( "  .b..: $rD <- tiny $rB + FIELD_A",    oc.alu,      ao.a_plus_b,  None,        None,        None,          pre_field_b,    None,               pre_field_d,   reg_val_a,       buf_ones_field_a,    None,             None,   0,  0,  0,  0,  0 ),
-            # Load immediate group                   EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Load immediate group                   EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "$ .00f: $rD <- VALUE",                 oc.alu,      ao.a_or_b,    None,        None,        None,          None,           None,               pre_field_d,   buf_field_e,     0,                   None,             None,   0,  0,  0,  0,  0 ),
             ( "  20ef: $pc <- VALUE",                 oc.branch,   None,         None,        bo.pc_w,     None,          None,           None,               None,          buf_field_e,     None,                None,             None,   0,  0,  0,  0,  0 ),
             ( "  30ef: $tpc <- VALUE",                oc.branch,   None,         None,        bo.tpc_w,    None,          None,           None,               None,          buf_field_e,     None,                None,             None,   0,  0,  0,  0,  0 ),
             ( "  40ef: call VALUE",                   oc.branch,   None,         None,        bo.pc_w,     None,          None,           None,               REG_SP,        buf_field_e,     None,                None,             None,   0,  0,  0,  0,  0 ),
             #( "  80ef: type $r0...$r7 <- VALUE", ),
             #( "  90ef: type $r8...$r14 <- VALUE, ),
-            # Constant ALU group                     EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Constant ALU group                     EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  .1.f: $rD <- FIELD_E ^ $rB",         oc.alu,      ao.a_xor_b,   None,        None,        None,          None,           pre_field_b,        pre_field_d,   buf_field_e,     reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
             ( "  .2.f: $rD <- FIELD_E | $rB",         oc.alu,      ao.a_or_b,    None,        None,        None,          None,           pre_field_b,        pre_field_d,   buf_field_e,     reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
             ( "$ .3.f: $rD <- FIELD_E & $rB",         oc.alu,      ao.a_and_b,   None,        None,        None,          None,           pre_field_b,        pre_field_d,   buf_field_e,     reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
             ( "  .4.f: $rD <- FIELD_E + $rB",         oc.alu,      ao.a_plus_b,  None,        None,        None,          None,           pre_field_b,        pre_field_d,   buf_field_e,     reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
             ( "  .5.f: $rD <- FIELD_E - $rB",         oc.alu,      ao.a_minus_b, None,        None,        None,          None,           pre_field_b,        pre_field_d,   buf_field_e,     reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
-            # Short load immediate group             EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Short load immediate group             EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "$ .0f0: $rD <- short VALUE",           oc.alu,      ao.a_or_b,    None,        None,        None,          None,           None,               pre_field_d,   buf_field_e,     0,                   None,             None,   0,  0,  0,  0,  0 ),
             ( "  20fe: $pc <- short VALUE",           oc.branch,   None,         None,        bo.pc_w,     None,          None,           None,               None,          buf_field_e,     None,                None,             None,   0,  0,  0,  0,  0 ),
             ( "  30fe: $tpc <- short VALUE",          oc.branch,   None,         None,        bo.tpc_w,    None,          None,           None,               None,          buf_field_e,     None,                None,             None,   0,  0,  0,  0,  0 ),
             ( "  40fe: call short VALUE",             oc.branch,   None,         None,        bo.pc_w,     None,          None,           None,               REG_SP,        buf_field_e,     None,                None,             None,   0,  0,  0,  0,  0 ),
-            # Short constant ALU group               EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Short constant ALU group               EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  .1f.: $rD <- FIELD_E ^ $rA",         oc.alu,      ao.a_xor_b,   None,        None,        None,          None,           pre_field_a,        pre_field_d,   buf_field_e,     reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
             ( "  .2f.: $rD <- FIELD_E | $rA",         oc.alu,      ao.a_or_b,    None,        None,        None,          None,           pre_field_a,        pre_field_d,   buf_field_e,     reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
             ( "  .3f.: $rD <- FIELD_E & $rA",         oc.alu,      ao.a_and_b,   None,        None,        None,          None,           pre_field_a,        pre_field_d,   buf_field_e,     reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
             ( "$ .4f.: $rD <- FIELD_E + $rA",         oc.alu,      ao.a_plus_b,  None,        None,        None,          None,           pre_field_a,        pre_field_d,   buf_field_e,     reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
             ( "  .5f.: $rD <- FIELD_E - $rA",         oc.alu,      ao.a_minus_b, None,        None,        None,          None,           pre_field_a,        pre_field_d,   buf_field_e,     reg_val_b,           None,             None,   0,  0,  0,  0,  0 ),
-            # Zero-compare conditional branch group  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Zero-compare conditional branch group  EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  f00.: if $rA == 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_eq,    None,          pre_field_a,    None,               None,          reg_val_a,       0,                   buf_field_e,      None,   0,  0,  0,  0,  0 ),
             ( "  f01.: if $rA != 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_ne,    None,          pre_field_a,    None,               None,          reg_val_a,       0,                   buf_field_e,      None,   0,  0,  0,  0,  0 ),
             ( "  f02.: if $rA < 0",                   oc.branch,   ao.a_minus_b, None,        bo.cb_lts,   None,          pre_field_a,    None,               None,          reg_val_a,       0,                   buf_field_e,      None,   0,  0,  0,  0,  0 ),
@@ -352,7 +458,7 @@ class DecodeStage(GenericModule):
             ( "  f0b.: if $rA >= 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_ges,   None,          pre_field_a,    None,               None,          reg_val_a,       0,                   buf_field_e,      None,   0,  0,  0,  0,  0 ),
             ( "  f0c.: if $rA > 0",                   oc.branch,   ao.a_minus_b, None,        bo.cb_lts,   None,          None,           pre_field_a,        None,          0,               reg_val_b,           buf_field_e,      None,   0,  0,  0,  0,  0 ),
             ( "  f0d.: if $rA <= 0",                  oc.branch,   ao.a_minus_b, None,        bo.cb_ges,   None,          None,           pre_field_a,        None,          0,               reg_val_b,           buf_field_e,      None,   0,  0,  0,  0,  0 ),
-            # Conditional branch group               EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Conditional branch group               EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  f1..: if $rB == $rA",                oc.branch,   ao.a_minus_b, None,        bo.cb_eq,    None,          pre_field_b,    pre_field_a,        None,          reg_val_a,       reg_val_b,           buf_field_e,      None,   0,  0,  0,  0,  0 ),
             ( "  f2..: if $rB != $rA",                oc.branch,   ao.a_minus_b, None,        bo.cb_ne,    None,          pre_field_b,    pre_field_a,        None,          reg_val_a,       reg_val_b,           buf_field_e,      None,   0,  0,  0,  0,  0 ),
             ( "  f3..: if signed $rB < $rA",          oc.branch,   ao.a_minus_b, None,        bo.cb_lts,   None,          pre_field_b,    pre_field_a,        None,          reg_val_a,       reg_val_b,           buf_field_e,      None,   0,  0,  0,  0,  0 ),
@@ -365,13 +471,13 @@ class DecodeStage(GenericModule):
             ( "  fc..: if signed $rB >= $rA",         oc.branch,   ao.a_minus_b, None,        bo.cb_ges,   None,          pre_field_b,    pre_field_a,        None,          reg_val_a,       reg_val_b,           buf_field_e,      None,   0,  0,  0,  0,  0 ),
             ( "  fd..: if $rB < $rA",                 oc.branch,   ao.a_minus_b, None,        bo.cb_lt,    None,          pre_field_b,    pre_field_a,        None,          reg_val_a,       reg_val_b,           buf_field_e,      None,   0,  0,  0,  0,  0 ),
             ( "  fe..: if $rB >= $rA",                oc.branch,   ao.a_minus_b, None,        bo.cb_ge,    None,          pre_field_b,    pre_field_a,        None,          reg_val_a,       reg_val_b,           buf_field_e,      None,   0,  0,  0,  0,  0 ),
-            # Bit-set-test branch group              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Bit-set-test branch group              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  f.f.: if $rA[.]  == 1",              oc.branch,   None,         None,        bo.bb_one,   None,          pre_field_a,    None,               None,          reg_val_a,       buf_field_c,         buf_field_e,      None,   0,  0,  0,  0,  0 ),
             ( "  f..f: if $rB[.]  == 0",              oc.branch,   None,         None,        bo.bb_zero,  None,          pre_field_b,    None,               None,          reg_val_a,       buf_field_c,         buf_field_e,      None,   0,  0,  0,  0,  0 ),
-            # Stack group                            EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Stack group                            EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "$ .c**: MEM[$rA+tiny OFS*4] <- $rD",   oc.ld_st,    None,         None,        None,        lo.store,      pre_field_d,    pre_tiny_field_a,   None,          reg_val_a,       reg_val_b,           buf_tiny_ofs,     a32,    0,  0,  0,  0,  0 ),
             ( "$ .d**: $rD <- MEM[$rA+tiny OFS*4]",   oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_tiny_field_a,   pre_field_d,   None,            reg_val_b,           buf_tiny_ofs,     a32,    0,  0,  0,  0,  0 ),
-            # Indirect load/store group              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Indirect load/store group              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "$ .e4.: $rD <- MEM8[$rA]",             oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        pre_field_d,   None,            reg_val_b,           0,                a8,     0,  0,  1,  0,  0 ),
             ( "  .e5.: $rD <- MEM16[$rA]",            oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        pre_field_d,   None,            reg_val_b,           0,                a16,    0,  0,  0,  1,  0 ),
             ( "  .e6.: $rD <- MEM32[$rA]",            oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        pre_field_d,   None,            reg_val_b,           0,                a32,    0,  0,  0,  0,  0 ),
@@ -382,12 +488,12 @@ class DecodeStage(GenericModule):
             ( "  .eb.: MEMSC32[$rA] <- $rD",          oc.ld_st,    None,         None,        None,        lo.store,      pre_field_d,    pre_field_a,        pre_field_d,   reg_val_a,       reg_val_b,           0,                a32,    0,  0,  0,  0,  0 ),
             ( "  .ec.: $rD <- SMEM8[$rA]",            oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        pre_field_d,   None,            reg_val_b,           0,                a8,     1,  0,  0,  0,  0 ),
             ( "  .ed.: $rD <- SMEM16[$rA]",           oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        pre_field_d,   None,            reg_val_b,           0,                a16,    0,  1,  0,  0,  0 ),
-            # Indirect jump group                    EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Indirect jump group                    EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  1ee.: INV[$rA]",                     oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        None,          None,            reg_val_b,           0,                a32,    0,  0,  0,  0,  0 ),
             ( "  2ee.: $pc <- MEM32[$rA]",            oc.branch_ind, None,       None,        bo.pc_w_ind, lo.load,       None,           pre_field_a,        None,          None,            reg_val_b,           0,                a32,    0,  0,  0,  0,  0 ),
             ( "  3ee.: $tpc <- MEM32[$rA]",           oc.branch_ind, None,       None,        bo.tpc_w_ind,lo.load,       None,           pre_field_a,        None,          None,            reg_val_b,           0,                a32,    0,  0,  0,  0,  0 ),
             ( "  4ee.: call MEM32[$rA]",              oc.branch_ind, None,       None,        bo.pc_w_ind, lo.load,       None,           pre_field_a,        REG_SP,        None,            reg_val_b,           0,                a32,    0,  0,  0,  0,  0 ),
-            # Offset-indirect load/store group       EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Offset-indirect load/store group       EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  .f4.: $rD <- MEM8[$rA+FIELD_E]",     oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        pre_field_d,   None,            reg_val_b,           buf_field_e,      a8,     0,  0,  1,  0,  0 ),
             ( "  .f5.: $rD <- MEM16[$rA+FIELD_E]",    oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        pre_field_d,   None,            reg_val_b,           buf_field_e,      a16,    0,  0,  0,  1,  0 ),
             ( "  .f6.: $rD <- MEM32[$rA+FIELD_E]",    oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        pre_field_d,   None,            reg_val_b,           buf_field_e,      a32,    0,  0,  0,  0,  0 ),
@@ -398,15 +504,15 @@ class DecodeStage(GenericModule):
             ( "  .fb.: MEMSC32[$rA+FIELD_E] <- $rD",  oc.ld_st,    None,         None,        None,        lo.store,      pre_field_d,    pre_field_a,        pre_field_d,   reg_val_a,       reg_val_b,           buf_field_e,      a32,    0,  0,  0,  0,  0 ),
             ( "  .fc.: $rD <- SMEM8[$rA+FIELD_E]",    oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        pre_field_d,   None,            reg_val_b,           buf_field_e,      a8,     1,  0,  0,  0,  0 ),
             ( "  .fd.: $rD <- SMEM16[$rA+FIELD_E]",   oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        pre_field_d,   None,            reg_val_b,           buf_field_e,      a16,    0,  1,  0,  0,  0 ),
-            # Offset-indirect jump group             EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Offset-indirect jump group             EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  1fe.: INV[$rA+FIELD_E]",             oc.ld_st,    None,         None,        None,        lo.load,       None,           pre_field_a,        None,          None,            reg_val_b,           buf_field_e,      a32,    0,  0,  0,  0,  0 ),
             ( "  2fe.: $pc <- MEM32[$rA+FIELD_E]",    oc.branch_ind, None,       None,        bo.pc_w_ind, lo.load,       None,           pre_field_a,        None,          None,            reg_val_b,           buf_field_e,      a32,    0,  0,  0,  0,  0 ),
             ( "  3fe.: $tpc <- MEM32[$rA+FIELD_E]",   oc.branch_ind, None,       None,        bo.tpc_w_ind,lo.load,       None,           pre_field_a,        None,          None,            reg_val_b,           buf_field_e,      a32,    0,  0,  0,  0,  0 ),
             ( "  4fe.: call MEM32[$rA+FIELD_E]",      oc.branch_ind, None,       None,        bo.pc_w_ind, lo.load,       None,           pre_field_a,        REG_SP,        None,            reg_val_b,           buf_field_e,      a32,    0,  0,  0,  0,  0 ),
-            # CSR group                              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # CSR group                              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  .0f8: $rD <- CSR[FIELD_E]",          oc.ld_st,    None,         None,        None,        lo.csr_load,   None,           None,               pre_field_d,   None,            0,                   buf_field_e,      a32,    0,  0,  0,  0,  0 ),
             ( "  .0f9: CSR[FIELD_E] <- $rD",          oc.ld_st,    None,         None,        None,        lo.csr_store,  pre_field_d,    None,               None,          reg_val_a,       0,                   buf_field_e,      a32,    0,  0,  0,  0,  0 ),
-            # Absolute load/store group              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Absolute load/store group              EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  .f4f: $rD <- MEM8[FIELD_E]",         oc.ld_st,    None,         None,        None,        lo.load,       None,           None,               pre_field_d,   None,            0,                   buf_field_e,      a8,     0,  0,  1,  0,  0 ),
             ( "  .f5f: $rD <- MEM16[FIELD_E]",        oc.ld_st,    None,         None,        None,        lo.load,       None,           None,               pre_field_d,   None,            0,                   buf_field_e,      a16,    0,  0,  0,  1,  0 ),
             ( "  .f6f: $rD <- MEM32[FIELD_E]",        oc.ld_st,    None,         None,        None,        lo.load,       None,           None,               pre_field_d,   None,            0,                   buf_field_e,      a32,    0,  0,  0,  0,  0 ),
@@ -417,7 +523,7 @@ class DecodeStage(GenericModule):
             ( "  .fbf: MEMSC32[FIELD_E] <- $rD",      oc.ld_st,    None,         None,        None,        lo.store,      pre_field_d,    None,               pre_field_d,   reg_val_a,       0,                   buf_field_e,      a32,    0,  0,  0,  0,  0 ),
             ( "  .fcf: $rD <- SMEM8[FIELD_E]",        oc.ld_st,    None,         None,        None,        lo.load,       None,           None,               pre_field_d,   None,            0,                   buf_field_e,      a8,     1,  0,  0,  0,  0 ),
             ( "  .fdf: $rD <- SMEM16[FIELD_E]",       oc.ld_st,    None,         None,        None,        lo.load,       None,           None,               pre_field_d,   None,            0,                   buf_field_e,      a16,    0,  1,  0,  0,  0 ),
-            # Absolute jump group                    EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RES_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
+            # Absolute jump group                    EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
             ( "  1fef: INV[FIELD_E]",                 oc.ld_st,    None,         None,        None,        lo.load,       None,           None,               None,          None,            0,                   buf_field_e,      a32,    0,  0,  0,  0,  0 ),
             ( "  2fef: $pc <- MEM32[FIELD_E]",        oc.branch_ind, None,       None,        bo.pc_w_ind, lo.load,       None,           None,               None,          None,            0,                   buf_field_e,      a32,    0,  0,  0,  0,  0 ),
             ( "  3fef: $tpc <- MEM32[FIELD_E]",       oc.branch_ind, None,       None,        bo.tpc_w_ind,lo.load,       None,           None,               None,          None,            0,                   buf_field_e,      a32,    0,  0,  0,  0,  0 ),
@@ -442,74 +548,11 @@ class DecodeStage(GenericModule):
         def is_mini_set(full_mask:str) -> bool:
             return full_mask.strip()[0] == "$"
 
-        def parse_bit_mask(full_mask: str) -> Tuple[Wire, str]:
-            """Create an expression that checks for the provided pattern
-
-            Args:
-                full_mask (str): bit-mask string in the format of .-s, *-s and hex digits, as described in the decode table
-
-            Returns:
-                Wire: An expression that returns '1' if the instruction code matches that pattern, '0' otherwise.
-            """
+        def get_inst_mask(full_mask: str) -> str:
             mask = full_mask.split(':')[0].strip() # Remove comment and trailing/leading spaces
             if mask[0] == "$": mask = mask[1:]
             mask = mask.strip()
-            ins_name = full_mask.split(':')[1].strip() # This is the comment part, which we'll use to make up the name for the wire
-            ins_name = ins_name.replace('<-', 'eq')
-            ins_name = ins_name.replace('-$', 'minus_')
-            ins_name = ins_name.replace('$', '')
-            ins_name = ins_name.replace('[.]', '_bit')
-            ins_name = ins_name.replace('[', '_')
-            ins_name = ins_name.replace(']', '')
-            ins_name = ins_name.replace('>>>', 'asr')
-            ins_name = ins_name.replace('>>', 'lsr')
-            ins_name = ins_name.replace('<<', 'lsl')
-            ins_name = ins_name.replace('&', 'and')
-            ins_name = ins_name.replace('|', 'or')
-            ins_name = ins_name.replace('^', 'xor')
-            ins_name = ins_name.replace('+', 'plus')
-            ins_name = ins_name.replace('-', 'minus')
-            ins_name = ins_name.replace('*', 'times')
-            ins_name = ins_name.replace('~', 'not')
-            ins_name = ins_name.replace('<=', 'le')
-            ins_name = ins_name.replace('>=', 'ge')
-            ins_name = ins_name.replace('<', 'lt')
-            ins_name = ins_name.replace('>', 'gt')
-            ins_name = ins_name.replace('==', 'eq')
-            ins_name = ins_name.replace('!=', 'ne')
-            ins_name = ins_name.replace(' ', '_')
-            ins_name = ins_name.lower()
-            # If we're creating the buffered decode signals by simply registering the unbuffered ones, we only need to generate the 'pre' versions.
-            if self.register_mask_signals:
-                field_sets      = ((pre_field_d,      pre_field_c,      pre_field_b,      pre_field_a),      )
-                field_is_f_sets = ((pre_field_d_is_f, pre_field_c_is_f, pre_field_b_is_f, pre_field_a_is_f), )
-            else:
-                field_sets      = ((pre_field_d,      pre_field_c,      pre_field_b,      pre_field_a),      (buf_field_d,      buf_field_c,      buf_field_b,      buf_field_a)     )
-                field_is_f_sets = ((pre_field_d_is_f, pre_field_c_is_f, pre_field_b_is_f, pre_field_a_is_f), (buf_field_d_is_f, buf_field_c_is_f, buf_field_b_is_f, buf_field_a_is_f))
-            expressions = []
-            for fields, field_is_fs in zip(field_sets, field_is_f_sets):
-                idx = 0
-                expr = 1
-                bitmask = ""
-                for field, field_is_f in zip(fields, field_is_fs):
-                    digit = mask[idx]
-                    bitmask += digit
-                    if digit == '.':
-                        expr = expr & ~field_is_f
-                    elif digit == '*':
-                        pass
-                    elif digit in ('0123456789abcdef'):
-                        value = int(digit, 16)
-                        expr = expr & (field == value)
-                    else:
-                        raise SyntaxErrorException(f"Unknown digit {digit} in decode mask {full_mask}")
-                    idx += 1
-                expressions.append(expr)
-            # Generate the registered version, if that's the way we want to go
-            if self.register_mask_signals:
-                assert len(expressions) == 1
-                expressions.append(Reg(expressions[0], clock_en=buf_en))
-            return *expressions, bitmask, ins_name
+            return mask
 
         # Field and their mapping to output signals:
         CODE       =  0    #
@@ -520,7 +563,7 @@ class DecodeStage(GenericModule):
         LDST_OP    =  5    #    ldst_op = EnumNet(ldst_ops)
         RD1_ADDR   =  6    #
         RD2_ADDR   =  7    #
-        RES_ADDR   =  8    #    result_reg_addr = BrewRegAddr
+        RSV_ADDR   =  8    #    result_reg_addr = BrewRegAddr
         OP_A       =  9    #    op_a = BrewData
         OP_B       = 10    #    op_b = BrewData
         OP_C       = 11    #    op_c = BrewData
@@ -539,26 +582,6 @@ class DecodeStage(GenericModule):
         print("Available instructions:")
         for inst in inst_table:
             print(f"    {inst[0]}")
-
-        # At this point we have all the required selections for the various control lines in 'inst_table' and their selection expressions in 'mask_expressions'.
-        # All we need to do is to create the appropriate 'SelectOne' expressions.
-
-        buf_mask_expressions = []
-        pre_mask_expressions = []
-        mask_bitmasks = []
-        mask_expression_names = set()
-        for pre_expr, buf_expr, bitmask, name in (parse_bit_mask(line[CODE]) for line in inst_table):
-            idx = 1
-            base_name = name
-            while name in mask_expression_names:
-                name = f"{base_name}_{idx}"
-                idx += 1
-            mask_expression_names.add(name)
-            setattr(self, f"mask_for_buf_{name}", buf_expr)
-            buf_mask_expressions.append(buf_expr)
-            setattr(self, f"mask_for_pre_{name}", pre_expr)
-            pre_mask_expressions.append(pre_expr)
-            mask_bitmasks.append(bitmask)
 
         if self.use_decode_rom:
             # Compression groups have '0..f' for exact match, '.' for non-f match and 'X' for match non-F and retain.
@@ -672,148 +695,158 @@ class DecodeStage(GenericModule):
             #self.decode_rom_addr <<= SelectOne(*group_selectors)
             self.decode_rom_addr <<= SelectOne(*optimize_selector(group_selectors, "decoder_rom", "inst_group_"))
 
+        # What we care about is this: which instruction (masks) result in the ALU to perform an addition (as an example).
+        # For that, for each column of the above table, we collect all the masks that result the same outcome.
+        # This we collect into a dict for each column. The key is the output value, the value is the set of masks.
+        # This set is also stored as a dict, this time the keys are the masks and the values are None.
+        # We use this dict representation for masks as it allows for various optimizations to be performed better
+        output_selectors = []
+        output_cnt = len(full_inst_table[0]) - 1
 
-        select_list_exec_unit  = []
-        select_list_alu_op     = []
-        select_list_shifter_op = []
-        select_list_branch_op  = []
-        select_list_ldst_op    = []
-        pre_select_list_rd1_addr   = []
-        pre_select_list_rd2_addr   = []
-        pre_select_list_res_addr   = []
-        select_list_op_a       = []
-        select_list_op_b       = []
-        select_list_op_c       = []
-        select_list_mem_len    = []
-        select_list_bse        = []
-        select_list_wse        = []
-        select_list_bze        = []
-        select_list_wze        = []
-        select_list_int_en     = []
+        for output_idx, name_base in zip(range(1,output_cnt+1), selector_name_bases):
+            for_rf = output_idx in (RD1_ADDR, RD2_ADDR, RSV_ADDR)
+            output_port = getattr(self.reg_file_req, name_base) if for_rf else getattr(self.output_port, name_base)
+            intermediate_port = Wire()
+            setattr(self, f"intermediate_value_for_{name_base.upper()}", intermediate_port)
+            output_selector = SelectorGroup(
+                selectors = OrderedDict(),
+                name_base = name_base,
+                for_rf=for_rf,
+                valid_generator=False,
+                output_port = output_port,
+                intermediate_port = intermediate_port
+            )
+            name_base = name_base.upper()
+            wire_idx = 1
+            for inst_line in full_inst_table:
+                if not is_mini_set(inst_line[0]) and self.use_mini_table:
+                    continue
+                mask = get_inst_mask(inst_line[0])
 
-        select_lists = (
-            select_list_exec_unit,
-            select_list_alu_op,
-            select_list_shifter_op,
-            select_list_branch_op,
-            select_list_ldst_op,
-            pre_select_list_rd1_addr,
-            pre_select_list_rd2_addr,
-            pre_select_list_res_addr,
-            select_list_op_a,
-            select_list_op_b,
-            select_list_op_c,
-            select_list_mem_len,
-            select_list_bse,
-            select_list_wse,
-            select_list_bze,
-            select_list_wze,
-            select_list_int_en,
-        )
+                selected = inst_line[output_idx]
+                if selected not in output_selector.selectors:
+                    # Create a local wire to hold the selector
+                    if is_junction_base(selected):
+                        selected_name = f"wire_{wire_idx}"
+                        wire_idx += 1
+                    elif isinstance(selected, float):
+                        selected_name = str(selected).replace(".","p")
+                    else:
+                        # Do some manipulation in case names contain '.'-s
+                        selected_name = str(selected).split(".")[-1].upper()
+                    # Create a name for the port on the DecoderLogic module; use the same name for local_port
+                    # NOTE: the local_port member will eventually be swapped out for an actual Wire, but we
+                    #       will do some transformations first that can introduce/eliminate some ports
+                    port_name = f"select_{selected_name}_for_output_{name_base}"
+                    buf_port_name = f"buf_select_{selected_name}_for_output_{name_base}"
+                    output_selector.selectors[selected] = SelectorDesc(local_port=port_name, buf_port=buf_port_name, decoder_port_name=port_name, masks = OrderedDict())
+                output_selector.selectors[selected].masks[mask] = None
+            output_selectors.append(output_selector)
 
-        bitmask_list_exec_unit  = OrderedDict()
-        bitmask_list_alu_op     = OrderedDict()
-        bitmask_list_shifter_op = OrderedDict()
-        bitmask_list_branch_op  = OrderedDict()
-        bitmask_list_ldst_op    = OrderedDict()
-        pre_bitmask_list_rd1_addr   = OrderedDict()
-        pre_bitmask_list_rd2_addr   = OrderedDict()
-        pre_bitmask_list_res_addr   = OrderedDict()
-        bitmask_list_op_a       = OrderedDict()
-        bitmask_list_op_b       = OrderedDict()
-        bitmask_list_op_c       = OrderedDict()
-        bitmask_list_mem_len    = OrderedDict()
-        bitmask_list_bse        = OrderedDict()
-        bitmask_list_wse        = OrderedDict()
-        bitmask_list_bze        = OrderedDict()
-        bitmask_list_wze        = OrderedDict()
-        bitmask_list_int_en     = OrderedDict()
+        # For the RF input groups we need to crate a 'valid' signal
+        rf_valid_selectors = []
+        for output_selector in output_selectors:
+            if output_selector.for_rf:
+                name_base = output_selector.name_base.replace("_addr", "_valid")
+                output_port = getattr(self.reg_file_req, name_base)
+                intermediate_port = Wire()
+                setattr(self, f"intermediate_value_for_{name_base.upper()}", intermediate_port)
 
-        bitmask_lists = (
-            bitmask_list_exec_unit,
-            bitmask_list_alu_op,
-            bitmask_list_shifter_op,
-            bitmask_list_branch_op,
-            bitmask_list_ldst_op,
-            pre_bitmask_list_rd1_addr,
-            pre_bitmask_list_rd2_addr,
-            pre_bitmask_list_res_addr,
-            bitmask_list_op_a,
-            bitmask_list_op_b,
-            bitmask_list_op_c,
-            bitmask_list_mem_len,
-            bitmask_list_bse,
-            bitmask_list_wse,
-            bitmask_list_bze,
-            bitmask_list_wze,
-            bitmask_list_int_en,
-        )
+                valid_selector = SelectorGroup(
+                    selectors=OrderedDict(),
+                    default_value=0,
+                    name_base=name_base,
+                    for_rf=True,
+                    valid_generator=True,
+                    output_port=output_port,
+                    intermediate_port=intermediate_port
+                )
+                masks = OrderedDict()
+                # For these, we need to create a 'valid' signal as well
+                for selector_key, selector_desc in output_selector.selectors.items():
+                    if selector_key is not None:
+                        masks.update(selector_desc.masks)
+                port_name = f"select_for_output_{name_base.upper()}"
+                valid_selector.selectors[1] = SelectorDesc(local_port=port_name,buf_port=None,decoder_port_name=port_name,masks=masks)
+                rf_valid_selectors.append(valid_selector)
 
+        # For each group, find the selector with the most conditions and create a default state for them
+        for output_selector in output_selectors:
+            default_cnt = -1
+            default_key = None
+            for selector_key, selector_desc in output_selector.selectors.items():
+                if len(selector_desc.masks) > default_cnt:
+                    default_cnt = len(selector_desc.masks)
+                    default_key = selector_key
+            if default_cnt > 1:
+                output_selector.default_value = default_key
+                del output_selector.selectors[default_key]
 
-        for line, pre_mask_expr, buf_mask_expr, bitmask in zip(inst_table, pre_mask_expressions, buf_mask_expressions, mask_bitmasks):
-            for idx, (select_list, bitmask_list, value) in enumerate(zip(select_lists, bitmask_lists, line[EXEC_UNIT:])):
-                idx += 1 # We are skipping the first column, so we have to accommodate it here
+        # Merge valid selectors into output_selectors
+        output_selectors += rf_valid_selectors
+        # Create local and buffered ports for everybody; create buffer registers and hook the two up
+        for output_selector in output_selectors:
+            local_port = Wire()
+            setattr(self, f"local_value_for_{output_selector.name_base.upper()}", local_port)
 
-                # RF drive signals are generated from pre-buffer expresisons
-                if idx in (RD1_ADDR, RD2_ADDR, RES_ADDR):
-                    assert not isinstance(value, str)
-                    select_list += (pre_mask_expr, value)
-                    if value not in bitmask_list: bitmask_list[value] = []
-                    bitmask_list[value].append(bitmask)
-                else:
-                    # Remove all the 0-s from the selectors for these fields and rely on default_ports to restore them
-                    if idx in (BSE, WSE, BZE, WZE, WOI) and value == 0:
-                        value = None
-                    if value is not None:
-                        select_list += (buf_mask_expr, value)
-                        if value not in bitmask_list: bitmask_list[value] = []
-                        bitmask_list[value].append(bitmask)
+            for selector_key, selector_desc in output_selector.selectors.items():
+                local_port = Wire()
+                setattr(self, selector_desc.local_port, local_port)
+                selector_desc.local_port = local_port
+                if not output_selector.for_rf:
+                    buf_port = Wire()
+                    setattr(self, selector_desc.buf_port, buf_port)
+                    selector_desc.buf_port = buf_port
+                    buf_port <<= Reg(local_port, clock_en=buf_en)
 
-        #### DEBUG ####
-        # Dump the selectors into a file
-        #with open("masklist.csv", "wt") as masklist_file:
-        #    for bitmask in bitmask_lists:
-        #        for masklist in bitmask.values():
-        #            masklist_file.write(",".join(masklist)+"\n")
+        # Hook up the decode logic instance
+        decode_logic = DecodeLogic(output_selectors)
+        decode_logic.field_a <<= pre_field_a
+        decode_logic.field_b <<= pre_field_b
+        decode_logic.field_c <<= pre_field_c
+        decode_logic.field_d <<= pre_field_d
+        decode_logic.field_a_is_f <<= pre_field_a_is_f
+        decode_logic.field_b_is_f <<= pre_field_b_is_f
+        decode_logic.field_c_is_f <<= pre_field_c_is_f
+        decode_logic.field_d_is_f <<= pre_field_d_is_f
+        for output_selector in output_selectors:
+            for selector in output_selector.selectors.values():
+                selector.local_port <<= getattr(decode_logic, selector.decoder_port_name)
 
+        # For each group, create the final mux
+        # For muxes that feed 'execute', we'll use the buffered selectors, for the ones
+        # feeding the 'RF' we're going to use the unbuffered ones.
+        # NOTE: we don't buffer the *SELECTED* value. That's the responsibility of the decode table above to name the appropriate values
+        for output_selector in output_selectors:
+            mux_arg_list = []
+            for selector_key, selector_desc in output_selector.selectors.items():
+                mux_arg_list += [selector_desc.local_port if output_selector.for_rf else selector_desc.buf_port, selector_key]
+            if output_selector.default_value is not None:
+                output_selector.intermediate_port <<= SelectOne(*mux_arg_list, default_port=output_selector.default_value)
+            else:
+                output_selector.intermediate_port <<= SelectOne(*mux_arg_list)
 
-        # ... actually a little more than that: we have to also generate the reservation logic. So let's start with that.
-        pre_select_list_read1_needed = []
-        pre_select_list_read2_needed = []
-        pre_select_list_rsv_needed = []
+        # We need to special-case a few things:
+        # 1. fetch.av should mask out all RF request valids
+        # 2. fetch.av should also mask out write-back valid
+        read1_valid = Select(self.fetch.av, self.intermediate_value_for_READ1_VALID, 0)
+        read2_valid = Select(self.fetch.av, self.intermediate_value_for_READ2_VALID, 0)
+        rsv_valid = Select(self.fetch.av, self.intermediate_value_for_RSV_VALID, 0)
+        rsv_addr = self.intermediate_value_for_RSV_ADDR
 
-        for line, pre_mask_expr in zip(inst_table, pre_mask_expressions):
-            for select_list, value in zip((pre_select_list_read1_needed, pre_select_list_read2_needed, pre_select_list_rsv_needed), line[RD1_ADDR:RES_ADDR+1]):
-                if value is not None: select_list += (pre_mask_expr, 1)
+        # Hook up execute drivers to their final output
+        for output_selector in output_selectors:
+            if not output_selector.for_rf:
+                out_port = getattr(self.output_port, output_selector.name_base)
+                out_port <<= output_selector.intermediate_port
 
-
-
-        # Now that we have the selection lists, we can compose the muxes
-        # We will use the default ports to create an 'exc_unknown_inst' exception in case no selectors hit. We only need to set the EXEC_UNIT and BRANCH_OP fields.
-        exec_unit      = SelectOne(*optimize_selector(select_list_exec_unit,      "exec_unit"), default_port = op_class.branch)         if len(select_list_exec_unit) > 0 else None
-        alu_op         = SelectOne(*optimize_selector(select_list_alu_op,         "alu_op"))                                            if len(select_list_alu_op) > 0 else None
-        shifter_op     = SelectOne(*optimize_selector(select_list_shifter_op,     "shifter_op"))                                        if len(select_list_shifter_op) > 0 else None
-        branch_op      = SelectOne(*optimize_selector(select_list_branch_op,      "branch_op"), default_port=branch_ops.unknown)        if len(select_list_branch_op) > 0 else None
-        ldst_op        = SelectOne(*optimize_selector(select_list_ldst_op,        "ldst_op"))                                           if len(select_list_ldst_op) > 0 else None
-        pre_rd1_addr   = SelectOne(*optimize_selector(pre_select_list_rd1_addr,   "pre_rd1_addr"))                                      if len(pre_select_list_rd1_addr) > 0 else None
-        pre_rd2_addr   = SelectOne(*optimize_selector(pre_select_list_rd2_addr,   "pre_rd2_addr"))                                      if len(pre_select_list_rd2_addr) > 0 else None
-        pre_res_addr   = SelectOne(*optimize_selector(pre_select_list_res_addr,   "pre_res_addr"))                                      if len(pre_select_list_res_addr) > 0 else None
-        op_a           = SelectOne(*optimize_selector(select_list_op_a,           "op_a"))                                              if len(select_list_op_a) > 0 else None
-        op_b           = SelectOne(*optimize_selector(select_list_op_b,           "op_b"))                                              if len(select_list_op_b) > 0 else None
-        op_c           = SelectOne(*optimize_selector(select_list_op_c,           "op_c"))                                              if len(select_list_op_c) > 0 else None
-        mem_len        = SelectOne(*optimize_selector(select_list_mem_len,        "mem_len"))                                           if len(select_list_mem_len) > 0 else None
-        bse            = SelectOne(*optimize_selector(select_list_bse,            "bse"), default_port = 0)                             if len(select_list_bse) > 0 else 0
-        wse            = SelectOne(*optimize_selector(select_list_wse,            "wse"), default_port = 0)                             if len(select_list_wse) > 0 else 0
-        bze            = SelectOne(*optimize_selector(select_list_bze,            "bze"), default_port = 0)                             if len(select_list_bze) > 0 else 0
-        wze            = SelectOne(*optimize_selector(select_list_wze,            "wze"), default_port = 0)                             if len(select_list_wze) > 0 else 0
-        woi            = SelectOne(*optimize_selector(select_list_int_en,         "woi"), default_port = 0)                             if len(select_list_int_en) > 0 else 0
-
-        pre_read1_needed = Select(self.fetch.av, SelectOne(*optimize_selector(pre_select_list_read1_needed, "pre_read1_needed"), default_port=0) if len(pre_select_list_read1_needed) > 0 else 0, 0)
-        pre_read2_needed = Select(self.fetch.av, SelectOne(*optimize_selector(pre_select_list_read2_needed, "pre_read2_needed"), default_port=0) if len(pre_select_list_read2_needed) > 0 else 0, 0)
-        pre_rsv_needed   = Select(self.fetch.av, SelectOne(*optimize_selector(pre_select_list_rsv_needed,   "pre_rsv_needed"),   default_port=0) if len(pre_select_list_rsv_needed)   > 0 else 0, 0)
-
-        buf_rsv_needed = Reg(pre_rsv_needed, clock_en=buf_en)
-        buf_res_addr   = Reg(pre_res_addr,   clock_en=buf_en)
+        # We need to deal with the write-back signals and some other signals that aren't directly generated
+        buf_rsv_valid  = Reg(rsv_valid, clock_en=buf_en)
+        buf_rsv_addr   = Reg(rsv_addr,   clock_en=buf_en)
+        self.output_port.result_reg_addr <<= BrewRegAddr(buf_rsv_addr)
+        self.output_port.result_reg_addr_valid <<= buf_rsv_valid
+        self.output_port.inst_len <<= buf_fetch.inst_len
+        self.output_port.fetch_av <<= buf_fetch.av
 
         # We let the register file handle the hand-shaking for us. We just need to implement the data
         self.fetch.ready <<= self.reg_file_req.ready
@@ -822,36 +855,19 @@ class DecodeStage(GenericModule):
         self.output_port.valid <<= self.reg_file_rsp.valid
         self.reg_file_rsp.ready <<= self.output_port.ready
 
-        self.reg_file_req.read1_addr  <<= BrewRegAddr(pre_rd1_addr)
-        self.reg_file_req.read1_valid <<= pre_read1_needed
-        self.reg_file_req.read2_addr  <<= BrewRegAddr(pre_rd2_addr)
-        self.reg_file_req.read2_valid <<= pre_read2_needed
-        self.reg_file_req.rsv_addr    <<= BrewRegAddr(pre_res_addr)
-        self.reg_file_req.rsv_valid   <<= pre_rsv_needed
+        # Finally we have to hook up the data port of the RF (the responses are already part of the muxes)
+        self.reg_file_req.read1_addr  <<= BrewRegAddr(self.intermediate_value_for_READ1_ADDR)
+        self.reg_file_req.read1_valid <<= read1_valid
+        self.reg_file_req.read2_addr  <<= BrewRegAddr(self.intermediate_value_for_READ2_ADDR)
+        self.reg_file_req.read2_valid <<= read2_valid
+        self.reg_file_req.rsv_addr    <<= BrewRegAddr(self.intermediate_value_for_RSV_ADDR)
+        self.reg_file_req.rsv_valid   <<= rsv_valid
 
-        self.output_port.exec_unit             <<= exec_unit
-        self.output_port.alu_op                <<= alu_op
-        self.output_port.shifter_op            <<= shifter_op if shifter_op is not None else None
-        self.output_port.branch_op             <<= branch_op
-        self.output_port.ldst_op               <<= ldst_op
-        self.output_port.op_a                  <<= op_a
-        self.output_port.op_b                  <<= op_b
-        self.output_port.op_c                  <<= op_c
-        self.output_port.mem_access_len        <<= mem_len
-        self.output_port.inst_len              <<= buf_fetch.inst_len
-        self.output_port.do_bse                <<= bse
-        self.output_port.do_wse                <<= wse
-        self.output_port.do_bze                <<= bze
-        self.output_port.do_wze                <<= wze
-        self.output_port.woi                   <<= woi
-        self.output_port.result_reg_addr       <<= BrewRegAddr(buf_res_addr)
-        self.output_port.result_reg_addr_valid <<= buf_rsv_needed
-        self.output_port.fetch_av              <<= buf_fetch.av
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! THE MUXES HAVE TO BE AFTER THE REGISTERS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
         #self.break_fetch_burst <<= (self.output_port.valid & self.output_port.ready) & ((exec_unit == op_class.ld_st) | (exec_unit == op_class.branch))
         #self.break_fetch_burst <<= (self.output_port.valid & self.output_port.ready) & ((exec_unit == op_class.branch))
-        self.break_fetch_burst <<= (self.output_port.valid & self.output_port.ready) & (exec_unit == op_class.ld_st)
-
+        self.break_fetch_burst <<= (self.output_port.valid & self.output_port.ready) & (self.intermediate_value_for_EXEC_UNIT == op_class.ld_st)
 
 
 
@@ -863,19 +879,19 @@ def gen():
 
     netlist = Build.generate_rtl(top, "decode.sv")
     top_level_name = netlist.get_module_class_name(netlist.top_level)
-    #top_level_name = "DecodeStage"
-    #flow = QuartusFlow(
-    #    target_dir="q_decode",
-    #    top_level=top_level_name,
-    #    source_files=("decode.sv",),
-    #    clocks=(("clk", 10),),# ("top_clk", 100)),
-    #    project_name="decode",
-    #    no_timing_report_clocks="clk",
-    #    family="MAX 10",
-    #    device="10M50DAF672C7G" # Something large with a ton of pins
-    #)
-    #flow.generate()
-    #flow.run()
+    top_level_name = "DecodeStage"
+    flow = QuartusFlow(
+        target_dir="q_decode",
+        top_level=top_level_name,
+        source_files=("decode.sv",),
+        clocks=(("clk", 10),),# ("top_clk", 100)),
+        project_name="decode",
+        no_timing_report_clocks="clk",
+        family="MAX 10",
+        device="10M50DAF672C7G" # Something large with a ton of pins
+    )
+    flow.generate()
+    flow.run()
 
 if __name__ == "__main__":
     gen()
