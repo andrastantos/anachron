@@ -283,7 +283,7 @@ def sim():
             self.exec_emulator = ExecEmulator(exec_exp_queue)
             self.fetch_emulator = FetchEmulator(exec_exp_queue, self.exec_emulator.set_wait_range, self.reg_file_emulator.set_wait_range)
 
-            self.dut = DecodeStage(use_mini_table=False)
+            self.dut = DecodeStage(use_mini_table=False, support_exc_unknown_inst=True)
 
             self.dut.fetch <<= self.fetch_emulator.fetch
 
