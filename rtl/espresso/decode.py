@@ -505,13 +505,22 @@ class DecodeStage(GenericModule):
 
     break_fetch_burst = Output(logic)
 
-    def construct(self, has_multiply: bool = True, has_shift: bool = True, use_mini_table: bool = False, use_decode_rom: bool = False, register_mask_signals: bool = False):
+    def construct(
+        self,
+        has_multiply: bool = True,
+        has_shift: bool = True,
+        use_mini_table: bool = False,
+        use_decode_rom: bool = False,
+        register_mask_signals: bool = False,
+        support_exc_unknown_inst: bool = False
+    ):
         self.has_multiply = has_multiply
         self.has_shift = has_shift
         self.use_mini_table = use_mini_table
         assert not use_decode_rom, "ROM decoders are not supported at the moment. See notes at the top of decode.py"
         self.use_decode_rom = use_decode_rom
         self.register_mask_signals = register_mask_signals
+        self.support_exc_unknown_inst = support_exc_unknown_inst
 
     def body(self):
         # We're not being very nice with Silicons' type system: we have a bunch of unsigned types
@@ -799,6 +808,9 @@ class DecodeStage(GenericModule):
             ( "  3fef: $tpc <- MEM32[FIELD_E]",       oc.branch_ind, None,       None,        bo.tpc_w_ind,lo.load,       None,           None,               None,          None,            0,                   buf_field_e,      a32,    0,  0,  0,  0,  0 ),
             ( "  4fef: call MEM32[FIELD_E]",          oc.branch_ind, None,       None,        bo.pc_w_ind, lo.load,       None,           None,               REG_SP,        None,            0,                   buf_field_e,      a32,    0,  0,  0,  0,  0 ),
         )
+        unknown_inst_fields = (
+              None,                                   oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          exceptions.exc_unknown_inst,None,     None,             None,None,None,None,None,None
+        )
 
         def is_mini_set(full_mask:str) -> bool:
             return full_mask.strip()[0] == "$"
@@ -1042,16 +1054,21 @@ class DecodeStage(GenericModule):
                 rf_valid_selectors.append(valid_selector)
 
         # For each group, find the selector with the most conditions and create a default state for them
-        for output_selector in output_selectors:
-            default_cnt = -1
-            default_key = None
-            for selector_key, selector_desc in output_selector.selectors.items():
-                if len(selector_desc.masks) > default_cnt:
-                    default_cnt = len(selector_desc.masks)
-                    default_key = selector_key
-            if default_cnt > 1:
-                output_selector.default_value = default_key
-                del output_selector.selectors[default_key]
+        # However we can only pull this trick if we don't need to support 'exc_unknown_inst' exceptions.
+        # If we did, let's insert the handling of that as the default value
+        for output_selector, unk_val in zip(output_selectors, unknown_inst_fields[1:]):
+            if self.support_exc_unknown_inst and unk_val is not None:
+                output_selector.default_value = unk_val
+            else:
+                default_cnt = -1
+                default_key = None
+                for selector_key, selector_desc in output_selector.selectors.items():
+                    if len(selector_desc.masks) > default_cnt:
+                        default_cnt = len(selector_desc.masks)
+                        default_key = selector_key
+                if default_cnt > 1:
+                    output_selector.default_value = default_key
+                    del output_selector.selectors[default_key]
 
         # Merge valid selectors into output_selectors
         output_selectors += rf_valid_selectors
@@ -1151,7 +1168,7 @@ class DecodeStage(GenericModule):
 def gen():
     def top():
         #return ScanWrapper(DecodeStage, {"clk", "rst"})
-        return DecodeStage(use_mini_table = False, use_decode_rom = False)
+        return DecodeStage(support_exc_unknown_inst = True)
 
     netlist = Build.generate_rtl(top, "decode.sv")
     top_level_name = netlist.get_module_class_name(netlist.top_level)
