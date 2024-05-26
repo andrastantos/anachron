@@ -21,7 +21,8 @@ except ImportError:
     from synth import *
 
 """
-In V1, fetch works from a 16-bit read port: it gets (up to) 16-bits of data at a time.
+In Espresso, fetch works from a 16-bit read port: it gets (up to) 16-bits of
+data at a time.
 
 It constructs full instructions and supplies them to decode.
 
@@ -29,11 +30,13 @@ We don't do any branch-prediction, or to be more precise, we're following
 straight-line execution, until told otherwise.
 
 We don't support any prefix instructions or extension groups either.
-As such, the maximum instruction length is 48 bits and can always be decoded by looking
-at the first 16-bits of the instruction field.
+As such, the maximum instruction length is 48 bits and can always be decoded
+by looking at the first 16-bits of the instruction field.
 
 The composition of fetch comes from 3 modules:
-
+- InstBuffer
+- InstQueue
+- InstAssemble
 """
 
 """
@@ -42,13 +45,6 @@ NOTES: On the BusIf, there's no way to cancel a request: once it's out, it's out
        has two implications:
        1. We need to keep 'request' active until 'response' comes back.
        2. We need to throw away data during flushing
-
-Things to test:
-- Cancellation in all stages of a fetch
-    - Cancelling in the same cycle we issue a request is busted: we update ADDR from the request,
-      but cancel the first burst, so we start to fetch from the wrong address.
-- Test all sorts of invalid instruction sequences.
-- Bursts through a page boundary
 
 NOTE: Fetch as-is now has a minimum 4-cycle latency:
     1 cycle to initiate the bus request
@@ -59,38 +55,30 @@ NOTE: Fetch as-is now has a minimum 4-cycle latency:
 """
 Branch handling:
 
-do_branch is a global signal, that is registered at the output of 'execute'. This goes high for one cycle, signalling that
-a new (non-consecutive, that is) address was loaded into $scp or $tcp or task_mode was changed. The new value of these
-registers gets latched on the same clock cycle when do_branch goes high.
+do_branch is a global signal, that is registered at the output of 'execute'.
+This goes high for one cycle, signalling that a new (non-consecutive, that is)
+address was loaded into $scp or $tcp or task_mode was changed. The new value of
+these registers gets latched on the same clock cycle when do_branch goes high.
 
-What needs to happen is that we need to cancel all in-process instructions and restart fetching from the new execution point.
+What needs to happen is that we need to cancel all in-process instructions and
+restart fetching from the new execution point.
 
-1. Execute will not pass the branching instruction to memory. If there is a reservation (such as an AV in a load), it *does*
-   pass a fake resoult over that clears the reservation.
-2. Execute accepts the next instruction (if any), but cancells it. The way to do that is to override the output to be a simple
-   pass-through for memory with write-enable disabled, so no actual change to the target register will occur, but the reservation
-   gets deleted. TODO: the RF supports this, but memory/exec not yet.
-3. Decode will also accept the next instruction (if any), it will however not attempt any reservations and won't pass it to execute either.
+1. Execute will not pass the branching instruction to memory. If there is a
+   reservation (such as an AV in a load), it *does* pass a fake result over
+   that clears the reservation.
+2. Execute accepts the next instruction (if any), but cancels it. The way to do
+   that is to override the output to be a simple pass-through for memory with
+   write-enable disabled, so no actual change to the target register will occur,
+   but the reservation gets deleted.
+   TODO: the RF supports this, but memory/exec not yet.
+3. Decode will also accept the next instruction (if any), it will however not
+   attempt any reservations and won't pass it to execute either.
    TODO: decode doesn't actually do any of this yet.
-4. inst_assemble will also accept the next 16-bits from the fetch queue, but will delete and restart
-5. inst_queue will take the next word, but will reset after.
-6. inst_buffer might push one word into the queue, but will cancel subsequent responses from the bus_if, even if they were already queued up.
-
-TODO: should we consider simply cancelling all reservations in the RF upon a branch? The danger is the following:
-   1. We have a loooong oustanding load.
-   2. The next instruction is a branch that ... well, branches
-   3. The first instruction at the branch target is something that depends on the target register of the load.
-   We are lucky though: since the load hugs the bus, fetch will not succeed until the load returns the result, so by the time
-   the fetched instruction winds its way through fetch, the results are safely in the RF. This is very brittle though and the
-   first time we introduce an instruction buffer or some sort of a cache, the assumption is not valid anymore and I would wind up
-   with an extremely hard to find heisen-bug.
-
-   So, I'm not going to depend on this behavior.
-
-TODO: yet another alternative is that we artificially hold off fetch with outstanding loads during a branch. That would mean exposing
-   another wire, called 'doing_load' or something that is incorporated into the branch handling logic.
-
-OVERALL: I think I'm going to stick with the fake write-back idea: that seems relatively clean at least.
+4. InstAssemble will also accept the next 16-bits from the fetch queue, but
+   will delete and restart
+5. InstQueue will take the next word, but will reset after.
+6. InstBuffer might push one word into the queue, but will cancel subsequent
+   responses from the bus_if, even if they were already queued up.
 """
 class FetchQueueIf(ReadyValid):
     data = Unsigned(16)
@@ -106,18 +94,22 @@ def truncate_queue_ptr(ptr):
     return ptr[QueuePointerType.get_length()-1:0]
 class InstBuffer(GenericModule):
     """
-    This module deals with the interfacing to the bus interface and generating an instruction word stream for the fetch stage.
+    This module deals with the interfacing to the bus interface and generating
+    an instruction word stream for the fetch stage.
 
-    Here, all we care about is to generate requests to the bus interface and stuff the responses into the queue.
+    Here, all we care about is to generate requests to the bus interface and
+    stuff the responses into the queue.
 
-    We will try to generate long bursts, but keep count of how many requests we've sent out to ensure the
-    queue won't overflow, should we get all the responses back. We also make sure that we won't hold the bus
-    for too long, limiting our bursts to the size of the free queue.
+    We will try to generate long bursts, but keep count of how many requests
+    we've sent out to ensure the queue won't overflow, should we get all the
+    responses back. We also make sure that we won't hold the bus for too long,
+    limiting our bursts to the size of the free queue.
 
-    To simplify implementation, we won't start a new request, until the queue is at least half empty, but we don't
-    monitor subsequent pops from the queue.
+    To simplify implementation, we won't start a new request, until the queue
+    is at least half empty, but we don't monitor subsequent pops from the queue.
 
-    We also of course have to pay attention to branches and restart ourselves as needed.
+    We also of course have to pay attention to branches and restart ourselves as
+    needed.
     """
     clk = ClkPort()
     rst = RstPort()
