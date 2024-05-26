@@ -215,7 +215,7 @@ Learnings
 =========
 
 - A 32-bit adder in a MAX10 is border-line too big to close timing at a 100MHz
-- Two large-ish adders certainly don't fit (LoadStoreUnit)
+- Two large-ish adders certainly don't fit (AddrCalcUnit)
 - Muxes to select from registers are also problematic (RegFile)
 - The optimizer is relatively good at finding optimal logic, or at least describing the same logic in alternate forms doesn't really impress it one way or another.
 - Larger designs are slower, potentially significantly then it's components. That's especially true for signals crossing unit-boundaries. This can probably be mitigated somewhat by religiously registering every signal on component boundaries.

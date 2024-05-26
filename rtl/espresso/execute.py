@@ -8,12 +8,22 @@ try:
     from .memory import MemoryStage
     from .scan import ScanWrapper
     from .synth import *
+    from .exec_alu import *
+    from .exec_shifter import *
+    from .exec_addr_calc import *
+    from .exec_mult import *
+    from .exec_branch_target import *
 except ImportError:
     from brew_types import *
     from brew_utils import *
     from memory import MemoryStage
     from scan import ScanWrapper
     from synth import *
+    from exec_alu import *
+    from exec_shifter import *
+    from exec_addr_calc import *
+    from exec_mult import *
+    from exec_branch_target import *
 
 """
 Execute stage of the V1 pipeline.
@@ -58,170 +68,6 @@ any instruction that leaks through from cycle-1.
 #TIMING_CLOSURE_REG = Reg
 TIMING_CLOSURE_REG = lambda x:x
 
-class ExecUnitResultIf(Interface):
-    result = BrewData
-
-
-class AluInputIf(Interface):
-    opcode = EnumNet(alu_ops)
-    op_a = BrewData
-    op_b = BrewData
-    pc = BrewInstAddr
-    tpc = BrewInstAddr
-
-class AluOutputIf(Interface):
-    result = BrewData
-    f_zero = logic
-    f_sign  = logic
-    f_carry = logic
-    f_overflow = logic
-
-class AluUnit(Module):
-    clk = ClkPort()
-    rst = RstPort()
-
-    input_port = Input(AluInputIf)
-    output_port = Output(AluOutputIf)
-
-    OPTIMIZED = True
-    def body(self):
-        if self.OPTIMIZED:
-            c_in = Wire(logic)
-            c_in <<= (self.input_port.opcode == alu_ops.a_minus_b)
-            xor_b = Wire(BrewData)
-            xor_b <<= Select((self.input_port.opcode == alu_ops.a_minus_b), 0, 0xffffffff)
-            b = xor_b ^ self.input_port.op_b
-            a = Select((self.input_port.opcode == alu_ops.pc_plus_b), self.input_port.op_a, concat(self.input_port.pc, "1'b0"))
-            sum = a + b + c_in
-            and_result = a & b
-            xor_result = self.input_port.op_a ^ self.input_port.op_b
-
-            use_adder = (self.input_port.opcode == alu_ops.a_plus_b) | (self.input_port.opcode == alu_ops.a_minus_b)
-            use_and = (self.input_port.opcode == alu_ops.a_and_b)
-            adder_result = Wire(Unsigned(33))
-            adder_result <<= SelectOne(
-                use_adder,                                      sum,
-                self.input_port.opcode == alu_ops.a_or_b,       self.input_port.op_a | self.input_port.op_b,
-                use_and,                                        and_result,
-                self.input_port.opcode == alu_ops.a_xor_b,      xor_result,
-                self.input_port.opcode == alu_ops.tpc,          concat(self.input_port.tpc, "1'b0"),
-                self.input_port.opcode == alu_ops.pc_plus_b,    sum,
-            )
-
-            self.output_port.result <<= adder_result[31:0]
-            #self.output_port.f_zero <<= adder_result[31:0] == 0
-            self.output_port.f_zero <<= xor_result == 0
-            self.output_port.f_sign <<= adder_result[31]
-            self.output_port.f_carry <<= adder_result[32] ^ (self.input_port.opcode == alu_ops.a_minus_b)
-            # overflow for now is only valid for a_minus_b
-            # See https://en.wikipedia.org/wiki/Overflow_flag for details
-            self.output_port.f_overflow <<= (self.input_port.op_a[31] != self.input_port.op_b[31]) & (self.input_port.op_a[31] != adder_result[31])
-        else:
-            adder_result = Wire(Unsigned(33))
-            adder_result <<= SelectOne(
-                self.input_port.opcode == alu_ops.a_plus_b,     (self.input_port.op_a + self.input_port.op_b),
-                self.input_port.opcode == alu_ops.a_minus_b,    Unsigned(33)(self.input_port.op_a - self.input_port.op_b),
-                self.input_port.opcode == alu_ops.a_or_b,       self.input_port.op_a | self.input_port.op_b,
-                self.input_port.opcode == alu_ops.a_and_b,      self.input_port.op_a & self.input_port.op_b,
-                self.input_port.opcode == alu_ops.a_xor_b,      self.input_port.op_a ^ self.input_port.op_b,
-                self.input_port.opcode == alu_ops.tpc,          concat(self.input_port.tpc, "1'b0"),
-                self.input_port.opcode == alu_ops.pc_plus_b,    concat(self.input_port.pc, "1'b0") + self.input_port.op_b,
-            )
-
-            self.output_port.result <<= adder_result[31:0]
-            self.output_port.f_zero <<= adder_result[31:0] == 0
-            self.output_port.f_sign <<= adder_result[31]
-            self.output_port.f_carry <<= adder_result[32]
-            # overflow for now is only valid for a_minus_b
-            # See https://en.wikipedia.org/wiki/Overflow_flag for details
-            self.output_port.f_overflow <<= (self.input_port.op_a[31] != self.input_port.op_b[31]) & (self.input_port.op_a[31] != adder_result[31])
-
-
-class ShifterInputIf(Interface):
-    opcode = EnumNet(shifter_ops)
-    op_a = BrewData
-    op_b = BrewData
-
-class ShifterOutputIf(Interface):
-    result = BrewData
-
-class ShifterUnit(Module):
-    clk = ClkPort()
-    rst = RstPort()
-
-    input_port = Input(ShifterInputIf)
-    output_port = Output(ShifterOutputIf)
-
-    def body(self):
-        # TODO: this can be optimized quite a bit. As of now, we instantiate 3 barrel shifters
-        self.signed_a = Signed(32)(self.input_port.op_a)
-        shifter_result = SelectOne(
-            self.input_port.opcode == shifter_ops.shll, self.input_port.op_a << self.input_port.op_b[4:0],
-            self.input_port.opcode == shifter_ops.shlr, self.input_port.op_a >> self.input_port.op_b[4:0],
-            self.input_port.opcode == shifter_ops.shar, self.signed_a >> self.input_port.op_b[4:0],
-        )[31:0]
-
-        self.output_port.result <<= shifter_result
-
-
-class MultInputIf(Interface):
-    valid = logic
-    op_a = BrewData
-    op_b = BrewData
-
-class MultOutputIf(Interface):
-    result = BrewData
-
-class MultUnit(Module):
-    clk = ClkPort()
-    rst = RstPort()
-
-    input_port = Input(MultInputIf)
-    output_port = Output(MultOutputIf)
-
-    OPTIMIZED = True
-    def body(self):
-        if self.OPTIMIZED:
-            partial_11 = (self.input_port.op_a[15: 0] * self.input_port.op_b[15: 0])
-            partial_12 = (self.input_port.op_a[31:16] * self.input_port.op_b[15: 0])[15:0]
-            partial_21 = (self.input_port.op_a[15: 0] * self.input_port.op_b[31:16])[15:0]
-            s1_partial_11 = Reg(partial_11, clock_en = self.input_port.valid)
-            s1_partial_12 = Reg(partial_12, clock_en = self.input_port.valid)
-            s1_partial_21 = Reg(partial_21, clock_en = self.input_port.valid)
-            mult_result = (s1_partial_11 + concat(s1_partial_12+s1_partial_21, "16'b0"))[31:0]
-        else:
-            op_a = Select(self.input_port.valid, Reg(self.input_port.op_a, clock_en = self.input_port.valid), self.input_port.op_a)
-            op_b = Select(self.input_port.valid, Reg(self.input_port.op_b, clock_en = self.input_port.valid), self.input_port.op_b)
-            mult_result_large = op_a * op_b
-            mult_result = mult_result_large[31:0]
-
-        self.output_port.result <<= mult_result
-
-
-class BranchTargetUnitInputIf(Interface):
-    op_c       = BrewData
-    pc         = BrewInstAddr
-    inst_len   = Unsigned(2) # 0: single-beat, 1: two-beat, 3: 4-beat
-
-class BranchTargetUnitOutputIf(Interface):
-    branch_addr = BrewInstAddr
-    straight_addr = BrewInstAddr
-
-class BranchTargetUnit(Module):
-
-    input_port = Input(BranchTargetUnitInputIf)
-    output_port = Output(BranchTargetUnitOutputIf)
-
-    def body(self):
-        def unmunge_offset(offset):
-            return concat(
-                offset[0], offset[0], offset[0], offset[0], offset[0], offset[0], offset[0], offset[0],
-                offset[0], offset[0], offset[0], offset[0], offset[0], offset[0], offset[0], offset[0],
-                offset[15:1]
-            )
-        offset = unmunge_offset(self.input_port.op_c)
-        self.output_port.branch_addr   <<= (self.input_port.pc + offset)[30:0]
-        self.output_port.straight_addr <<= (self.input_port.pc + self.input_port.inst_len + 1)[30:0]
 
 
 class BranchUnitInputIf(Interface):
@@ -371,54 +217,6 @@ class BranchUnit(Module):
 
 
 
-
-
-class LoadStoreInputIf(Interface):
-    is_ldst = logic
-    op_b = BrewData
-    op_c = BrewData
-    mem_base = BrewMemBase
-    mem_limit = BrewMemBase
-    task_mode = logic
-    mem_access_len = Unsigned(2) # 0: 8-bit, 1: 16-bit, 2: 32-bit
-    is_csr = logic
-
-class LoadStoreOutputIf(Interface):
-    phy_addr = BrewAddr
-    eff_addr = BrewAddr
-    mem_av = logic
-    mem_unaligned = logic
-    is_csr = logic
-
-class LoadStoreUnit(Module):
-    clk = ClkPort()
-    rst = RstPort()
-
-    input_port = Input(LoadStoreInputIf)
-    output_port = Output(LoadStoreOutputIf)
-
-    def body(self):
-        eff_addr = TIMING_CLOSURE_REG((self.input_port.op_b + self.input_port.op_c)[31:0])
-        phy_addr = Select(
-            self.input_port.is_csr,
-            get_phy_addr(eff_addr, Select(self.input_port.task_mode, 0, self.input_port.mem_base)),
-            concat(self.input_port.op_c[15:0], "2'b00") | Select(self.input_port.task_mode, 0, 0x20000),
-        )
-
-        mem_av = self.input_port.task_mode & self.input_port.is_ldst & is_over_limit(eff_addr, self.input_port.mem_limit) & ~self.input_port.is_csr
-        mem_unaligned = ~self.input_port.is_csr & self.input_port.is_ldst & Select(self.input_port.mem_access_len,
-            0, # 8-bit access is always aligned
-            eff_addr[0], # 16-bit access is unaligned if LSB is non-0
-            eff_addr[0] | eff_addr[1], # 32-bit access is unaligned if lower two bits are non-0
-            1 # This is an invalid length
-        )
-
-        self.output_port.phy_addr <<= phy_addr
-        self.output_port.eff_addr <<= eff_addr
-        self.output_port.mem_av <<= mem_av
-        self.output_port.mem_unaligned <<= mem_unaligned
-        self.output_port.is_csr <<= self.input_port.is_csr
-
 class ExecuteStage(GenericModule):
     clk = ClkPort()
     rst = RstPort()
@@ -498,8 +296,8 @@ class ExecuteStage(GenericModule):
 
 
         # Load-store
-        ldst_output = Wire(LoadStoreOutputIf)
-        ldst_unit = LoadStoreUnit()
+        ldst_output = Wire(AddrCalcOutputIf)
+        ldst_unit = AddrCalcUnit()
         ldst_unit.input_port.is_ldst        <<= (self.input_port.exec_unit == op_class.ld_st) | (self.input_port.exec_unit == op_class.branch_ind)
         ldst_unit.input_port.is_csr         <<= (self.input_port.ldst_op == ldst_ops.csr_load) | (self.input_port.ldst_op == ldst_ops.csr_store)
         ldst_unit.input_port.op_b           <<= self.input_port.op_b
@@ -509,7 +307,7 @@ class ExecuteStage(GenericModule):
         ldst_unit.input_port.task_mode      <<= self.task_mode_in
         ldst_unit.input_port.mem_access_len <<= self.input_port.mem_access_len
         ldst_output <<= ldst_unit.output_port
-        s1_ldst_output = Wire(LoadStoreOutputIf)
+        s1_ldst_output = Wire(AddrCalcOutputIf)
         s1_ldst_output <<= Reg(ldst_output, clock_en = stage_1_reg_en)
 
 
