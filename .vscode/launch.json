@@ -96,5 +96,23 @@
             "cwd": "${workspaceFolder}/rtl/espresso/test",
             "justMyCode": false,
         },
+        {
+            "name": "ESPRESSO execute GEN",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "execute.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/rtl/espresso",
+            "justMyCode": false,
+        },
+        {
+            "name": "ESPRESSO execute TB",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "execute_tb.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/rtl/espresso/test",
+            "justMyCode": false,
+        },
     ]
 }

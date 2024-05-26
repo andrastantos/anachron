@@ -559,6 +559,7 @@ class DecodeStage(GenericModule):
             sign_extend_to(buf_fetch.inst_1, 32),
             concat(buf_fetch.inst_2, buf_fetch.inst_1)
         )
+        buf_swi_code = buf_field_d | 0x20 # SWI exception codes are not exactly the same as field_d
 
         buf_field_a_is_f = Reg(pre_field_a_is_f, clock_en=buf_en)
         buf_field_b_is_f = Reg(pre_field_b_is_f, clock_en=buf_en)
@@ -662,14 +663,14 @@ class DecodeStage(GenericModule):
             *mult_ops,
             #  Number of bits needed:                     3         3              2            4           2              2                2                   1              3               3                    2                  2     1   1   1   1   1
             #  Exception group                       EXEC_UNIT    ALU_OP        SHIFTER_OP   BRANCH_OP    LDST_OP        RD1_ADDR        RD2_ADDR            RSV_ADDR       OP_A             OP_B                 OP_C              MEM_LEN BSE WSE BZE WZE WOI
-            ( "$ 0000: SWI_0",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_field_d,     None,                None,             None,   0,  0,  0,  0,  0 ),
-            ( "$ 1000: SWI_1",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_field_d,     None,                None,             None,   0,  0,  0,  0,  0 ),
-            ( "$ 2000: SWI_2",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_field_d,     None,                None,             None,   0,  0,  0,  0,  0 ),
-            ( "$ 3000: SWI_3",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_field_d,     None,                None,             None,   0,  0,  0,  0,  0 ),
-            ( "$ 4000: SWI_4",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_field_d,     None,                None,             None,   0,  0,  0,  0,  0 ),
-            ( "$ 5000: SWI_5",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_field_d,     None,                None,             None,   0,  0,  0,  0,  0 ),
-            ( "$ 6000: SWI_6",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_field_d,     None,                None,             None,   0,  0,  0,  0,  0 ),
-            ( "$ 7000: SWI_7",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_field_d,     None,                None,             None,   0,  0,  0,  0,  0 ),
+            ( "$ 0000: SWI_0",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_swi_code,    None,                None,             None,   0,  0,  0,  0,  0 ),
+            ( "$ 1000: SWI_1",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_swi_code,    None,                None,             None,   0,  0,  0,  0,  0 ),
+            ( "$ 2000: SWI_2",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_swi_code,    None,                None,             None,   0,  0,  0,  0,  0 ),
+            ( "$ 3000: SWI_3",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_swi_code,    None,                None,             None,   0,  0,  0,  0,  0 ),
+            ( "$ 4000: SWI_4",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_swi_code,    None,                None,             None,   0,  0,  0,  0,  0 ),
+            ( "$ 5000: SWI_5",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_swi_code,    None,                None,             None,   0,  0,  0,  0,  0 ),
+            ( "$ 6000: SWI_6",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_swi_code,    None,                None,             None,   0,  0,  0,  0,  0 ),
+            ( "$ 7000: SWI_7",                        oc.branch,   None,         None,        bo.swi,      None,          None,           None,               None,          buf_swi_code,    None,                None,             None,   0,  0,  0,  0,  0 ),
             ( "  8000: STM",                          oc.branch,   None,         None,        bo.stm,      None,          None,           None,               None,          None,            None,                None,             None,   0,  0,  0,  0,  0 ),
             ( "  9000: WOI",                          oc.branch,   ao.a_minus_b, None,        bo.cb_eq,    None,          pre_field_a,    pre_field_b,        None,          reg_val_a,       reg_val_b,           0,                None,   0,  0,  0,  0,  1 ), # Decoded as 'if $0 == $0 $pc <- $pc'
             ( "  a000: PFLUSH",                       oc.branch,   ao.a_minus_b, None,        bo.cb_ne,    None,          pre_field_a,    pre_field_b,        None,          reg_val_a,       reg_val_b,           0,                None,   0,  0,  0,  0,  0 ), # Decoded as 'if $0 != $0 $pc <- $pc'

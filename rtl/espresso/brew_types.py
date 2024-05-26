@@ -48,8 +48,6 @@ class shifter_ops(Enum):
     shar     = 2
 
 class branch_ops(Enum):
-    unknown   = 0
-
     cb_eq     = 1
     cb_ne     = 2
     cb_lts    = 3
