@@ -19,15 +19,15 @@ class MultInputIf(Interface):
     op_a = BrewData
     op_b = BrewData
 
-class MultOutputIf(Interface):
-    result = BrewData
+#class MultOutputIf(Interface):
+#   result = BrewData
 
 class MultUnit(Module):
     clk = ClkPort()
     rst = RstPort()
 
     input_port = Input(MultInputIf)
-    output_port = Output(MultOutputIf)
+    output_port = Output(BrewData)
 
     OPTIMIZED = True
     def body(self):
@@ -45,7 +45,7 @@ class MultUnit(Module):
             mult_result_large = op_a * op_b
             mult_result = mult_result_large[31:0]
 
-        self.output_port.result <<= mult_result
+        self.output_port <<= mult_result
 
 
 def gen():

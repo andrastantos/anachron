@@ -13,6 +13,7 @@ try:
     from .exec_addr_calc import *
     from .exec_mult import *
     from .exec_branch_target import *
+    from .exec_branch import *
 except ImportError:
     from brew_types import *
     from brew_utils import *
@@ -24,6 +25,7 @@ except ImportError:
     from exec_addr_calc import *
     from exec_mult import *
     from exec_branch_target import *
+    from exec_branch import *
 
 """
 Execute stage of the V1 pipeline.
@@ -42,18 +44,18 @@ It does the following:
 
     <- cycle 1 -> <- cycle 2 ->
 
+    +-----------+
+    |    ALU    |
+    +-----------+
     +-----------+ +-----------+
-    |    ALU    | |   Branch  |
-    +-----------+ |           |
-    +-----------+ |           |
-    | Br. Trgt. | |           |
+    | Br. Trgt. | |   Branch  |
     +-----------+ +-----------+
     +-----------+ +-----------+
-    |    LDST   | |   Memory  |
+    | addr-gen  | |   Memory  |
     +-----------+ +-----------+
-    +-------------------------+
-    |         Shifter         |
-    +-------------------------+
+    +-----------+
+    |  Shifter  |
+    +-----------+
     +-------------------------+
     |        Multilper        |
     +-------------------------+
@@ -63,159 +65,392 @@ though the branch target address is calculated in cycle-1. This means that cycle
 executes the instruction in a branch-shadow, if there were no bubbles in the pipeline.
 There is logic in cycle-2 to remember a branch from the previous cycle and cancel
 any instruction that leaks through from cycle-1.
+
+OK, so this is silly. What I should be doing is to build multi-cycle execution
+units, just as with multiply. So, branch target and branch should be just one
+unit, just like address calculation and memory.
+
+or... maybe not. Yet, the interfaces should flow-through, no bypass info.
+
+The counter-argument of course is stageing register reuse. This argument can
+certainly be made for ALU and shifter.
+
+OK, so address calc and branch should certainly be more integrated: a lot
+of calculation for branch can be pre-loaded in which case registers could be
+saved.
 """
 
-#TIMING_CLOSURE_REG = Reg
-TIMING_CLOSURE_REG = lambda x:x
+class Exec12If(ReadyValid):
+    ################ ALU/SHIFT/MULT
+    result                  = BrewData
+    f_zero                  = logic
+    f_sign                  = logic
+    f_carry                 = logic
+    f_overflow              = logic
+    is_mult_op              = logic
+    ################ ADDR CALC
+    phy_addr                = BrewAddr
+    eff_addr                = BrewAddr
+    mem_av                  = logic
+    mem_unaligned           = logic
+    is_csr                  = logic
+    ################ BRANCH TARGET
+    branch_addr             = BrewInstAddr
+    straight_addr           = BrewInstAddr
+    ################ BRANCH INPUT
+    branch_op               = EnumNet(branch_ops)
+    is_branch_ind           = logic
+    op_a                    = BrewData # Can we move this to stage 1? For now let's keep it here...
+    bit_test_bit            = logic
+    spc                     = BrewInstAddr
+    tpc                     = BrewInstAddr
+    task_mode               = logic
+    fetch_av                = logic # Coming all the way from fetch: if the instruction gotten this far, we should raise the exception
+    mem_av                  = logic # Coming from the load-store unit if that figures out an exception
+    mem_unaligned           = logic # Coming from the load-store unit if an unaligned access was attempted
+    is_branch_insn          = logic
+    woi                     = logic
+    ################ MEMORY INPUT
+    read_not_write          = logic
+    access_len              = Unsigned(2) # 0 for 8-bit, 1 for 16-bit, 2 for 32-bit
+    is_mem_op               = logic
+    ################ WRITE-BACK GENERATION
+    result_reg_addr         = BrewRegAddr
+    result_reg_addr_valid   = logic
+    do_bse                  = logic
+    do_wse                  = logic
+    do_bze                  = logic
+    do_wze                  = logic
 
+class ExecStage1(GenericModule):
+    clk = ClkPort()
+    rst = RstPort()
 
+    # Pipeline input
+    input_port = Input(DecodeExecIf)
 
-class BranchUnitInputIf(Interface):
-    opcode          = EnumNet(branch_ops)
-    op_a            = BrewData
-    op_b            = BrewData
-    #pc              = BrewInstAddr
-    spc             = BrewInstAddr
-    tpc             = BrewInstAddr
-    #op_c            = BrewData
-    task_mode       = logic
-    branch_addr     = BrewInstAddr
-    interrupt       = logic
-    fetch_av        = logic # Coming all the way from fetch: if the instruction gotten this far, we should raise the exception
-    mem_av          = logic # Coming from the load-store unit if that figures out an exception
-    mem_unaligned   = logic # Coming from the load-store unit if an unaligned access was attempted
-    f_zero          = logic
-    f_sign          = logic
-    f_carry         = logic
-    f_overflow      = logic
-    is_branch_insn  = logic
-    woi             = logic
+    # Pipeline output
+    output_port = Output(Exec12If)
 
-class BranchUnitOutputIf(Interface):
-    spc                       = BrewInstAddr
-    spc_changed               = logic
-    tpc                       = BrewInstAddr
-    tpc_changed               = logic
-    task_mode                 = logic
-    task_mode_changed         = logic
-    ecause                    = EnumNet(exceptions)
-    is_exception              = logic
-    is_exception_or_interrupt = logic
-    do_branch                 = logic
+    # Multiplier output
+    mult_result = Output(BrewData) # This is needed separately due to the internal pipelining of the multiplier
 
-class BranchUnit(Module):
+    # side-band interfaces
+    mem_base = Input(BrewMemBase)
+    mem_limit = Input(BrewMemBase)
+    spc_in  = Input(BrewInstAddr)
+    tpc_in  = Input(BrewInstAddr)
+    task_mode_in  = Input(logic)
+    do_branch_immediate = Input(logic) # This is the unregistered version, not the one that all other stages use
+    do_branch = Input(logic) # This is the regular, registered version
 
-    input_port = Input(BranchUnitInputIf)
-    output_port = Output(BranchUnitOutputIf)
+    def construct(self, has_multiply: bool = True, has_shift: bool = True):
+        self.has_multiply = has_multiply
+        self.has_shift = has_shift
 
     def body(self):
-        @module(1)
-        def bb_get_bit(word, bit_code):
-            return SelectOne(
-                bit_code == 0,  word[0],
-                bit_code == 1,  word[1],
-                bit_code == 2,  word[2],
-                bit_code == 3,  word[3],
-                bit_code == 4,  word[4],
-                bit_code == 5,  word[5],
-                bit_code == 6,  word[6],
-                bit_code == 7,  word[7],
-                bit_code == 8,  word[8],
-                bit_code == 9,  word[9],
-                bit_code == 10, word[14],
-                bit_code == 11, word[15],
-                bit_code == 12, word[16],
-                bit_code == 13, word[30],
-                bit_code == 14, word[31],
+        # We have two stages in one, really here
+
+        input_buf = ForwardBuf()
+        input_buf_en = input_buf.out_reg_en
+
+        reg_input_port = Wire(DecodeExecIf)
+        reg_input_port <<= input_buf(self.input_port)
+
+        # Have to capture all the side-band ports that are needed in stage 2:
+        # SPC/TPC all the others are stage-1 relative
+        # TODO: do we? I'm not actually certain now that we register the input into stages...
+        reg_tpc = Reg(self.tpc_in, clock_en=input_buf_en)
+        reg_spc = Reg(self.spc_in, clock_en=input_buf_en)
+        reg_task_mode = Reg(self.task_mode_in, clock_en=input_buf_en)
+        reg_pc = Select(reg_task_mode, reg_spc, reg_tpc)
+
+        # Handshake
+        # TODO: not sure about the double-clear here: we clear stage 1 for two cycles on a branch...
+        reg_input_port.ready <<= self.do_branch_immediate | self.do_branch | self.output_port.ready
+        self.output_port.valid <<= reg_input_port.valid & ~ self.do_branch
+
+        # ALU
+        alu_output = Wire(AluOutputIf)
+        alu_unit = AluUnit()
+        alu_unit.input_port.opcode <<= reg_input_port.alu_op
+        alu_unit.input_port.op_a   <<= reg_input_port.op_a
+        alu_unit.input_port.op_b   <<= reg_input_port.op_b
+        alu_unit.input_port.pc     <<= reg_pc
+        alu_unit.input_port.tpc    <<= reg_tpc
+        alu_output <<= alu_unit.output_port
+
+        # Shifter
+        if self.has_shift:
+            shifter_output = Wire(ShifterOutputIf)
+            shifter_unit = ShifterUnit()
+            shifter_unit.input_port.opcode <<= reg_input_port.shifter_op
+            shifter_unit.input_port.op_a   <<= reg_input_port.op_a
+            shifter_unit.input_port.op_b   <<= reg_input_port.op_b
+            shifter_output <<= shifter_unit.output_port
+
+        # Multiplier (this unit has internal pipelining)
+        if self.has_multiply:
+            mult_unit = MultUnit()
+            mult_unit.input_port.valid  <<= input_buf_en
+            mult_unit.input_port.op_a   <<= reg_input_port.op_a
+            mult_unit.input_port.op_b   <<= reg_input_port.op_b
+            self.mult_result <<= mult_unit.output_port
+
+        # Physical and effective address calculation
+        addr_calc_output = Wire(AddrCalcOutputIf)
+        addr_calc_unit = AddrCalcUnit()
+        addr_calc_unit.input_port.is_ldst        <<= (reg_input_port.exec_unit == op_class.ld_st) | (reg_input_port.exec_unit == op_class.branch_ind)
+        addr_calc_unit.input_port.is_csr         <<= (reg_input_port.ldst_op == ldst_ops.csr_load) | (reg_input_port.ldst_op == ldst_ops.csr_store)
+        addr_calc_unit.input_port.op_b           <<= reg_input_port.op_b
+        addr_calc_unit.input_port.op_c           <<= reg_input_port.op_c
+        addr_calc_unit.input_port.mem_base       <<= self.mem_base # I don't think this needs registering: if this was changed by a previous instruction, we should pick it up immediately
+        addr_calc_unit.input_port.mem_limit      <<= self.mem_limit # I don't think this needs registering: if this was changed by a previous instruction, we should pick it up immediately
+        addr_calc_unit.input_port.task_mode      <<= self.task_mode_in # I don't think this needs registering: if this was changed by a previous instruction, we would be branching
+        addr_calc_unit.input_port.mem_access_len <<= reg_input_port.mem_access_len
+        addr_calc_output <<= addr_calc_unit.output_port
+
+        # Branch-target
+        branch_target_output = Wire(BranchTargetUnitOutputIf)
+        branch_target_unit = BranchTargetUnit()
+        branch_target_unit.input_port.op_c       <<= reg_input_port.op_c
+        branch_target_unit.input_port.pc         <<= reg_pc
+        branch_target_unit.input_port.inst_len   <<= reg_input_port.inst_len
+        branch_target_output <<= branch_target_unit.output_port
+
+        # Bit-test result extractor
+        bit_test_output = Wire(BitExtractOutputIf)
+        bit_test_unit = BitExtract()
+        bit_test_unit.input_port.op_a     <<= reg_input_port.op_a
+        bit_test_unit.input_port.op_b     <<= reg_input_port.op_b
+        bit_test_output <<= bit_test_unit.output_port
+
+
+        # Combining the unit outputs into a single interface
+        ################ ALU/SHIFT/MULT
+        self.output_port.result                <<= Select(reg_input_port.exec_unit == op_class.alu, shifter_output.result, alu_output.result)
+        self.output_port.f_zero                <<= alu_output.f_zero
+        self.output_port.f_sign                <<= alu_output.f_sign
+        self.output_port.f_carry               <<= alu_output.f_carry
+        self.output_port.f_overflow            <<= alu_output.f_overflow
+        self.output_port.is_mult_op            <<= (reg_input_port.exec_unit == op_class.mult)
+        ################ ADDR CALC
+        self.output_port.phy_addr              <<= addr_calc_output.phy_addr
+        self.output_port.eff_addr              <<= addr_calc_output.eff_addr
+        self.output_port.mem_av                <<= addr_calc_output.mem_av
+        self.output_port.mem_unaligned         <<= addr_calc_output.mem_unaligned
+        self.output_port.is_csr                <<= addr_calc_output.is_csr
+        ################ BRANCH TARGET
+        self.output_port.branch_addr           <<= branch_target_output.branch_addr
+        self.output_port.straight_addr         <<= branch_target_output.straight_addr
+        ################ BRANCH INPUT
+        self.output_port.branch_op             <<= reg_input_port.branch_op
+        self.output_port.is_branch_ind         <<= (reg_input_port.exec_unit == op_class.branch_ind)
+        self.output_port.op_a                  <<= reg_input_port.op_a
+        self.output_port.bit_test_bit          <<= bit_test_output.bit
+        self.output_port.spc                   <<= reg_spc
+        self.output_port.tpc                   <<= reg_tpc
+        self.output_port.task_mode             <<= reg_task_mode # TODO: Do we need to register THIS????
+        self.output_port.fetch_av              <<= reg_input_port.fetch_av
+        self.output_port.is_branch_insn        <<= (reg_input_port.exec_unit == op_class.branch) | (reg_input_port.exec_unit == op_class.branch_ind)
+        self.output_port.woi                   <<= reg_input_port.woi
+        ################ MEMORY INPUT
+        self.output_port.read_not_write        <<= ((reg_input_port.exec_unit == op_class.ld_st) & ((reg_input_port.ldst_op == ldst_ops.load) | (reg_input_port.ldst_op == ldst_ops.csr_load))) | (reg_input_port.exec_unit == op_class.branch_ind)
+        self.output_port.access_len            <<= reg_input_port.mem_access_len
+        self.output_port.is_mem_op             <<= (reg_input_port.exec_unit == op_class.ld_st) | (reg_input_port.exec_unit == op_class.branch_ind)
+        ################ WRITE-BACK GENERATION
+        self.output_port.result_reg_addr       <<= reg_input_port.result_reg_addr
+        self.output_port.result_reg_addr_valid <<= reg_input_port.result_reg_addr_valid
+        self.output_port.do_bse                <<= reg_input_port.do_bse
+        self.output_port.do_wse                <<= reg_input_port.do_wse
+        self.output_port.do_bze                <<= reg_input_port.do_bze
+        self.output_port.do_wze                <<= reg_input_port.do_wze
+
+class ExecStage2(GenericModule):
+    clk = ClkPort()
+    rst = RstPort()
+
+    # Pipeline input
+    input_port = Input(Exec12If)
+
+    # Multiplier result
+    mult_result = Input(BrewData)
+
+    # Pipeline output
+    output_port = Output(ResultExtendIf)
+
+    # Interface to the bus interface
+    bus_req_if = Output(BusIfRequestIf)
+    bus_rsp_if = Input(BusIfResponseIf)
+
+    # Interface to the CSR registers
+    csr_if = Output(CsrIf)
+
+    # side-band interfaces
+    spc_out = Output(BrewInstAddr)
+    tpc_out = Output(BrewInstAddr)
+    task_mode_out = Output(logic)
+    ecause_in = Input(EnumNet(exceptions))
+    ecause_out = Output(EnumNet(exceptions))
+    eaddr_out = Output(BrewAddr)
+    do_branch_immediate = Output(logic) # This is the unregistered version, not the one that all other stages use
+    do_branch = Output(logic) # This is the regular, registered version
+    interrupt = Input(logic)
+
+    complete = Output(logic) # goes high for 1 cycle when an instruction completes. Used for verification
+
+    def construct(self, has_multiply: bool = True, has_shift: bool = True):
+        self.has_multiply = has_multiply
+        self.has_shift = has_shift
+
+    def body(self):
+        # We have a few stages here:
+        #    1. the second stage of multiply (it's actually instantiated in stage-1, but the results need to be dealt with here)
+        #    2. branch: this one determines if a branch/exception/interrupt happened and if so, where to jump to
+        #    3. memory: which is responsible for load/stores including CSR reads/writes
+        # The interesting point is that the only thing that *can* provide back-pressure here is memory. So, unless
+        # we do a memory operation, we can always accept the next instruction. This makes handshaking very simple indeed.
+
+        # TODO: do we need to feed memory with registered or unregistered signals? I think the answer to that is no.
+        #       In this world, we register in the input and if memory doesn't well, it should...
+
+        input_ready = Wire(logic)
+        input_reg_en = input_ready & self.input_port.valid
+        mem_unit_ready = Wire()
+        mem_output = Wire(MemOutputIf)
+
+        reg_input_port = Wire(self.input_port.get_data_member_type())
+        reg_input_port <<= Reg(self.input_port.get_data_members(), clock_en = input_reg_en)
+        reg_input_port_data_valid = Wire(logic)
+        reg_input_port_data_valid <<= Reg(Select(self.do_branch | self.do_branch_immediate, Select(input_ready & self.input_port.valid, reg_input_port_data_valid, 1), 0))
+        reg_pc = Select(reg_input_port.task_mode, reg_input_port.spc, reg_input_port.tpc)
+
+        # TODO: do we need to clear after a branch?
+        input_ready <<= Select(reg_input_port.is_mem_op, 1, mem_unit_ready) | self.do_branch
+        self.input_port.ready <<= input_ready
+
+        # Branch unit
+        branch_output = Wire(BranchUnitOutputIf)
+        branch_unit = BranchUnit()
+        branch_unit.input_port.opcode          <<= reg_input_port.branch_op
+        branch_unit.input_port.spc             <<= reg_input_port.spc
+        branch_unit.input_port.tpc             <<= reg_input_port.tpc
+        branch_unit.input_port.task_mode       <<= reg_input_port.task_mode
+        branch_unit.input_port.branch_addr     <<= Select(
+            reg_input_port.is_branch_ind,
+            reg_input_port.branch_addr,
+            concat(mem_output.data_h, mem_output.data_l)[31:1]
+        )
+        branch_unit.input_port.interrupt       <<= self.interrupt
+        branch_unit.input_port.fetch_av        <<= reg_input_port.fetch_av
+        branch_unit.input_port.mem_av          <<= reg_input_port.mem_av
+        branch_unit.input_port.mem_unaligned   <<= reg_input_port.mem_unaligned
+        branch_unit.input_port.op_a            <<= reg_input_port.op_a
+        branch_unit.input_port.bit_test_bit    <<= reg_input_port.bit_test_bit
+        branch_unit.input_port.f_zero          <<= reg_input_port.f_zero
+        branch_unit.input_port.f_sign          <<= reg_input_port.f_sign
+        branch_unit.input_port.f_carry         <<= reg_input_port.f_carry
+        branch_unit.input_port.f_overflow      <<= reg_input_port.f_overflow
+        branch_unit.input_port.is_branch_insn  <<= reg_input_port.is_branch_insn
+        branch_unit.input_port.woi             <<= reg_input_port.woi
+        branch_output <<= branch_unit.output_port
+
+        # Memory unit
+        mem_input = Wire(MemInputIf)
+        mem_output = Wire(MemOutputIf)
+        memory_unit = MemoryStage()
+        mem_input.read_not_write <<= reg_input_port.read_not_write
+        mem_input.data <<= reg_input_port.op_a
+        mem_input.addr <<= reg_input_port.phy_addr
+        mem_input.is_csr <<= reg_input_port.is_csr
+        mem_input.access_len <<= reg_input_port.access_len
+        memory_unit.input_port <<= mem_input
+        self.bus_req_if <<= memory_unit.bus_req_if
+        memory_unit.bus_rsp_if <<= self.bus_rsp_if
+        self.csr_if <<= memory_unit.csr_if
+        mem_output <<= memory_unit.output_port
+        mem_unit_ready <<= mem_input.ready
+
+        # Write-back interface
+        selector_choices = []
+        if self.has_multiply:
+            selector_choices += [reg_input_port.is_mult_op, self.mult_result]
+        selector_choices += [reg_input_port.is_branch_insn, concat(reg_input_port.straight_addr, "1'b0")] # Patch through return address for calls
+        result = SelectOne(*selector_choices, default_port = reg_input_port.result)
+        is_ld_st = reg_input_port.is_mem_op & ~reg_input_port.is_branch_ind
+
+        self.output_port.data_l <<= Select(is_ld_st, result[15: 0], mem_output.data_l)
+        self.output_port.data_h <<= Select(is_ld_st, result[31:16], mem_output.data_h)
+        self.output_port.data_en <<= reg_input_port.result_reg_addr_valid
+        self.output_port.addr <<= reg_input_port.result_reg_addr
+        self.output_port.do_bse <<= reg_input_port.do_bse
+        self.output_port.do_wse <<= reg_input_port.do_wse
+        self.output_port.do_bze <<= reg_input_port.do_bze
+        self.output_port.do_wze <<= reg_input_port.do_wze
+        self.output_port.valid <<= reg_input_port_data_valid & ~self.do_branch_immediate & ~self.do_branch # Not sure this is correct.
+
+        # Create side-band interfaces
+        #####################################
+
+        # When we have a branch, we have to clear the exec unit from s2; otherwise it will potentially prevent 'sideband_strobe' from firing when we resume from the target.
+        # The test for this is:
+        #   $pc <- mem[some_table] # jumps to xxx
+        # xxx:
+        #   $pc <- yyy
+        # These back-to-back jumps would fail without the intervention
+
+        # TODO: this I hope is not an issue anymore, but needs to be tested.
+        sideband_strobe = Wire()
+        sideband_strobe <<= reg_input_port_data_valid & input_ready & self.input_port.valid
+
+        self.do_branch_immediate <<= branch_output.do_branch & sideband_strobe
+        self.do_branch <<= Reg(self.do_branch_immediate)
+
+        straight_tpc_out = Select(reg_input_port.task_mode, reg_input_port.tpc, reg_input_port.straight_addr)
+        self.tpc_out <<= Select(
+            sideband_strobe,
+            reg_input_port.tpc,
+            Select(
+                branch_output.tpc_changed,
+                straight_tpc_out,
+                branch_output.tpc,
             )
-
-        # Branch codes:
-        #  eq: f_zero = 1
-        #  ne: f_zero = 0
-        #  lt: f_carry = 1
-        #  ge: f_carry = 0
-        #  lts: f_sign != f_overflow
-        #  ges: f_sign == f_overflow
-        condition_result = self.input_port.is_branch_insn & SelectOne(
-            self.input_port.opcode == branch_ops.cb_eq,   self.input_port.f_zero,
-            self.input_port.opcode == branch_ops.cb_ne,   ~self.input_port.f_zero,
-            self.input_port.opcode == branch_ops.cb_lts,  self.input_port.f_sign != self.input_port.f_overflow,
-            self.input_port.opcode == branch_ops.cb_ges,  self.input_port.f_sign == self.input_port.f_overflow,
-            self.input_port.opcode == branch_ops.cb_lt,   self.input_port.f_carry,
-            self.input_port.opcode == branch_ops.cb_ge,   ~self.input_port.f_carry,
-            self.input_port.opcode == branch_ops.bb_one,  bb_get_bit(self.input_port.op_a, self.input_port.op_b),
-            self.input_port.opcode == branch_ops.bb_zero, ~bb_get_bit(self.input_port.op_a, self.input_port.op_b),
         )
-
-        # Set if we have an exception: in task mode this results in a switch to scheduler mode, in scheduler mode, it's a reset
-        is_exception = (self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.swi)) | self.input_port.mem_av | self.input_port.mem_unaligned | self.input_port.fetch_av
-
-        # Set whenever we branch without a mode change
-        in_mode_branch = SelectOne(
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w),        1,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w_ind),    1,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w),       self.input_port.task_mode,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w_ind),   self.input_port.task_mode,
-            is_exception,                                                                        ~self.input_port.task_mode,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.stm),         0,
-            default_port =                                                                       condition_result,
+        straight_spc_out = Select(~reg_input_port.task_mode, reg_input_port.spc, reg_input_port.straight_addr)
+        self.spc_out <<= Select(
+            sideband_strobe,
+            reg_input_port.spc,
+            Select(
+                branch_output.spc_changed,
+                straight_spc_out,
+                branch_output.spc,
+            )
         )
-
-        branch_target = SelectOne(
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w),                                 self.input_port.op_a[31:1],
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w),                                self.input_port.op_a[31:1],
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w_ind),                             self.input_port.branch_addr,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w_ind),                            self.input_port.branch_addr,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.stm),                                  self.input_port.tpc,
-            default_port =                                                                                                Select(is_exception | self.input_port.interrupt, self.input_port.branch_addr, self.input_port.tpc),
+        self.task_mode_out <<= Select(
+            sideband_strobe,
+            reg_input_port.task_mode,
+            Select(
+                branch_output.task_mode_changed,
+                reg_input_port.task_mode,
+                branch_output.task_mode,
+            )
         )
-        spc_branch_target = Select(
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w),
-            self.input_port.branch_addr,
-            self.input_port.op_a[31:1],
+        self.ecause_out <<= Select(
+            sideband_strobe,
+            self.ecause_in,
+            Select(
+                branch_output.is_exception_or_interrupt,
+                self.ecause_in,
+                branch_output.ecause
+            )
         )
+        self.eaddr_out <<= Reg(Select(
+            (branch_output.ecause == exceptions.exc_unaligned) | (branch_output.ecause == exceptions.exc_mem_av),
+            concat(reg_pc, "1'b0"),
+            reg_input_port.eff_addr
+        ), clock_en=sideband_strobe & branch_output.is_exception)
 
-        self.output_port.spc            <<= Select(is_exception, spc_branch_target, 0)
-        self.output_port.spc_changed    <<= ~self.input_port.task_mode & (is_exception | (in_mode_branch & (~self.input_port.woi | ~self.input_port.interrupt)))
-        self.output_port.tpc            <<= branch_target
-        self.output_port.tpc_changed    <<= Select(
-            self.input_port.task_mode,
-            # In Scheduler mode: TPC can only change through TCP manipulation instructions. For those, the value comes through op_c
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w),
-            # In task mode, all branches count, but so do exceptions which, while don't change TPC, they don't update TPC either.
-            in_mode_branch | is_exception | self.input_port.interrupt
-        )
-        self.output_port.task_mode_changed <<= Select(
-            self.input_port.task_mode,
-            # In scheduler mode: exit to ask mode, if STM instruction is executed
-            (self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.stm)),
-            # In task mode: we enter scheduler mode in case of an exception or interrupt
-            is_exception | self.input_port.interrupt
-        )
-        self.output_port.task_mode  <<= self.input_port.task_mode ^ self.output_port.task_mode_changed
-
-        self.output_port.do_branch  <<= in_mode_branch | self.output_port.task_mode_changed
-
-        swi_exception = self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.swi)
-
-        # We set the ECAUSE bits even in scheduler mode: this allows for interrupt polling and,
-        # after a reset, we can check it to determine the reason for the reset
-        # NOTE: we *have* to do the type-cast outside the switch: the terms are always evaluated
-        #       in simulation, and thus, if op_a is an invalid exception, the simulator would
-        #       blow up trying to do the type-conversion, even if swi_exception isn't set.
-        self.output_port.ecause <<= EnumNet(exceptions)(SelectFirst(
-            self.input_port.interrupt,      exceptions.exc_hwi,
-            self.input_port.fetch_av,       exceptions.exc_inst_av,
-            self.input_port.mem_unaligned,  exceptions.exc_unaligned,
-            self.input_port.mem_av,         exceptions.exc_mem_av,
-            swi_exception,                  self.input_port.op_a[6:0],
-        ))
-        self.output_port.is_exception <<= is_exception
-        self.output_port.is_exception_or_interrupt  <<= is_exception | (self.input_port.task_mode & self.input_port.interrupt)
-
-
-
-
+        self.complete <<= sideband_strobe
 
 class ExecuteStage(GenericModule):
     clk = ClkPort()
@@ -256,303 +491,42 @@ class ExecuteStage(GenericModule):
         self.has_shift = has_shift
 
     def body(self):
-        # We have two stages in one, really here
-        pc = Select(self.task_mode_in, self.spc_in, self.tpc_in)
+        exec_12_if = Wire(Exec12If)
+        mult_result = Wire(BrewData)
+        do_branch = Wire()
+        do_branch_immediate = Wire()
 
-        # this signal is high for one cycle *after* a branch. It's used in stage 2 to cancel any instruction that leaked through stage 1
-        s1_was_branch = Reg(self.do_branch)
-        s2_was_branch = Reg(s1_was_branch)
+        stage1 = ExecStage1(has_multiply=self.has_multiply, has_shift=self.has_shift)
+        stage1.input_port <<= self.input_port
+        exec_12_if <<= stage1.output_port
+        mult_result <<= stage1.mult_result
+        stage1.mem_base            <<= self.mem_base
+        stage1.mem_limit           <<= self.mem_limit
+        stage1.spc_in              <<= self.spc_in
+        stage1.tpc_in              <<= self.tpc_in
+        stage1.task_mode_in        <<= self.task_mode_in
+        stage1.do_branch_immediate <<= do_branch_immediate
+        stage1.do_branch           <<= do_branch
 
-        # Stege 1
-        ########################################
-        # Ready-valid FSM
-        stage_1_valid = Wire(logic)
-        stage_2_ready = Wire(logic)
+        stage2 = ExecStage2(has_multiply=self.has_multiply, has_shift=self.has_shift)
+        stage2.input_port          <<= exec_12_if
+        self.output_port           <<= stage2.output_port
+        stage2.mult_result         <<= mult_result
+        self.bus_req_if            <<= stage2.bus_req_if
+        stage2.bus_rsp_if          <<= self.bus_rsp_if
+        self.csr_if                <<= stage2.csr_if
+        self.spc_out               <<= stage2.spc_out
+        self.tpc_out               <<= stage2.tpc_out
+        self.task_mode_out         <<= stage2.task_mode_out
+        stage2.ecause_in           <<= self.ecause_in
+        self.ecause_out            <<= stage2.ecause_out
+        self.eaddr_out             <<= stage2.eaddr_out
+        do_branch_immediate        <<= stage2.do_branch_immediate
+        do_branch                  <<= stage2.do_branch
+        stage2.interrupt           <<= self.interrupt
+        self.complete              <<= stage2.complete
 
-        multi_cycle_exec_lockout = Reg(self.input_port.ready & self.input_port.valid & (self.input_port.exec_unit == op_class.mult) & ~self.input_port.fetch_av)
-
-        stage_1_fsm = ForwardBufLogic()
-        stage_1_fsm.clear <<= self.do_branch
-        stage_1_fsm.input_valid <<= ~multi_cycle_exec_lockout & ~s1_was_branch & ~self.do_branch & self.input_port.valid
-        # we 'bite out' a cycle for two-cycle units, such as multiply
-        self.input_port.ready <<= ~multi_cycle_exec_lockout & ~s1_was_branch  & stage_1_fsm.input_ready
-        stage_1_valid <<= stage_1_fsm.output_valid
-        stage_1_fsm.output_ready <<= stage_2_ready
-
-        stage_1_reg_en = Wire(logic)
-        stage_1_reg_en <<= ~multi_cycle_exec_lockout & ~s1_was_branch  & stage_1_fsm.out_reg_en
-
-        # ALU
-        alu_output = Wire(AluOutputIf)
-        alu_unit = AluUnit()
-        alu_unit.input_port.opcode <<= self.input_port.alu_op
-        alu_unit.input_port.op_a   <<= self.input_port.op_a
-        alu_unit.input_port.op_b   <<= self.input_port.op_b
-        alu_unit.input_port.pc     <<= pc
-        alu_unit.input_port.tpc    <<= self.tpc_in
-        alu_output <<= alu_unit.output_port
-        s1_alu_output = Wire(AluOutputIf)
-        s1_alu_output <<= Reg(alu_output, clock_en = stage_1_reg_en)
-
-
-        # Load-store
-        ldst_output = Wire(AddrCalcOutputIf)
-        ldst_unit = AddrCalcUnit()
-        ldst_unit.input_port.is_ldst        <<= (self.input_port.exec_unit == op_class.ld_st) | (self.input_port.exec_unit == op_class.branch_ind)
-        ldst_unit.input_port.is_csr         <<= (self.input_port.ldst_op == ldst_ops.csr_load) | (self.input_port.ldst_op == ldst_ops.csr_store)
-        ldst_unit.input_port.op_b           <<= self.input_port.op_b
-        ldst_unit.input_port.op_c           <<= self.input_port.op_c
-        ldst_unit.input_port.mem_base       <<= self.mem_base
-        ldst_unit.input_port.mem_limit      <<= self.mem_limit
-        ldst_unit.input_port.task_mode      <<= self.task_mode_in
-        ldst_unit.input_port.mem_access_len <<= self.input_port.mem_access_len
-        ldst_output <<= ldst_unit.output_port
-        s1_ldst_output = Wire(AddrCalcOutputIf)
-        s1_ldst_output <<= Reg(ldst_output, clock_en = stage_1_reg_en)
-
-
-        # Branch-target
-        branch_target_output = Wire(BranchTargetUnitOutputIf)
-        branch_target_unit = BranchTargetUnit()
-        branch_target_unit.input_port.op_c       <<= self.input_port.op_c
-        branch_target_unit.input_port.pc         <<= pc
-        branch_target_unit.input_port.inst_len   <<= self.input_port.inst_len
-        branch_target_output <<= branch_target_unit.output_port
-        s1_branch_target_output = Wire(BranchTargetUnitOutputIf)
-        s1_branch_target_output <<= Reg(branch_target_output, clock_en = stage_1_reg_en)
-
-        # Shifter
-        if self.has_shift:
-            shifter_output = Wire(ShifterOutputIf)
-            shifter_unit = ShifterUnit()
-            shifter_unit.input_port.opcode <<= self.input_port.shifter_op
-            shifter_unit.input_port.op_a   <<= self.input_port.op_a
-            shifter_unit.input_port.op_b   <<= self.input_port.op_b
-            shifter_output <<= shifter_unit.output_port
-            s1_shifter_output = Wire(ShifterOutputIf)
-            s1_shifter_output <<= Reg(shifter_output, clock_en = stage_1_reg_en)
-
-        # Multiplier (this unit has internal pipelining)
-        if self.has_multiply:
-            mult_output = Wire(MultOutputIf)
-            mult_unit = MultUnit()
-            mult_unit.input_port.valid  <<= stage_1_reg_en
-            mult_unit.input_port.op_a   <<= self.input_port.op_a
-            mult_unit.input_port.op_b   <<= self.input_port.op_b
-            mult_output <<= mult_unit.output_port
-
-        # Delay inputs that we will need later
-        s1_exec_unit = Reg(self.input_port.exec_unit, clock_en = stage_1_reg_en)
-        s1_branch_op = Reg(self.input_port.branch_op, clock_en = stage_1_reg_en)
-        s1_ldst_op = Reg(self.input_port.ldst_op, clock_en = stage_1_reg_en)
-        s1_op_a = Reg(self.input_port.op_a, clock_en = stage_1_reg_en)
-        s1_op_b = Reg(self.input_port.op_b, clock_en = stage_1_reg_en)
-        s1_op_c = Reg(self.input_port.op_c, clock_en = stage_1_reg_en)
-        s1_do_bse = Reg(self.input_port.do_bse, clock_en = stage_1_reg_en)
-        s1_do_wse = Reg(self.input_port.do_wse, clock_en = stage_1_reg_en)
-        s1_do_bze = Reg(self.input_port.do_bze, clock_en = stage_1_reg_en)
-        s1_do_wze = Reg(self.input_port.do_wze, clock_en = stage_1_reg_en)
-        s1_woi = Reg(self.input_port.woi, clock_en = stage_1_reg_en)
-        s1_result_reg_addr = Reg(self.input_port.result_reg_addr, clock_en = stage_1_reg_en)
-        s1_result_reg_addr_valid = Reg(self.input_port.result_reg_addr_valid, clock_en = stage_1_reg_en)
-        s1_fetch_av = Reg(self.input_port.fetch_av, clock_en = stage_1_reg_en)
-        s1_tpc = Reg(self.tpc_in, clock_en = stage_1_reg_en)
-        s1_spc = Reg(self.spc_in, clock_en = stage_1_reg_en)
-        s1_task_mode = Reg(self.task_mode_in, clock_en = stage_1_reg_en)
-        s1_mem_access_len = Reg(self.input_port.mem_access_len, clock_en = stage_1_reg_en)
-        s1_eff_addr = Reg(ldst_unit.output_port.eff_addr, clock_en = stage_1_reg_en)
-        s1_pc = Select(s1_task_mode, s1_spc, s1_tpc)
-
-        # Stage 2
-        ########################################
-        # Ready-valid FSM
-        branch_input = Wire(BranchUnitInputIf)
-        branch_output = Wire(BranchUnitOutputIf)
-
-        mem_input = Wire(MemInputIf)
-        s2_mem_output = Wire(MemOutputIf)
-
-        s2_pc = Select(s1_task_mode, s1_spc, s1_tpc)
-
-        stage_2_valid = Wire(logic)
-        s2_exec_unit = Wire(EnumNet(op_class))
-        s2_ldst_op = Wire()
-        s2_result_reg_addr_valid = Wire()
-
-        # NOTE: The use of s1_exec_unit here is not exactly nice: we depend on it being static independent of stage_2_ready.
-        # It's correct, but it's not nice.
-        # NOTE: since we're going out to the RF write port, self.output_port.ready doesn't exist. That in turn means
-        #       that stage_2_fsm.input_ready is constant '1'. So, really the only reason we would apply back-pressure
-        #       is if there's a pending bus operation.
-        stage_2_fsm = ForwardBufLogic()
-        stage_2_fsm.input_valid <<= stage_1_valid
-        # We cancel stage-2 of an instruction, if there was an exception or an interrupt.
-        # This is different from stage-1, where we want to cancel all instructions in a branch-shadow.
-        # The distinction is only relevant for CALL-s, which do branch, yet have side-effects as well.
-        stage_2_fsm.clear <<= branch_output.is_exception_or_interrupt
-        block_mem = s1_ldst_output.mem_av | s1_ldst_output.mem_unaligned | s1_fetch_av
-        s1_is_ld_st = (s1_exec_unit == op_class.ld_st) | (s1_exec_unit == op_class.branch_ind)
-        s2_is_ld_st = (s2_exec_unit == op_class.ld_st) | (s2_exec_unit == op_class.branch_ind)
-        mem_input.valid <<= stage_1_valid & ~block_mem & s1_is_ld_st
-        stage_2_ready <<= Select(s1_is_ld_st & ~block_mem, stage_2_fsm.input_ready,  mem_input.ready)
-        stage_2_valid <<= Select(s2_is_ld_st & ~block_mem, stage_2_fsm.output_valid, s2_mem_output.valid | (s2_result_reg_addr_valid & (s2_ldst_op == ldst_ops.store))) & ~s2_was_branch
-        stage_2_fsm.output_ready <<= Select(s2_is_ld_st & ((s2_ldst_op == ldst_ops.load) | (s2_ldst_op == ldst_ops.csr_load)) & ~block_mem, 1, s2_mem_output.valid)
-
-        stage_2_reg_en = Wire(logic)
-        stage_2_reg_en <<= stage_1_valid & stage_2_ready & ~Reg(self.do_branch)
-
-        # PC handling:
-        # We are upgrading TPC/SPC in the first cycle of execute, as if for straight execution.
-        # In the second stage, we use the pre-computed branch target and exception flags to handle branches.
-        # These means that there are two possible sources for xPC updates in every cycle:
-        # - Current instruction in 'execute 1'
-        # - Previous instruction in case of a branch, in 'execute 2'
-        # To make things right, 'execute 2' has priority updating xPC
-
-        # Branch unit
-        branch_unit = BranchUnit()
-        branch_input.opcode          <<= s1_branch_op
-        #branch_input.pc              <<= s2_pc
-        branch_input.spc             <<= s1_spc
-        branch_input.tpc             <<= s1_tpc
-        branch_input.task_mode       <<= s1_task_mode
-        branch_input.branch_addr     <<= Select(
-            (s1_exec_unit == op_class.branch_ind),
-            s1_branch_target_output.branch_addr,
-            concat(s2_mem_output.data_h, s2_mem_output.data_l)[31:1]
-        )
-        branch_input.interrupt       <<= self.interrupt
-        branch_input.fetch_av        <<= s1_fetch_av
-        branch_input.mem_av          <<= s1_ldst_output.mem_av
-        branch_input.mem_unaligned   <<= s1_ldst_output.mem_unaligned
-        branch_input.op_a            <<= s1_op_a
-        branch_input.op_b            <<= s1_op_b
-        #branch_input.op_c            <<= s1_op_c
-        branch_input.f_zero          <<= s1_alu_output.f_zero
-        branch_input.f_sign          <<= s1_alu_output.f_sign
-        branch_input.f_carry         <<= s1_alu_output.f_carry
-        branch_input.f_overflow      <<= s1_alu_output.f_overflow
-        branch_input.is_branch_insn  <<= (s1_exec_unit == op_class.branch) | (s1_exec_unit == op_class.branch_ind)
-        branch_input.woi             <<= s1_woi
-
-        branch_unit.input_port <<= branch_input
-        branch_output <<= branch_unit.output_port
-        #spc
-        #spc_changed
-        #tpc
-        #tpc_changed
-        #task_mode
-        #task_mode_changed
-        #ecause
-        #do_branch
-
-        # Memory unit
-        memory_unit = MemoryStage()
-
-
-        mem_input.read_not_write <<= s1_is_ld_st & ((s1_ldst_op == ldst_ops.load) | (s1_ldst_op == ldst_ops.csr_load))
-        mem_input.data <<= s1_op_a
-        mem_input.addr <<= s1_ldst_output.phy_addr
-        mem_input.is_csr <<= s1_ldst_output.is_csr
-        mem_input.access_len <<= s1_mem_access_len
-        memory_unit.input_port <<= mem_input
-        self.bus_req_if <<= memory_unit.bus_req_if
-        memory_unit.bus_rsp_if <<= self.bus_rsp_if
-        self.csr_if <<= memory_unit.csr_if
-        s2_mem_output <<= memory_unit.output_port
-        #data_l
-        #data_h
-
-        # Combine all outputs into a single output register, mux-in memory results
-        selector_choices = [s1_exec_unit == op_class.alu, s1_alu_output.result]
-        if self.has_multiply:
-            selector_choices += [s1_exec_unit == op_class.mult, mult_output.result]
-        if self.has_shift:
-            selector_choices += [s1_exec_unit == op_class.shift, s1_shifter_output.result]
-        selector_choices += [(s1_exec_unit == op_class.branch) | (s1_exec_unit == op_class.branch_ind), concat(s1_branch_target_output.straight_addr, "1'b0")]
-        result = SelectOne(*selector_choices)
-
-        s2_result_reg_addr_valid <<= Reg(s1_result_reg_addr_valid, clock_en = stage_2_reg_en)
-        self.output_port.valid <<= stage_2_valid & s2_result_reg_addr_valid & (Reg(stage_2_reg_en) | (s2_mem_output.valid & s2_is_ld_st))
-        # TODO: I'm not sure if we need these delayed versions for write-back
-        #s2_result_reg_addr = Reg(s1_result_reg_addr, clock_en = stage_2_reg_en)
-        #ldst_result_reg_addr = Reg(s1_result_reg_addr, clock_en = mem_input.ready)
-
-        # When we have a branch, we have to clear the exec unit from s2; otherwise it will potentially prevent 'sideband_strobe' from firing when we resume from the target.
-        # The test for this is:
-        #   $pc <- mem[some_table] # jumps to xxx
-        # xxx:
-        #   $pc <- yyy
-        # These back-to-back jumps would fail without the intervention
-        s2_exec_unit <<= Reg(Select(self.do_branch, Select(stage_2_reg_en, s2_exec_unit, s1_exec_unit), op_class.invalid))
-        s2_ldst_op <<= Reg(s1_ldst_op, clock_en = stage_2_reg_en)
-
-        self.output_port.data_l <<= Select(s2_exec_unit == op_class.ld_st, Reg(result[15: 0], clock_en = stage_2_reg_en), Select(s2_ldst_op == ldst_ops.store, s2_mem_output.data_l, 0))
-        self.output_port.data_h <<= Select(s2_exec_unit == op_class.ld_st, Reg(result[31:16], clock_en = stage_2_reg_en), Select(s2_ldst_op == ldst_ops.store, s2_mem_output.data_h, 0))
-        self.output_port.data_en <<= 1
-        #self.output_port.addr <<= Select(s2_exec_unit == op_class.ld_st, s2_result_reg_addr, ldst_result_reg_addr)
-        self.output_port.addr <<= Reg(s1_result_reg_addr, clock_en = stage_2_reg_en)
-        self.output_port.do_bse <<= Reg(s1_do_bse, clock_en = stage_2_reg_en)
-        self.output_port.do_wse <<= Reg(s1_do_wse, clock_en = stage_2_reg_en)
-        self.output_port.do_bze <<= Reg(s1_do_bze, clock_en = stage_2_reg_en)
-        self.output_port.do_wze <<= Reg(s1_do_wze, clock_en = stage_2_reg_en)
-
-        # Set sideband outputs as needed
-        sideband_strobe = Select(
-            s2_exec_unit == op_class.branch_ind,
-            (s1_exec_unit != op_class.branch_ind) & stage_2_reg_en,
-            s2_mem_output.valid
-        )
-        self.do_branch <<= branch_output.do_branch & sideband_strobe
-
-        straight_tpc_out = Select(stage_1_reg_en, self.tpc_in, Select(self.task_mode_in, self.tpc_in, branch_target_output.straight_addr))
-        self.tpc_out <<= Select(
-            s1_was_branch,
-            Select(
-                sideband_strobe & branch_output.tpc_changed,
-                straight_tpc_out,
-                branch_output.tpc,
-            ),
-            self.tpc_in
-        )
-        straight_spc_out = Select(stage_1_reg_en, self.spc_in, Select(~(self.task_mode_out | self.task_mode_in), self.spc_in, branch_target_output.straight_addr))
-        self.spc_out <<= Select(
-            s1_was_branch,
-            Select(
-                sideband_strobe & branch_output.spc_changed,
-                straight_spc_out,
-                branch_output.spc,
-            ),
-            self.spc_in
-        )
-        self.task_mode_out <<= Select(
-            s1_was_branch,
-            Select(
-                sideband_strobe & branch_output.task_mode_changed,
-                self.task_mode_in,
-                branch_output.task_mode,
-            ),
-            self.task_mode_in
-        )
-        self.ecause_out <<= Select(
-            sideband_strobe & ~s1_was_branch,
-            self.ecause_in,
-            Select(
-                branch_output.is_exception_or_interrupt,
-                self.ecause_in,
-                branch_output.ecause
-            )
-        )
-        # We mask eaddr_out updates in the shadow of a branch: do_branch is one cycle delayed, so if that fires, the current instruction
-        # should be cancelled and have no side-effects. That goes for eaddr_out as well.
-        self.eaddr_out <<= Reg(Select(
-            s1_fetch_av | ((s1_exec_unit == op_class.branch) & (s1_branch_op == branch_ops.swi)),
-            s1_eff_addr,
-            concat(s1_pc, "1'b0"),
-        ), clock_en=branch_output.is_exception)
-
-        #self.complete <<= stage_2_reg_en
-        self.complete <<= stage_2_valid
+        self.do_branch             <<= do_branch
 
 
 

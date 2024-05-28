@@ -38,6 +38,42 @@ class BranchTargetUnit(Module):
         self.output_port.straight_addr <<= (self.input_port.pc + self.input_port.inst_len + 1)[30:0]
 
 
+
+# We have a tiny module to select bits from operands. This is used in BranchUnit, but we can pre-load the logic and save a ton of pipeline registers
+class BitExtractInputIf(Interface):
+    op_a            = BrewData
+    op_b            = BrewData
+
+class BitExtractOutputIf(Interface):
+    bit             = logic
+
+class BitExtract(Module):
+    input_port = Input(BitExtractInputIf)
+    output_port = Output(BitExtractOutputIf)
+
+    def body(self):
+        @module(1)
+        def bb_get_bit(word, bit_code):
+            return SelectOne(
+                bit_code == 0,  word[0],
+                bit_code == 1,  word[1],
+                bit_code == 2,  word[2],
+                bit_code == 3,  word[3],
+                bit_code == 4,  word[4],
+                bit_code == 5,  word[5],
+                bit_code == 6,  word[6],
+                bit_code == 7,  word[7],
+                bit_code == 8,  word[8],
+                bit_code == 9,  word[9],
+                bit_code == 10, word[14],
+                bit_code == 11, word[15],
+                bit_code == 12, word[16],
+                bit_code == 13, word[30],
+                bit_code == 14, word[31],
+            )
+        self.output_port.bit <<= bb_get_bit(self.input_port.op_a, self.input_port.op_b)
+
+
 def gen():
     def top():
         #return ScanWrapper(ExecuteStage, {"clk", "rst"}, has_multiply=True, has_shift=True)

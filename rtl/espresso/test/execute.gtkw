@@ -1,0 +1,113 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Tue May 28 16:42:53 2024
+[*]
+[dumpfile] "/home/tantos/anachron/rtl/espresso/test/execute.vcd"
+[dumpfile_mtime] "Tue May 28 00:32:28 2024"
+[dumpfile_size] 173353
+[savefile] "/home/tantos/anachron/rtl/espresso/test/execute.gtkw"
+[timestart] 0
+[size] 1920 990
+[pos] -1 -1
+*-5.280674 144 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] top.
+[treeopen] top.dut.
+[treeopen] top.dut.stage1.
+[sst_width] 233
+[signals_width] 432
+[sst_expanded] 1
+[sst_vpaned_height] 280
+@28
+top.dut.clk
+@800200
+-EXEC_INPUT_PORT
+@28
+top.dut.input_port_valid
+top.dut.input_port_ready
+top.dut.input_port_alu_op
+top.dut.input_port_branch_op
+top.dut.input_port_do_bse
+top.dut.input_port_do_bze
+top.dut.input_port_do_wse
+top.dut.input_port_do_wze
+top.dut.input_port_exec_unit
+top.dut.input_port_fetch_av
+top.dut.input_port_inst_len[1:0]
+top.dut.input_port_ldst_op
+top.dut.input_port_mem_access_len[1:0]
+@22
+top.dut.input_port_op_a[31:0]
+top.dut.input_port_op_b[31:0]
+top.dut.input_port_op_c[31:0]
+top.dut.input_port_result_reg_addr[3:0]
+@28
+top.dut.input_port_result_reg_addr_valid
+top.dut.input_port_shifter_op
+top.dut.input_port_woi
+@1000200
+-EXEC_INPUT_PORT
+@22
+top.dut.tpc_in[30:0]
+top.dut.tpc_out[30:0]
+top.dut.spc_in[30:0]
+top.dut.spc_out[30:0]
+top.dut.stage1.output_port_spc[30:0]
+@28
+top.dut.task_mode_in
+top.dut.task_mode_out
+top.dut.do_branch
+@29
+top.dut.do_branch_immediate
+@800200
+-EXEC_12_IF
+@28
+top.dut.exec_12_if_valid
+top.dut.exec_12_if_ready
+top.dut.exec_12_if_access_len[1:0]
+top.dut.exec_12_if_bit_test_bit
+@22
+top.dut.exec_12_if_branch_addr[30:0]
+@28
+top.dut.exec_12_if_branch_op
+top.dut.exec_12_if_do_bse
+top.dut.exec_12_if_do_bze
+top.dut.exec_12_if_do_wse
+top.dut.exec_12_if_do_wze
+@22
+top.dut.exec_12_if_eff_addr[31:0]
+@28
+top.dut.exec_12_if_f_carry
+top.dut.exec_12_if_f_overflow
+top.dut.exec_12_if_f_sign
+top.dut.exec_12_if_f_zero
+top.dut.exec_12_if_fetch_av
+top.dut.exec_12_if_is_branch_ind
+top.dut.exec_12_if_is_branch_insn
+top.dut.exec_12_if_is_csr
+top.dut.exec_12_if_is_mem_op
+top.dut.exec_12_if_is_mult_op
+top.dut.exec_12_if_mem_av
+top.dut.exec_12_if_mem_unaligned
+@22
+top.dut.exec_12_if_op_a[31:0]
+top.dut.exec_12_if_phy_addr[31:0]
+@28
+top.dut.exec_12_if_read_not_write
+@22
+top.dut.exec_12_if_result[31:0]
+top.dut.exec_12_if_result_reg_addr[3:0]
+@28
+top.dut.exec_12_if_result_reg_addr_valid
+@22
+top.dut.exec_12_if_spc[30:0]
+top.dut.exec_12_if_straight_addr[30:0]
+@28
+top.dut.exec_12_if_task_mode
+@22
+top.dut.exec_12_if_tpc[30:0]
+@28
+top.dut.exec_12_if_woi
+@1000200
+-EXEC_12_IF
+[pattern_trace] 1
+[pattern_trace] 0

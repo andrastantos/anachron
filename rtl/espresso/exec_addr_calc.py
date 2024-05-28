@@ -34,9 +34,6 @@ class AddrCalcOutputIf(Interface):
     is_csr = logic
 
 class AddrCalcUnit(Module):
-    clk = ClkPort()
-    rst = RstPort()
-
     input_port = Input(AddrCalcInputIf)
     output_port = Output(AddrCalcOutputIf)
 
@@ -53,7 +50,7 @@ class AddrCalcUnit(Module):
             0, # 8-bit access is always aligned
             eff_addr[0], # 16-bit access is unaligned if LSB is non-0
             eff_addr[0] | eff_addr[1], # 32-bit access is unaligned if lower two bits are non-0
-            1 # This is an invalid length
+            None # This is an invalid length
         )
 
         self.output_port.phy_addr <<= phy_addr

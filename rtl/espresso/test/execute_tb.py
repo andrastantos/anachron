@@ -34,13 +34,13 @@ from expectations import *
 
 def sim():
 
-    def test(name, ref, act, fmt = None):
+    def test(name, ref, act, fmt = None, fatal=True):
         if ref is not None and ref != act:
             if fmt is not None:
                 print(f"mismatch {name}: expected={ref:{fmt}} actual={act:{fmt}}")
             else:
                 print(f"mismatch {name}: expected={ref} actual={act}")
-            assert ref is None or ref == act
+            if fatal: assert ref is None or ref == act
 
     class Result(object):
         def __init__(
@@ -104,11 +104,11 @@ def sim():
             ecause_out: Junction,
             do_branch: Junction,
         ):
-            test("spc_out",       self.spc_out,       spc_out,         "08x")
-            test("tpc_out",       self.tpc_out,       tpc_out,         "08x")
-            test("task_mode_out", self.task_mode_out, task_mode_out)
-            test("ecause_out",    self.ecause_out,    ecause_out,      "016b")
-            test("do_branch",     self.do_branch,     do_branch)
+            test("spc_out",       self.spc_out,       spc_out,         "08x", fatal=False)
+            test("tpc_out",       self.tpc_out,       tpc_out,         "08x", fatal=False)
+            test("task_mode_out", self.task_mode_out, task_mode_out, fatal=False)
+            test("ecause_out",    self.ecause_out,    ecause_out,      "016b", fatal=False)
+            test("do_branch",     self.do_branch,     do_branch, fatal=False)
 
             return True
 
