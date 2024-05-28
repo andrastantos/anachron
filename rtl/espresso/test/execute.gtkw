@@ -1,22 +1,22 @@
 [*]
-[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Tue May 28 16:42:53 2024
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Tue May 28 18:58:25 2024
 [*]
 [dumpfile] "/home/tantos/anachron/rtl/espresso/test/execute.vcd"
-[dumpfile_mtime] "Tue May 28 00:32:28 2024"
-[dumpfile_size] 173353
+[dumpfile_mtime] "Tue May 28 18:57:40 2024"
+[dumpfile_size] 170234
 [savefile] "/home/tantos/anachron/rtl/espresso/test/execute.gtkw"
 [timestart] 0
-[size] 1920 990
+[size] 1920 1097
 [pos] -1 -1
-*-5.280674 144 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-5.703310 134 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
 [treeopen] top.dut.stage1.
-[sst_width] 233
+[sst_width] 278
 [signals_width] 432
 [sst_expanded] 1
-[sst_vpaned_height] 280
+[sst_vpaned_height] 588
 @28
 top.dut.clk
 @800200

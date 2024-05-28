@@ -121,6 +121,9 @@ class Exec12If(ReadyValid):
     do_wse                  = logic
     do_bze                  = logic
     do_wze                  = logic
+    ################ HELP WITH INTERRUPTS AND EXCEPTIONS
+    is_interrupt            = logic
+    is_exception            = logic
 
 class ExecStage1(GenericModule):
     clk = ClkPort()
@@ -139,8 +142,12 @@ class ExecStage1(GenericModule):
     mem_base = Input(BrewMemBase)
     mem_limit = Input(BrewMemBase)
     spc_in  = Input(BrewInstAddr)
+    spc_out = Output(BrewInstAddr) # Output only straight-line updates. Branches come from stage 2
     tpc_in  = Input(BrewInstAddr)
+    tpc_out = Output(BrewInstAddr) # Output only straight-line updates. Branches come from stage 2
     task_mode_in  = Input(logic)
+    interrupt = Input(logic)
+
     do_branch_immediate = Input(logic) # This is the unregistered version, not the one that all other stages use
     do_branch = Input(logic) # This is the regular, registered version
 
@@ -164,6 +171,7 @@ class ExecStage1(GenericModule):
         reg_spc = Reg(self.spc_in, clock_en=input_buf_en)
         reg_task_mode = Reg(self.task_mode_in, clock_en=input_buf_en)
         reg_pc = Select(reg_task_mode, reg_spc, reg_tpc)
+        reg_interrupt = Reg(self.interrupt, clock_en=input_buf_en)
 
         # Handshake
         # TODO: not sure about the double-clear here: we clear stage 1 for two cycles on a branch...
@@ -225,6 +233,9 @@ class ExecStage1(GenericModule):
         bit_test_unit.input_port.op_b     <<= reg_input_port.op_b
         bit_test_output <<= bit_test_unit.output_port
 
+        is_branch_insn = (reg_input_port.exec_unit == op_class.branch) | (reg_input_port.exec_unit == op_class.branch_ind)
+        is_exception = (is_branch_insn & (reg_input_port.branch_op == branch_ops.swi)) | addr_calc_output.mem_av | addr_calc_output.mem_unaligned | reg_input_port.fetch_av
+
 
         # Combining the unit outputs into a single interface
         ################ ALU/SHIFT/MULT
@@ -252,7 +263,7 @@ class ExecStage1(GenericModule):
         self.output_port.tpc                   <<= reg_tpc
         self.output_port.task_mode             <<= reg_task_mode # TODO: Do we need to register THIS????
         self.output_port.fetch_av              <<= reg_input_port.fetch_av
-        self.output_port.is_branch_insn        <<= (reg_input_port.exec_unit == op_class.branch) | (reg_input_port.exec_unit == op_class.branch_ind)
+        self.output_port.is_branch_insn        <<= is_branch_insn
         self.output_port.woi                   <<= reg_input_port.woi
         ################ MEMORY INPUT
         self.output_port.read_not_write        <<= ((reg_input_port.exec_unit == op_class.ld_st) & ((reg_input_port.ldst_op == ldst_ops.load) | (reg_input_port.ldst_op == ldst_ops.csr_load))) | (reg_input_port.exec_unit == op_class.branch_ind)
@@ -265,6 +276,14 @@ class ExecStage1(GenericModule):
         self.output_port.do_wse                <<= reg_input_port.do_wse
         self.output_port.do_bze                <<= reg_input_port.do_bze
         self.output_port.do_wze                <<= reg_input_port.do_wze
+        ################ HELP WITH INTERRUPTS AND EXCEPTIONS
+        self.output_port.is_exception          <<= is_exception
+        self.output_port.is_interrupt          <<= reg_interrupt
+
+        # Side-band interface
+        self.spc_out                           <<= Select(reg_task_mode, branch_target_output.straight_addr, reg_spc)
+        #self.tpc_out                           <<= Select(is_exception | reg_interrupt, Select(reg_task_mode, reg_tpc, branch_target_output.straight_addr), reg_tpc)
+        self.tpc_out                           <<= Select(reg_task_mode, reg_tpc, branch_target_output.straight_addr)
 
 class ExecStage2(GenericModule):
     clk = ClkPort()
@@ -288,14 +307,17 @@ class ExecStage2(GenericModule):
 
     # side-band interfaces
     spc_out = Output(BrewInstAddr)
+    spc_changed = Output(logic)
     tpc_out = Output(BrewInstAddr)
+    tpc_changed = Output(logic)
     task_mode_out = Output(logic)
-    ecause_in = Input(EnumNet(exceptions))
+    task_mode_changed = Output(logic)
     ecause_out = Output(EnumNet(exceptions))
+    ecause_changed = Output(logic)
     eaddr_out = Output(BrewAddr)
+    eaddr_changed = Output(logic)
     do_branch_immediate = Output(logic) # This is the unregistered version, not the one that all other stages use
     do_branch = Output(logic) # This is the regular, registered version
-    interrupt = Input(logic)
 
     complete = Output(logic) # goes high for 1 cycle when an instruction completes. Used for verification
 
@@ -341,7 +363,8 @@ class ExecStage2(GenericModule):
             reg_input_port.branch_addr,
             concat(mem_output.data_h, mem_output.data_l)[31:1]
         )
-        branch_unit.input_port.interrupt       <<= self.interrupt
+        branch_unit.input_port.is_interrupt    <<= reg_input_port.is_interrupt
+        branch_unit.input_port.is_exception    <<= reg_input_port.is_exception
         branch_unit.input_port.fetch_av        <<= reg_input_port.fetch_av
         branch_unit.input_port.mem_av          <<= reg_input_port.mem_av
         branch_unit.input_port.mem_unaligned   <<= reg_input_port.mem_unaligned
@@ -406,49 +429,33 @@ class ExecStage2(GenericModule):
         self.do_branch_immediate <<= branch_output.do_branch & sideband_strobe
         self.do_branch <<= Reg(self.do_branch_immediate)
 
-        straight_tpc_out = Select(reg_input_port.task_mode, reg_input_port.tpc, reg_input_port.straight_addr)
-        self.tpc_out <<= Select(
-            sideband_strobe,
-            reg_input_port.tpc,
-            Select(
-                branch_output.tpc_changed,
-                straight_tpc_out,
-                branch_output.tpc,
-            )
+        self.spc_out <<= branch_output.spc
+        self.spc_changed <<= sideband_strobe & branch_output.spc_changed
+        self.tpc_out <<= branch_output.tpc
+        self.tpc_changed <<= sideband_strobe & branch_output.tpc_changed
+        self.task_mode_out <<= branch_output.task_mode
+        self.task_mode_changed <<= sideband_strobe & branch_output.task_mode_changed
+        self.ecause_out <<= branch_output.ecause
+        self.ecause_changed <<= sideband_strobe & branch_output.ecause_changed
+        self.eaddr_out <<= SelectOne(
+            #branch_output.ecause == exceptions.exc_reset,           0, <-- this never happens, it's just the default on POR
+            #branch_output.ecause == exceptions.exc_hwi,             concat(reg_pc, "1'b0"),
+            #branch_output.ecause == exceptions.exc_swi_0,           concat(reg_pc, "1'b0"),
+            #branch_output.ecause == exceptions.exc_swi_1,           concat(reg_pc, "1'b0"),
+            #branch_output.ecause == exceptions.exc_swi_2,           concat(reg_pc, "1'b0"),
+            #branch_output.ecause == exceptions.exc_swi_3,           concat(reg_pc, "1'b0"),
+            #branch_output.ecause == exceptions.exc_swi_4,           concat(reg_pc, "1'b0"),
+            #branch_output.ecause == exceptions.exc_swi_5,           concat(reg_pc, "1'b0"),
+            #branch_output.ecause == exceptions.exc_swi_6,           concat(reg_pc, "1'b0"),
+            #branch_output.ecause == exceptions.exc_swi_7,           concat(reg_pc, "1'b0"),
+            #branch_output.ecause == exceptions.exc_unknown_inst,    concat(reg_pc, "1'b0"),
+            #branch_output.ecause == exceptions.exc_inst_av,         concat(reg_pc, "1'b0"),
+            #branch_output.ecause == exceptions.exc_type,            ????, <-- this is complicated, but we don't have types yet, so it can never happen
+            branch_output.ecause == exceptions.exc_unaligned,       reg_input_port.eff_addr,
+            branch_output.ecause == exceptions.exc_mem_av,          reg_input_port.eff_addr,
+            default_port = concat(reg_pc, "1'b0")
         )
-        straight_spc_out = Select(~reg_input_port.task_mode, reg_input_port.spc, reg_input_port.straight_addr)
-        self.spc_out <<= Select(
-            sideband_strobe,
-            reg_input_port.spc,
-            Select(
-                branch_output.spc_changed,
-                straight_spc_out,
-                branch_output.spc,
-            )
-        )
-        self.task_mode_out <<= Select(
-            sideband_strobe,
-            reg_input_port.task_mode,
-            Select(
-                branch_output.task_mode_changed,
-                reg_input_port.task_mode,
-                branch_output.task_mode,
-            )
-        )
-        self.ecause_out <<= Select(
-            sideband_strobe,
-            self.ecause_in,
-            Select(
-                branch_output.is_exception_or_interrupt,
-                self.ecause_in,
-                branch_output.ecause
-            )
-        )
-        self.eaddr_out <<= Reg(Select(
-            (branch_output.ecause == exceptions.exc_unaligned) | (branch_output.ecause == exceptions.exc_mem_av),
-            concat(reg_pc, "1'b0"),
-            reg_input_port.eff_addr
-        ), clock_en=sideband_strobe & branch_output.is_exception)
+        self.eaddr_changed <<= sideband_strobe & branch_output.ecause_changed
 
         self.complete <<= sideband_strobe
 
@@ -515,19 +522,24 @@ class ExecuteStage(GenericModule):
         self.bus_req_if            <<= stage2.bus_req_if
         stage2.bus_rsp_if          <<= self.bus_rsp_if
         self.csr_if                <<= stage2.csr_if
-        self.spc_out               <<= stage2.spc_out
-        self.tpc_out               <<= stage2.tpc_out
-        self.task_mode_out         <<= stage2.task_mode_out
-        stage2.ecause_in           <<= self.ecause_in
-        self.ecause_out            <<= stage2.ecause_out
-        self.eaddr_out             <<= stage2.eaddr_out
         do_branch_immediate        <<= stage2.do_branch_immediate
         do_branch                  <<= stage2.do_branch
-        stage2.interrupt           <<= self.interrupt
         self.complete              <<= stage2.complete
 
-        self.do_branch             <<= do_branch
+        # Generate SPC/TPC and TASK_MOD outputs
+        # Stage 1 never changes TASK_MODE and always assumes straight-line execution for SPC/TPC
+        # Stage 2 corrects for all these assumptions and asserts the corresponding XXX_CHANGED flags as needed
 
+        self.tpc_out <<= Select(stage2.tpc_changed, stage1.tpc_out, stage2.tpc_out)
+        self.spc_out <<= Select(stage2.spc_changed, stage1.spc_out, stage2.spc_out)
+        self.task_mode_out <<= Select(stage2.task_mode_changed, exec_12_if.task_mode, stage2.task_mode_out)
+        self.ecause_out <<= Select(stage2.ecause_changed, self.ecause_in, stage2.ecause_out)
+        # TODO: this is silly: we have all of these are in/outs with external registers, except for this one, which is internal. Make up your mind!!!
+        self.eaddr_out <<= Reg(
+            Select(stage2.eaddr_changed, self.eaddr_out, stage2.eaddr_out)
+        )
+
+        self.do_branch             <<= do_branch
 
 
 def gen():

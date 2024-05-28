@@ -20,6 +20,7 @@ class BranchUnitInputIf(Interface):
     tpc             = BrewInstAddr
     task_mode       = logic
     branch_addr     = BrewInstAddr
+    straight_addr   = BrewInstAddr
     interrupt       = logic
     fetch_av        = logic # Coming all the way from fetch: if the instruction gotten this far, we should raise the exception
     mem_av          = logic # Coming from the load-store unit if that figures out an exception
@@ -29,6 +30,8 @@ class BranchUnitInputIf(Interface):
     f_carry         = logic
     f_overflow      = logic
     is_branch_insn  = logic
+    is_exception    = logic
+    is_interrupt    = logic
     woi             = logic
 
 class BranchUnitOutputIf(Interface):
@@ -39,8 +42,7 @@ class BranchUnitOutputIf(Interface):
     task_mode                 = logic
     task_mode_changed         = logic
     ecause                    = EnumNet(exceptions)
-    is_exception              = logic
-    is_exception_or_interrupt = logic
+    ecause_changed            = logic
     do_branch                 = logic
 
 
@@ -50,6 +52,7 @@ class BranchUnit(Module):
     output_port = Output(BranchUnitOutputIf)
 
     def body(self):
+        # Set whenever we branch without a mode change
         # Branch codes:
         #  eq: f_zero = 1
         #  ne: f_zero = 0
@@ -57,61 +60,66 @@ class BranchUnit(Module):
         #  ge: f_carry = 0
         #  lts: f_sign != f_overflow
         #  ges: f_sign == f_overflow
-        condition_result = self.input_port.is_branch_insn & SelectOne(
-            self.input_port.opcode == branch_ops.cb_eq,   self.input_port.f_zero,
-            self.input_port.opcode == branch_ops.cb_ne,   ~self.input_port.f_zero,
-            self.input_port.opcode == branch_ops.cb_lts,  self.input_port.f_sign != self.input_port.f_overflow,
-            self.input_port.opcode == branch_ops.cb_ges,  self.input_port.f_sign == self.input_port.f_overflow,
-            self.input_port.opcode == branch_ops.cb_lt,   self.input_port.f_carry,
-            self.input_port.opcode == branch_ops.cb_ge,   ~self.input_port.f_carry,
-            self.input_port.opcode == branch_ops.bb_one,  self.input_port.bit_test_bit,
-            self.input_port.opcode == branch_ops.bb_zero, ~self.input_port.bit_test_bit,
+        # Some explanation: WOI is decoded into a branch_eq that's always true to the same address as the instruction. So we should branch, unless there's an interrupt and we're in a WOI
+        # Exceptions in SCHEUDLER mode result in jump to 0, which is technically an in-mode branch
+        in_mode_branch = Select(
+            self.input_port.is_exception,
+            self.input_port.is_branch_insn & SelectOne(
+                self.input_port.opcode == branch_ops.pc_w,        1,
+                self.input_port.opcode == branch_ops.pc_w_ind,    1,
+                self.input_port.opcode == branch_ops.tpc_w,       self.input_port.task_mode,
+                self.input_port.opcode == branch_ops.tpc_w_ind,   self.input_port.task_mode,
+                self.input_port.opcode == branch_ops.cb_eq,       self.input_port.f_zero & ~(self.input_port.woi & self.input_port.is_interrupt),
+                self.input_port.opcode == branch_ops.cb_ne,      ~self.input_port.f_zero,
+                self.input_port.opcode == branch_ops.cb_lts,      self.input_port.f_sign != self.input_port.f_overflow,
+                self.input_port.opcode == branch_ops.cb_ges,      self.input_port.f_sign == self.input_port.f_overflow,
+                self.input_port.opcode == branch_ops.cb_lt,       self.input_port.f_carry,
+                self.input_port.opcode == branch_ops.cb_ge,      ~self.input_port.f_carry,
+                self.input_port.opcode == branch_ops.bb_one,      self.input_port.bit_test_bit,
+                self.input_port.opcode == branch_ops.bb_zero,    ~self.input_port.bit_test_bit,
+                self.input_port.opcode == branch_ops.stm,         0,
+            ),
+            ~self.input_port.task_mode
         )
 
-        # Set if we have an exception: in task mode this results in a switch to scheduler mode, in scheduler mode, it's a reset
-        is_exception = (self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.swi)) | self.input_port.mem_av | self.input_port.mem_unaligned | self.input_port.fetch_av
+        is_exception_or_interrupt = self.input_port.is_exception | (self.input_port.task_mode & self.input_port.is_interrupt)
 
-        # Set whenever we branch without a mode change
-        in_mode_branch = SelectOne(
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w),        1,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w_ind),    1,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w),       self.input_port.task_mode,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w_ind),   self.input_port.task_mode,
-            is_exception,                                                                        ~self.input_port.task_mode,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.stm),         0,
-            default_port =                                                                       condition_result,
+        self.output_port.tpc <<= Select(
+            is_exception_or_interrupt,
+            SelectOne(
+                self.input_port.opcode == branch_ops.pc_w,      self.input_port.op_a[31:1],
+                self.input_port.opcode == branch_ops.tpc_w,     self.input_port.op_a[31:1],
+                #self.input_port.opcode == branch_ops.pc_w_ind,  self.input_port.branch_addr,
+                #self.input_port.opcode == branch_ops.tpc_w_ind, self.input_port.branch_addr,
+                default_port =                                  self.input_port.branch_addr,
+            ),
+            self.input_port.tpc
         )
-
-        branch_target = SelectOne(
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w),                                 self.input_port.op_a[31:1],
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w),                                self.input_port.op_a[31:1],
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w_ind),                             self.input_port.branch_addr,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w_ind),                            self.input_port.branch_addr,
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.stm),                                  self.input_port.tpc,
-            default_port =                                                                                                Select(is_exception | self.input_port.interrupt, self.input_port.branch_addr, self.input_port.tpc),
-        )
-        spc_branch_target = Select(
-            self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w),
-            self.input_port.branch_addr,
-            self.input_port.op_a[31:1],
-        )
-
-        self.output_port.spc            <<= Select(is_exception, spc_branch_target, 0)
-        self.output_port.spc_changed    <<= ~self.input_port.task_mode & (is_exception | (in_mode_branch & (~self.input_port.woi | ~self.input_port.interrupt)))
-        self.output_port.tpc            <<= branch_target
-        self.output_port.tpc_changed    <<= Select(
+        self.output_port.tpc_changed <<= Select(
             self.input_port.task_mode,
             # In Scheduler mode: TPC can only change through TCP manipulation instructions. For those, the value comes through op_c
             self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.tpc_w),
-            # In task mode, all branches count, but so do exceptions which, while don't change TPC, they don't update TPC either.
-            in_mode_branch | is_exception | self.input_port.interrupt
+            # In task mode, all branches count, but so do exceptions and interrupts: stage1 already updated TPC
+            # to the next address, we'll have to correct for it here
+            in_mode_branch | is_exception_or_interrupt
         )
+
+        self.output_port.spc <<= Select(self.input_port.is_exception,
+            Select(
+                self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.pc_w),
+                self.input_port.branch_addr,
+                self.input_port.op_a[31:1],
+            ),
+            0
+        )
+        self.output_port.spc_changed <<= ~self.input_port.task_mode & (self.input_port.is_exception | in_mode_branch)
+
         self.output_port.task_mode_changed <<= Select(
             self.input_port.task_mode,
             # In scheduler mode: exit to ask mode, if STM instruction is executed
             (self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.stm)),
             # In task mode: we enter scheduler mode in case of an exception or interrupt
-            is_exception | self.input_port.interrupt
+            is_exception_or_interrupt
         )
         self.output_port.task_mode  <<= self.input_port.task_mode ^ self.output_port.task_mode_changed
 
@@ -131,8 +139,8 @@ class BranchUnit(Module):
             self.input_port.mem_av,         exceptions.exc_mem_av,
             swi_exception,                  self.input_port.op_a[6:0],
         ))
-        self.output_port.is_exception <<= is_exception
-        self.output_port.is_exception_or_interrupt  <<= is_exception | (self.input_port.task_mode & self.input_port.interrupt)
+        self.output_port.ecause_changed <<= is_exception_or_interrupt
+
 
 def gen():
     def top():
