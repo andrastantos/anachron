@@ -1,24 +1,25 @@
 [*]
-[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Tue May 28 18:58:25 2024
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Thu May 30 00:49:13 2024
 [*]
 [dumpfile] "/home/tantos/anachron/rtl/espresso/test/execute.vcd"
-[dumpfile_mtime] "Tue May 28 18:57:40 2024"
-[dumpfile_size] 170234
+[dumpfile_mtime] "Thu May 30 00:49:11 2024"
+[dumpfile_size] 185405
 [savefile] "/home/tantos/anachron/rtl/espresso/test/execute.gtkw"
 [timestart] 0
-[size] 1920 1097
+[size] 1920 990
 [pos] -1 -1
-*-5.703310 134 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-5.953119 120 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
-[treeopen] top.dut.stage1.
+[treeopen] top.dut.stage2.
 [sst_width] 278
 [signals_width] 432
 [sst_expanded] 1
-[sst_vpaned_height] 588
+[sst_vpaned_height] 590
 @28
 top.dut.clk
+top.dut.rst
 @800200
 -EXEC_INPUT_PORT
 @28
@@ -56,7 +57,6 @@ top.dut.stage1.output_port_spc[30:0]
 top.dut.task_mode_in
 top.dut.task_mode_out
 top.dut.do_branch
-@29
 top.dut.do_branch_immediate
 @800200
 -EXEC_12_IF
@@ -107,7 +107,98 @@ top.dut.exec_12_if_task_mode
 top.dut.exec_12_if_tpc[30:0]
 @28
 top.dut.exec_12_if_woi
+top.dut.stage1.reg_interrupt
+top.dut.stage2.reg_input_port_is_interrupt
+@29
+top.dut.interrupt
 @1000200
 -EXEC_12_IF
+@800200
+-STAGE2_OUTPUT
+@22
+top.dut.stage2.output_port_addr[3:0]
+@28
+top.dut.stage2.output_port_data_en
+@22
+top.dut.stage2.output_port_data_h[15:0]
+top.dut.stage2.output_port_data_l[15:0]
+@28
+top.dut.stage2.output_port_do_bse
+top.dut.stage2.output_port_do_bze
+top.dut.stage2.output_port_do_wse
+top.dut.stage2.output_port_do_wze
+top.dut.stage2.output_port_valid
+@1000200
+-STAGE2_OUTPUT
+@28
+top.dut.stage2.memory_unit.input_port_ready
+top.dut.stage2.memory_unit.active
+top.dut.stage2.memory_unit.gap
+top.dut.stage2.memory_unit.next_active
+@800200
+-BRANCH_UNIT_INPUT
+@28
+top.dut.stage2.branch_unit.input_port_bit_test_bit
+@22
+top.dut.stage2.branch_unit.input_port_branch_addr[30:0]
+@28
+top.dut.stage2.branch_unit.input_port_f_carry
+top.dut.stage2.branch_unit.input_port_f_overflow
+top.dut.stage2.branch_unit.input_port_f_sign
+top.dut.stage2.branch_unit.input_port_f_zero
+top.dut.stage2.branch_unit.input_port_fetch_av
+top.dut.stage2.branch_unit.input_port_interrupt
+top.dut.stage2.branch_unit.input_port_is_branch_insn
+top.dut.stage2.branch_unit.input_port_is_exception
+top.dut.stage2.branch_unit.input_port_is_interrupt
+top.dut.stage2.branch_unit.input_port_mem_av
+top.dut.stage2.branch_unit.input_port_mem_unaligned
+@22
+top.dut.stage2.branch_unit.input_port_op_a[31:0]
+@28
+top.dut.stage2.branch_unit.input_port_opcode
+@22
+top.dut.stage2.branch_unit.input_port_spc[30:0]
+@28
+top.dut.stage2.branch_unit.input_port_task_mode
+@22
+top.dut.stage2.branch_unit.input_port_tpc[30:0]
+@28
+top.dut.stage2.branch_unit.input_port_woi
+@1000200
+-BRANCH_UNIT_INPUT
+@28
+top.dut.stage2.branch_unit.input_port_task_mode
+top.dut.stage2.branch_unit.is_exception_or_interrupt
+@800200
+-MEM_UNIT_INPUT
+@28
+top.dut.stage2.memory_unit.input_port_access_len[1:0]
+@22
+top.dut.stage2.memory_unit.input_port_addr[31:0]
+top.dut.stage2.memory_unit.input_port_data[31:0]
+@28
+top.dut.stage2.memory_unit.input_port_is_csr
+top.dut.stage2.memory_unit.input_port_read_not_write
+top.dut.stage2.memory_unit.input_port_ready
+top.dut.stage2.memory_unit.input_port_valid
+@1000200
+-MEM_UNIT_INPUT
+@28
+top.dut.stage2.memory_unit.input_port_is_csr
+top.dut.stage2.memory_unit.csr_active
+top.dut.stage2.memory_unit.gap
+top.dut.stage2.memory_unit.active
+top.dut.stage1.addr_calc_unit.input_port_is_csr
+top.dut.stage1.addr_calc_unit.output_port_is_csr
+@800200
+-MEM_UNIT_OUTPUT
+@28
+top.dut.stage2.memory_unit.output_port_valid
+@22
+top.dut.stage2.memory_unit.output_port_data_h[15:0]
+top.dut.stage2.memory_unit.output_port_data_l[15:0]
+@1000200
+-MEM_UNIT_OUTPUT
 [pattern_trace] 1
 [pattern_trace] 0

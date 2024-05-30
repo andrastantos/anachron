@@ -27,6 +27,13 @@ except ImportError:
     from exec_branch_target import *
     from exec_branch import *
 
+'''
+Problem with multiply: Stage1 accepts a new operation while stage 2 is busy handling a read for instance. If, during that time, a multiply comes by,
+it'll be accepted. But multiply is multi-stage and will continue advancing on *that* pipeline; worse, multiply doesn't have back-pressure so it'll just
+assume that stage2 is ready to catch the result as it pops out.
+
+I think I'll brake multiply into two (combinational) stages and integrate them as usual building blocks. That seems the cleanest solution.
+'''
 """
 Execute stage of the V1 pipeline.
 
@@ -209,12 +216,12 @@ class ExecStage1(GenericModule):
         addr_calc_output = Wire(AddrCalcOutputIf)
         addr_calc_unit = AddrCalcUnit()
         addr_calc_unit.input_port.is_ldst        <<= (reg_input_port.exec_unit == op_class.ld_st) | (reg_input_port.exec_unit == op_class.branch_ind)
-        addr_calc_unit.input_port.is_csr         <<= (reg_input_port.ldst_op == ldst_ops.csr_load) | (reg_input_port.ldst_op == ldst_ops.csr_store)
+        addr_calc_unit.input_port.is_csr         <<= (reg_input_port.exec_unit == op_class.ld_st) & ((reg_input_port.ldst_op == ldst_ops.csr_load) | (reg_input_port.ldst_op == ldst_ops.csr_store))
         addr_calc_unit.input_port.op_b           <<= reg_input_port.op_b
         addr_calc_unit.input_port.op_c           <<= reg_input_port.op_c
         addr_calc_unit.input_port.mem_base       <<= self.mem_base # I don't think this needs registering: if this was changed by a previous instruction, we should pick it up immediately
         addr_calc_unit.input_port.mem_limit      <<= self.mem_limit # I don't think this needs registering: if this was changed by a previous instruction, we should pick it up immediately
-        addr_calc_unit.input_port.task_mode      <<= self.task_mode_in # I don't think this needs registering: if this was changed by a previous instruction, we would be branching
+        addr_calc_unit.input_port.task_mode      <<= reg_task_mode # I don't think this needs registering: if this was changed by a previous instruction, we would be branching
         addr_calc_unit.input_port.mem_access_len <<= reg_input_port.mem_access_len
         addr_calc_output <<= addr_calc_unit.output_port
 
@@ -336,6 +343,9 @@ class ExecStage2(GenericModule):
         # TODO: do we need to feed memory with registered or unregistered signals? I think the answer to that is no.
         #       In this world, we register in the input and if memory doesn't well, it should...
 
+        stage_done_strobe = Wire()
+        mem_output = Wire(MemOutputIf)
+
         input_ready = Wire(logic)
         input_reg_en = input_ready & self.input_port.valid
         mem_unit_ready = Wire()
@@ -344,11 +354,22 @@ class ExecStage2(GenericModule):
         reg_input_port = Wire(self.input_port.get_data_member_type())
         reg_input_port <<= Reg(self.input_port.get_data_members(), clock_en = input_reg_en)
         reg_input_port_data_valid = Wire(logic)
-        reg_input_port_data_valid <<= Reg(Select(self.do_branch | self.do_branch_immediate, Select(input_ready & self.input_port.valid, reg_input_port_data_valid, 1), 0))
+        clear_reg_input_valid = Wire(logic)
+        clear_reg_input_valid <<= Select(
+            reg_input_port.is_mem_op,
+            # Not an indirect jump: clear every time
+            1,
+            # Indirect jump: clear when memory response comes back
+            mem_output.valid
+        )
+        set_reg_input_valid = self.input_port.valid & self.input_port.ready
+        reg_input_port_data_valid_next = Select(set_reg_input_valid, Select(clear_reg_input_valid, reg_input_port_data_valid, 0), 1)
+        reg_input_port_data_valid <<= Reg(reg_input_port_data_valid_next)
+        #reg_input_port_data_valid <<= Reg(Select(self.do_branch | self.do_branch_immediate, Select(input_ready & self.input_port.valid, reg_input_port_data_valid, 1), 0))
         reg_pc = Select(reg_input_port.task_mode, reg_input_port.spc, reg_input_port.tpc)
 
         # TODO: do we need to clear after a branch?
-        input_ready <<= Select(reg_input_port.is_mem_op, 1, mem_unit_ready) | self.do_branch
+        input_ready <<= Select(reg_input_port.is_mem_op, 1, mem_unit_ready) | self.do_branch | ~reg_input_port_data_valid
         self.input_port.ready <<= input_ready
 
         # Branch unit
@@ -380,13 +401,13 @@ class ExecStage2(GenericModule):
 
         # Memory unit
         mem_input = Wire(MemInputIf)
-        mem_output = Wire(MemOutputIf)
         memory_unit = MemoryStage()
-        mem_input.read_not_write <<= reg_input_port.read_not_write
-        mem_input.data <<= reg_input_port.op_a
-        mem_input.addr <<= reg_input_port.phy_addr
-        mem_input.is_csr <<= reg_input_port.is_csr
-        mem_input.access_len <<= reg_input_port.access_len
+        mem_input.read_not_write <<= self.input_port.read_not_write
+        mem_input.data <<= self.input_port.op_a
+        mem_input.addr <<= self.input_port.phy_addr
+        mem_input.is_csr <<= self.input_port.is_csr
+        mem_input.access_len <<= self.input_port.access_len
+        mem_input.valid <<= self.input_port.valid
         memory_unit.input_port <<= mem_input
         self.bus_req_if <<= memory_unit.bus_req_if
         memory_unit.bus_rsp_if <<= self.bus_rsp_if
@@ -410,12 +431,13 @@ class ExecStage2(GenericModule):
         self.output_port.do_wse <<= reg_input_port.do_wse
         self.output_port.do_bze <<= reg_input_port.do_bze
         self.output_port.do_wze <<= reg_input_port.do_wze
-        self.output_port.valid <<= reg_input_port_data_valid & ~self.do_branch_immediate & ~self.do_branch # Not sure this is correct.
+        self.output_port.valid <<= stage_done_strobe
+        #self.output_port.valid <<= reg_input_port_data_valid & ~self.do_branch_immediate & ~self.do_branch # Not sure this is correct.
 
         # Create side-band interfaces
         #####################################
 
-        # When we have a branch, we have to clear the exec unit from s2; otherwise it will potentially prevent 'sideband_strobe' from firing when we resume from the target.
+        # When we have a branch, we have to clear the exec unit from s2; otherwise it will potentially prevent 'stage_done_strobe' from firing when we resume from the target.
         # The test for this is:
         #   $pc <- mem[some_table] # jumps to xxx
         # xxx:
@@ -423,20 +445,19 @@ class ExecStage2(GenericModule):
         # These back-to-back jumps would fail without the intervention
 
         # TODO: this I hope is not an issue anymore, but needs to be tested.
-        sideband_strobe = Wire()
-        sideband_strobe <<= reg_input_port_data_valid & input_ready & self.input_port.valid
+        stage_done_strobe <<= reg_input_port_data_valid & ~reg_input_port_data_valid_next
 
-        self.do_branch_immediate <<= branch_output.do_branch & sideband_strobe
+        self.do_branch_immediate <<= branch_output.do_branch & stage_done_strobe
         self.do_branch <<= Reg(self.do_branch_immediate)
 
         self.spc_out <<= branch_output.spc
-        self.spc_changed <<= sideband_strobe & branch_output.spc_changed
+        self.spc_changed <<= stage_done_strobe & branch_output.spc_changed
         self.tpc_out <<= branch_output.tpc
-        self.tpc_changed <<= sideband_strobe & branch_output.tpc_changed
+        self.tpc_changed <<= stage_done_strobe & branch_output.tpc_changed
         self.task_mode_out <<= branch_output.task_mode
-        self.task_mode_changed <<= sideband_strobe & branch_output.task_mode_changed
+        self.task_mode_changed <<= stage_done_strobe & branch_output.task_mode_changed
         self.ecause_out <<= branch_output.ecause
-        self.ecause_changed <<= sideband_strobe & branch_output.ecause_changed
+        self.ecause_changed <<= stage_done_strobe & branch_output.ecause_changed
         self.eaddr_out <<= SelectOne(
             #branch_output.ecause == exceptions.exc_reset,           0, <-- this never happens, it's just the default on POR
             #branch_output.ecause == exceptions.exc_hwi,             concat(reg_pc, "1'b0"),
@@ -455,9 +476,9 @@ class ExecStage2(GenericModule):
             branch_output.ecause == exceptions.exc_mem_av,          reg_input_port.eff_addr,
             default_port = concat(reg_pc, "1'b0")
         )
-        self.eaddr_changed <<= sideband_strobe & branch_output.ecause_changed
+        self.eaddr_changed <<= stage_done_strobe & branch_output.ecause_changed
 
-        self.complete <<= sideband_strobe
+        self.complete <<= stage_done_strobe
 
 class ExecuteStage(GenericModule):
     clk = ClkPort()
@@ -512,6 +533,7 @@ class ExecuteStage(GenericModule):
         stage1.spc_in              <<= self.spc_in
         stage1.tpc_in              <<= self.tpc_in
         stage1.task_mode_in        <<= self.task_mode_in
+        stage1.interrupt           <<= self.interrupt
         stage1.do_branch_immediate <<= do_branch_immediate
         stage1.do_branch           <<= do_branch
 

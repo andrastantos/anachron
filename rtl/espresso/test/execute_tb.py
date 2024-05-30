@@ -581,6 +581,7 @@ def sim():
 
 
             self.output_port.valid <<= 0
+            self.interrupt <<= 0
             yield from wait_clk()
             while self.rst:
                 yield from wait_clk()

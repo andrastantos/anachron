@@ -21,7 +21,6 @@ class BranchUnitInputIf(Interface):
     task_mode       = logic
     branch_addr     = BrewInstAddr
     straight_addr   = BrewInstAddr
-    interrupt       = logic
     fetch_av        = logic # Coming all the way from fetch: if the instruction gotten this far, we should raise the exception
     mem_av          = logic # Coming from the load-store unit if that figures out an exception
     mem_unaligned   = logic # Coming from the load-store unit if an unaligned access was attempted
@@ -133,7 +132,7 @@ class BranchUnit(Module):
         #       in simulation, and thus, if op_a is an invalid exception, the simulator would
         #       blow up trying to do the type-conversion, even if swi_exception isn't set.
         self.output_port.ecause <<= EnumNet(exceptions)(SelectFirst(
-            self.input_port.interrupt,      exceptions.exc_hwi,
+            self.input_port.is_interrupt,   exceptions.exc_hwi,
             self.input_port.fetch_av,       exceptions.exc_inst_av,
             self.input_port.mem_unaligned,  exceptions.exc_unaligned,
             self.input_port.mem_av,         exceptions.exc_mem_av,
