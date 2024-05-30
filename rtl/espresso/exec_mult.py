@@ -35,9 +35,12 @@ class MultUnit(Module):
             partial_11 = (self.input_port.op_a[15: 0] * self.input_port.op_b[15: 0])
             partial_12 = (self.input_port.op_a[31:16] * self.input_port.op_b[15: 0])[15:0]
             partial_21 = (self.input_port.op_a[15: 0] * self.input_port.op_b[31:16])[15:0]
-            s1_partial_11 = Reg(partial_11, clock_en = self.input_port.valid)
-            s1_partial_12 = Reg(partial_12, clock_en = self.input_port.valid)
-            s1_partial_21 = Reg(partial_21, clock_en = self.input_port.valid)
+            #s1_partial_11 = Reg(partial_11, clock_en = self.input_port.valid)
+            #s1_partial_12 = Reg(partial_12, clock_en = self.input_port.valid)
+            #s1_partial_21 = Reg(partial_21, clock_en = self.input_port.valid)
+            s1_partial_11 = partial_11
+            s1_partial_12 = partial_12
+            s1_partial_21 = partial_21
             mult_result = (s1_partial_11 + concat(s1_partial_12+s1_partial_21, "16'b0"))[31:0]
         else:
             op_a = Select(self.input_port.valid, Reg(self.input_port.op_a, clock_en = self.input_port.valid), self.input_port.op_a)

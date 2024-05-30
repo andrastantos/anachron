@@ -63,9 +63,9 @@ It does the following:
     +-----------+
     |  Shifter  |
     +-----------+
-    +-------------------------+
-    |        Multilper        |
-    +-------------------------+
+    +-----------+
+    | Multilper |
+    +-----------+
 
 PC is cycle-1 relative. If there was a branch, that will be determined in cycle-2,
 though the branch target address is calculated in cycle-1. This means that cycle-1
@@ -94,7 +94,6 @@ class Exec12If(ReadyValid):
     f_sign                  = logic
     f_carry                 = logic
     f_overflow              = logic
-    is_mult_op              = logic
     ################ ADDR CALC
     phy_addr                = BrewAddr
     eff_addr                = BrewAddr
@@ -141,9 +140,6 @@ class ExecStage1(GenericModule):
 
     # Pipeline output
     output_port = Output(Exec12If)
-
-    # Multiplier output
-    mult_result = Output(BrewData) # This is needed separately due to the internal pipelining of the multiplier
 
     # side-band interfaces
     mem_base = Input(BrewMemBase)
@@ -195,6 +191,7 @@ class ExecStage1(GenericModule):
         alu_unit.input_port.tpc    <<= reg_tpc
         alu_output <<= alu_unit.output_port
 
+        result_selectors = []
         # Shifter
         if self.has_shift:
             shifter_output = Wire(ShifterOutputIf)
@@ -203,6 +200,7 @@ class ExecStage1(GenericModule):
             shifter_unit.input_port.op_a   <<= reg_input_port.op_a
             shifter_unit.input_port.op_b   <<= reg_input_port.op_b
             shifter_output <<= shifter_unit.output_port
+            result_selectors += [reg_input_port.exec_unit == op_class.shift,   shifter_output.result]
 
         # Multiplier (this unit has internal pipelining)
         if self.has_multiply:
@@ -210,7 +208,8 @@ class ExecStage1(GenericModule):
             mult_unit.input_port.valid  <<= input_buf_en
             mult_unit.input_port.op_a   <<= reg_input_port.op_a
             mult_unit.input_port.op_b   <<= reg_input_port.op_b
-            self.mult_result <<= mult_unit.output_port
+            mult_result = mult_unit.output_port
+            result_selectors += [reg_input_port.exec_unit == op_class.mult,   mult_result]
 
         # Physical and effective address calculation
         addr_calc_output = Wire(AddrCalcOutputIf)
@@ -246,12 +245,11 @@ class ExecStage1(GenericModule):
 
         # Combining the unit outputs into a single interface
         ################ ALU/SHIFT/MULT
-        self.output_port.result                <<= Select(reg_input_port.exec_unit == op_class.alu, shifter_output.result, alu_output.result)
+        self.output_port.result                <<= SelectOne(*result_selectors, default_port = alu_output.result)
         self.output_port.f_zero                <<= alu_output.f_zero
         self.output_port.f_sign                <<= alu_output.f_sign
         self.output_port.f_carry               <<= alu_output.f_carry
         self.output_port.f_overflow            <<= alu_output.f_overflow
-        self.output_port.is_mult_op            <<= (reg_input_port.exec_unit == op_class.mult)
         ################ ADDR CALC
         self.output_port.phy_addr              <<= addr_calc_output.phy_addr
         self.output_port.eff_addr              <<= addr_calc_output.eff_addr
@@ -299,9 +297,6 @@ class ExecStage2(GenericModule):
     # Pipeline input
     input_port = Input(Exec12If)
 
-    # Multiplier result
-    mult_result = Input(BrewData)
-
     # Pipeline output
     output_port = Output(ResultExtendIf)
 
@@ -333,6 +328,10 @@ class ExecStage2(GenericModule):
         self.has_shift = has_shift
 
     def body(self):
+        # We can accept a transaction if:
+        #    1. Mem unit is ready
+        #    2. Write-back is ready (which is always)
+
         # We have a few stages here:
         #    1. the second stage of multiply (it's actually instantiated in stage-1, but the results need to be dealt with here)
         #    2. branch: this one determines if a branch/exception/interrupt happened and if so, where to jump to
@@ -346,31 +345,30 @@ class ExecStage2(GenericModule):
         stage_done_strobe = Wire()
         mem_output = Wire(MemOutputIf)
 
-        input_ready = Wire(logic)
-        input_reg_en = input_ready & self.input_port.valid
         mem_unit_ready = Wire()
         mem_output = Wire(MemOutputIf)
 
+        state_fsm = ForwardBufLogic()
+
         reg_input_port = Wire(self.input_port.get_data_member_type())
-        reg_input_port <<= Reg(self.input_port.get_data_members(), clock_en = input_reg_en)
-        reg_input_port_data_valid = Wire(logic)
-        clear_reg_input_valid = Wire(logic)
-        clear_reg_input_valid <<= Select(
-            reg_input_port.is_mem_op,
-            # Not an indirect jump: clear every time
-            1,
-            # Indirect jump: clear when memory response comes back
-            mem_output.valid
-        )
-        set_reg_input_valid = self.input_port.valid & self.input_port.ready
-        reg_input_port_data_valid_next = Select(set_reg_input_valid, Select(clear_reg_input_valid, reg_input_port_data_valid, 0), 1)
-        reg_input_port_data_valid <<= Reg(reg_input_port_data_valid_next)
+        reg_input_port <<= Reg(self.input_port.get_data_members(), clock_en = state_fsm.out_reg_en)
+
+        # We shouldn't depend on memory being able to accept a new request on the same cycle it provides a response. It may - should, really - be the case
+        # but it is probably not always going to be the case due to arbitration further down the pike. We *are* dependent on memory having no more than a
+        # single stage latency, that is, if it accepted a request, it will not accept a new one until the result is provided.
+        #
+        # This means that we have to split our logic here:
+        # - From the sate-FSMs perspective, we are consuming the data when mem produces the output. That is, when the data is generated.
+        # - After that however, we should clear a flag to indicate that the memory op held in reg_input_port is not valid anymore, unless of course we do consume a new
+        #   memory operation in the same cycle
+        mem_op_valid = SRReg(state_fsm.out_reg_en, mem_output.valid)
+
+        state_fsm.output_ready <<= Select(reg_input_port.is_mem_op, 1, mem_output.valid) # TODO: this is very weird to hook up 'valid' to 'ready'
+        self.input_port.ready <<= mem_unit_ready # We don't have to combine in do_branch: if there was a branch, we either didn't have a mem-op, or we have waited for it already
+        state_fsm.input_valid <<= self.input_port.valid & self.input_port.ready # THIS IS A GIANT HACK
+
         #reg_input_port_data_valid <<= Reg(Select(self.do_branch | self.do_branch_immediate, Select(input_ready & self.input_port.valid, reg_input_port_data_valid, 1), 0))
         reg_pc = Select(reg_input_port.task_mode, reg_input_port.spc, reg_input_port.tpc)
-
-        # TODO: do we need to clear after a branch?
-        input_ready <<= Select(reg_input_port.is_mem_op, 1, mem_unit_ready) | self.do_branch | ~reg_input_port_data_valid
-        self.input_port.ready <<= input_ready
 
         # Branch unit
         branch_output = Wire(BranchUnitOutputIf)
@@ -407,7 +405,7 @@ class ExecStage2(GenericModule):
         mem_input.addr <<= self.input_port.phy_addr
         mem_input.is_csr <<= self.input_port.is_csr
         mem_input.access_len <<= self.input_port.access_len
-        mem_input.valid <<= self.input_port.valid
+        mem_input.valid <<= self.input_port.valid & self.input_port.is_mem_op
         memory_unit.input_port <<= mem_input
         self.bus_req_if <<= memory_unit.bus_req_if
         memory_unit.bus_rsp_if <<= self.bus_rsp_if
@@ -417,8 +415,6 @@ class ExecStage2(GenericModule):
 
         # Write-back interface
         selector_choices = []
-        if self.has_multiply:
-            selector_choices += [reg_input_port.is_mult_op, self.mult_result]
         selector_choices += [reg_input_port.is_branch_insn, concat(reg_input_port.straight_addr, "1'b0")] # Patch through return address for calls
         result = SelectOne(*selector_choices, default_port = reg_input_port.result)
         is_ld_st = reg_input_port.is_mem_op & ~reg_input_port.is_branch_ind
@@ -445,7 +441,7 @@ class ExecStage2(GenericModule):
         # These back-to-back jumps would fail without the intervention
 
         # TODO: this I hope is not an issue anymore, but needs to be tested.
-        stage_done_strobe <<= reg_input_port_data_valid & ~reg_input_port_data_valid_next
+        stage_done_strobe <<= Select(reg_input_port.is_mem_op & mem_op_valid, state_fsm.output_valid, memory_unit.output_port.valid)
 
         self.do_branch_immediate <<= branch_output.do_branch & stage_done_strobe
         self.do_branch <<= Reg(self.do_branch_immediate)
@@ -520,14 +516,12 @@ class ExecuteStage(GenericModule):
 
     def body(self):
         exec_12_if = Wire(Exec12If)
-        mult_result = Wire(BrewData)
         do_branch = Wire()
         do_branch_immediate = Wire()
 
         stage1 = ExecStage1(has_multiply=self.has_multiply, has_shift=self.has_shift)
         stage1.input_port <<= self.input_port
         exec_12_if <<= stage1.output_port
-        mult_result <<= stage1.mult_result
         stage1.mem_base            <<= self.mem_base
         stage1.mem_limit           <<= self.mem_limit
         stage1.spc_in              <<= self.spc_in
@@ -540,7 +534,6 @@ class ExecuteStage(GenericModule):
         stage2 = ExecStage2(has_multiply=self.has_multiply, has_shift=self.has_shift)
         stage2.input_port          <<= exec_12_if
         self.output_port           <<= stage2.output_port
-        stage2.mult_result         <<= mult_result
         self.bus_req_if            <<= stage2.bus_req_if
         stage2.bus_rsp_if          <<= self.bus_rsp_if
         self.csr_if                <<= stage2.csr_if

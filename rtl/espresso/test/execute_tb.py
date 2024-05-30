@@ -106,8 +106,8 @@ def sim():
         ):
             test("spc_out",       self.spc_out,       spc_out,         "08x", fatal=False)
             test("tpc_out",       self.tpc_out,       tpc_out,         "08x", fatal=False)
-            test("task_mode_out", self.task_mode_out, task_mode_out, fatal=False)
-            test("ecause_out",    self.ecause_out,    ecause_out,      "016b", fatal=False)
+            test("task_mode_out", self.task_mode_out, task_mode_out,          fatal=False)
+            test("ecause_out",    self.ecause_out,    ecause_out,       None, fatal=False)
             test("do_branch",     self.do_branch,     do_branch, fatal=False)
 
             return True
@@ -600,7 +600,7 @@ def sim():
             yield from send_mult_op(41,100)
             for i in range(5):
                 yield from send_bubble()
-            yield from send_mult_op(42,101)
+            yield from send_mult_op(42,101, result_reg=1)
             yield from send_mult_op(43,102)
             yield from send_mult_op(44,103)
             for i in range(5):

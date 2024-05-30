@@ -29,3 +29,29 @@ def get_phy_addr(logical_addr, base):
 
 def is_over_limit(logical_addr, limit):
     return (logical_addr[27:BrewMemShift] > limit)
+
+def SRReg(set, reset):
+    state = Wire(logic)
+    state <<= Reg(Select(
+        set,
+        Select(
+            reset,
+            state,
+            0
+        ),
+        1
+    ))
+    return state
+
+def SRReg(set, reset):
+    state = Wire(logic)
+    state <<= Reg(Select(
+        reset,
+        Select(
+            set,
+            state,
+            1
+        ),
+        0
+    ))
+    return state
