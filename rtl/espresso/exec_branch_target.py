@@ -16,11 +16,11 @@ except ImportError:
 class BranchTargetUnitInputIf(Interface):
     op_c       = BrewData
     pc         = BrewInstAddr
-    inst_len   = Unsigned(2) # 0: single-beat, 1: two-beat, 3: 4-beat
+#    inst_len   = Unsigned(2) # 0: single-beat, 1: two-beat, 3: 4-beat
 
 class BranchTargetUnitOutputIf(Interface):
     branch_addr = BrewInstAddr
-    straight_addr = BrewInstAddr
+#    straight_addr = BrewInstAddr
 
 class BranchTargetUnit(Module):
     input_port = Input(BranchTargetUnitInputIf)
@@ -35,7 +35,7 @@ class BranchTargetUnit(Module):
             )
         offset = unmunge_offset(self.input_port.op_c)
         self.output_port.branch_addr   <<= (self.input_port.pc + offset)[30:0]
-        self.output_port.straight_addr <<= (self.input_port.pc + self.input_port.inst_len + 1)[30:0]
+#        self.output_port.straight_addr <<= (self.input_port.pc + self.input_port.inst_len + 1)[30:0]
 
 
 
