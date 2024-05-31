@@ -1,23 +1,23 @@
 [*]
-[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Fri May 31 17:29:19 2024
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Fri May 31 19:09:07 2024
 [*]
 [dumpfile] "/home/tantos/anachron/rtl/espresso/test/execute.vcd"
-[dumpfile_mtime] "Fri May 31 17:28:19 2024"
-[dumpfile_size] 256694
+[dumpfile_mtime] "Fri May 31 19:01:21 2024"
+[dumpfile_size] 278401
 [savefile] "/home/tantos/anachron/rtl/espresso/test/execute.gtkw"
-[timestart] 227
-[size] 1920 990
+[timestart] 164
+[size] 1920 1097
 [pos] -1 -1
-*-4.953119 124 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-5.519852 394 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
-[treeopen] top.dut.stage1.
+[treeopen] top.dut.stage1.shifter_unit.
 [treeopen] top.dut.stage2.
 [sst_width] 278
 [signals_width] 432
 [sst_expanded] 1
-[sst_vpaned_height] 590
+[sst_vpaned_height] 718
 @28
 top.dut.clk
 top.dut.rst
@@ -34,7 +34,9 @@ top.dut.input_port_do_wse
 top.dut.input_port_do_wze
 top.dut.input_port_exec_unit
 top.dut.input_port_fetch_av
+@24
 top.dut.input_port_inst_len[1:0]
+@28
 top.dut.input_port_ldst_op
 top.dut.input_port_mem_access_len[1:0]
 @22
@@ -49,35 +51,33 @@ top.dut.input_port_woi
 @1000200
 -EXEC_INPUT_PORT
 @22
-top.dut.stage1.tpc_out[30:0]
 top.dut.tpc_in[30:0]
 top.dut.tpc_out[30:0]
 top.dut.spc_in[30:0]
 top.dut.spc_out[30:0]
-top.dut.stage1.output_port_spc[30:0]
 @28
 top.dut.task_mode_in
 top.dut.task_mode_out
 top.dut.do_branch
 top.dut.do_branch_immediate
-@800200
+@800201
 -EXEC_12_IF
-@28
+@29
 top.dut.exec_12_if_valid
 top.dut.exec_12_if_ready
 top.dut.exec_12_if_access_len[1:0]
 top.dut.exec_12_if_bit_test_bit
-@22
+@23
 top.dut.exec_12_if_branch_addr[30:0]
-@28
+@29
 top.dut.exec_12_if_branch_op
 top.dut.exec_12_if_do_bse
 top.dut.exec_12_if_do_bze
 top.dut.exec_12_if_do_wse
 top.dut.exec_12_if_do_wze
-@22
+@23
 top.dut.exec_12_if_eff_addr[31:0]
-@28
+@29
 top.dut.exec_12_if_f_carry
 top.dut.exec_12_if_f_overflow
 top.dut.exec_12_if_f_sign
@@ -89,30 +89,26 @@ top.dut.exec_12_if_is_csr
 top.dut.exec_12_if_is_mem_op
 top.dut.exec_12_if_mem_av
 top.dut.exec_12_if_mem_unaligned
-@22
+@23
 top.dut.exec_12_if_op_a[31:0]
 top.dut.exec_12_if_phy_addr[31:0]
-@28
+@29
 top.dut.exec_12_if_read_not_write
-@22
+@23
 top.dut.exec_12_if_result[31:0]
 top.dut.exec_12_if_result_reg_addr[3:0]
-@28
+@29
 top.dut.exec_12_if_result_reg_addr_valid
-@22
+@23
 top.dut.exec_12_if_spc[30:0]
 top.dut.exec_12_if_straight_addr[30:0]
-@28
+@29
 top.dut.exec_12_if_task_mode
-@22
+@23
 top.dut.exec_12_if_tpc[30:0]
-@28
+@29
 top.dut.exec_12_if_woi
-top.dut.stage1.reg_interrupt
-top.dut.stage2.reg_input_port_is_interrupt
-top.dut.interrupt
-top.dut.stage1.interrupt
-@1000200
+@1000201
 -EXEC_12_IF
 @800200
 -STAGE2_OUTPUT
@@ -129,14 +125,10 @@ top.dut.stage2.output_port_do_bze
 top.dut.stage2.output_port_do_wse
 top.dut.stage2.output_port_do_wze
 top.dut.stage2.output_port_valid
+top.dut.stage2.do_branch
 @1000200
 -STAGE2_OUTPUT
-@28
-top.dut.stage2.memory_unit.input_port_ready
-top.dut.stage2.memory_unit.active
-top.dut.stage2.memory_unit.gap
-top.dut.stage2.memory_unit.next_active
-@800200
+@c00200
 -BRANCH_UNIT_INPUT
 @28
 top.dut.stage2.branch_unit.input_port_bit_test_bit
@@ -165,12 +157,27 @@ top.dut.stage2.branch_unit.input_port_task_mode
 top.dut.stage2.branch_unit.input_port_tpc[30:0]
 @28
 top.dut.stage2.branch_unit.input_port_woi
-@1000200
+@1401200
 -BRANCH_UNIT_INPUT
+@c00200
+-BRANC_UNIT_OUTPUT
 @28
-top.dut.stage2.branch_unit.input_port_task_mode
-top.dut.stage2.branch_unit.is_exception_or_interrupt
-@800200
+top.dut.stage2.branch_unit.output_port_do_branch
+top.dut.stage2.branch_unit.output_port_ecause
+top.dut.stage2.branch_unit.output_port_ecause_changed
+@22
+top.dut.stage2.branch_unit.output_port_spc[30:0]
+@28
+top.dut.stage2.branch_unit.output_port_spc_changed
+top.dut.stage2.branch_unit.output_port_task_mode
+top.dut.stage2.branch_unit.output_port_task_mode_changed
+@22
+top.dut.stage2.branch_unit.output_port_tpc[30:0]
+@28
+top.dut.stage2.branch_unit.output_port_tpc_changed
+@1401200
+-BRANC_UNIT_OUTPUT
+@c00200
 -MEM_UNIT_INPUT
 @28
 top.dut.stage2.memory_unit.input_port_access_len[1:0]
@@ -182,23 +189,31 @@ top.dut.stage2.memory_unit.input_port_is_csr
 top.dut.stage2.memory_unit.input_port_read_not_write
 top.dut.stage2.memory_unit.input_port_ready
 top.dut.stage2.memory_unit.input_port_valid
-@1000200
+@1401200
 -MEM_UNIT_INPUT
-@28
-top.dut.stage2.memory_unit.input_port_is_csr
-top.dut.stage2.memory_unit.csr_active
-top.dut.stage2.memory_unit.gap
-top.dut.stage2.memory_unit.active
-top.dut.stage1.addr_calc_unit.input_port_is_csr
-top.dut.stage1.addr_calc_unit.output_port_is_csr
-@800200
+@c00200
 -MEM_UNIT_OUTPUT
 @28
 top.dut.stage2.memory_unit.output_port_valid
 @22
 top.dut.stage2.memory_unit.output_port_data_h[15:0]
 top.dut.stage2.memory_unit.output_port_data_l[15:0]
-@1000200
+@1401200
 -MEM_UNIT_OUTPUT
+@800200
+-SHIFTER_UNIT_INPUT
+@22
+top.dut.stage1.shifter_unit.input_port_op_a[31:0]
+top.dut.stage1.shifter_unit.input_port_op_b[31:0]
+@28
+top.dut.stage1.shifter_unit.input_port_opcode
+@1000200
+-SHIFTER_UNIT_INPUT
+@800200
+-SHIFTER_UNIT_OUTPUT
+@22
+top.dut.stage1.shifter_unit.output_port_result[31:0]
+@1000200
+-SHIFTER_UNIT_OUTPUT
 [pattern_trace] 1
 [pattern_trace] 0
