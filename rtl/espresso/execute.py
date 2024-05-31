@@ -310,8 +310,8 @@ class ExecStage1(GenericModule):
         ################ HELP WITH INTERRUPTS AND EXCEPTIONS
         self.output_port.is_exception          <<= is_exception
         self.output_port.is_interrupt          <<= reg_interrupt
-        self.output_port.spc                   <<= self.spc_out
-        self.output_port.tpc                   <<= self.tpc_out
+        self.output_port.spc                   <<= self.spc_in
+        self.output_port.tpc                   <<= self.tpc_in
         self.output_port.task_mode             <<= self.task_mode_in
 
 
@@ -454,7 +454,7 @@ class ExecStage2(GenericModule):
         self.output_port.do_wse <<= reg_input_port.do_wse
         self.output_port.do_bze <<= reg_input_port.do_bze
         self.output_port.do_wze <<= reg_input_port.do_wze
-        self.output_port.valid <<= self.output_strobe
+        self.output_port.valid <<= self.output_strobe & ~self.do_branch
         #self.output_port.valid <<= reg_input_port_data_valid & ~self.do_branch_immediate & ~self.do_branch # Not sure this is correct.
 
         # Create side-band interfaces

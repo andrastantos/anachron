@@ -33,14 +33,20 @@ from expectations import *
 
 
 def sim():
+    # This is a giant hack, but we need to work around Pythons reference semantics.
+    # This array will have a reference to in top.simulator_ref, which gets filled in (appended to) in top.simulate
+    simulator: Sequence[Simulator] = []
 
     def test(name, ref, act, fmt = None, fatal=True):
         if ref is not None and ref != act:
             if fmt is not None:
-                print(f"mismatch {name}: expected={ref:{fmt}} actual={act:{fmt}}")
+                msg = f"mismatch {name}: expected={ref:{fmt}} actual={act:{fmt}}"
             else:
-                print(f"mismatch {name}: expected={ref} actual={act}")
-            if fatal: assert ref is None or ref == act
+                msg = f"mismatch {name}: expected={ref} actual={act}"
+            if fatal:
+                first(simulator).sim_assert(ref == act, msg)
+            else:
+                first(simulator).sim_check_cond(ref == act, msg)
 
     class Result(object):
         def __init__(
@@ -179,15 +185,15 @@ def sim():
                 else:
                     self.this_jump_type = DecodeEmulator.JumpType.Straight
                 self.this_jump_type_wire <<= self.this_jump_type
-                print(f"{simulator.now:4d} input transfer started")
+                simulator.log(f"  input transfer started")
                 self.output_port.valid <<= 1
                 yield from wait_clk()
                 assert self.output_port.ready.sim_value is not None
                 while self.output_port.ready != 1:
-                    print(f"{simulator.now:4d} input transfer waiting")
+                    simulator.log(f"  input transfer waiting")
                     yield from wait_clk()
                 self.output_port.valid <<= 0
-                print(f"{simulator.now:4d} input transfer accepted")
+                simulator.log(f"  input transfer accepted")
 
 
             def set_side_band(*, tpc = None, spc = None, task_mode = True, mem_base = None, mem_limit = None, interrupt = False, ecause = 0):
@@ -286,7 +292,7 @@ def sim():
 
                 if self.last_jump_type == DecodeEmulator.JumpType.Straight:
                     # If the previous instruction somehow generated a branch, this instruction should be cancelled and so no side-effects should be observable
-                    print(f"{simulator.now:4d} Sending {unit} {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')}")
+                    simulator.log(f"Sending {unit} {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')}")
                     if not fetch_av:
                         self.result_queue.append(Result(
                             data_l = result & 0xffff,
@@ -299,6 +305,14 @@ def sim():
                             do_bze = 0,
                             do_wze = 0
                         ))
+                    else:
+                        self.result_queue.append(Result(
+                            data_l=None,
+                            data_h=None,
+                            data_en=0,
+                            addr=None,
+                            result_valid=1
+                        ))
                     self.pc_result_queue.append(PCResult(
                         spc_out = next_spc,
                         tpc_out = next_tpc,
@@ -307,7 +321,7 @@ def sim():
                         do_branch = next_do_branch
                     ))
                 else:
-                    print(f"{simulator.now:4d} Sending CANCELLED {unit} {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')}")
+                    simulator.log(f"Sending CANCELLED {unit} {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')}")
                     self.pc_result_queue.append(PCResult())
                 yield from wait_for_transfer()
 
@@ -459,7 +473,7 @@ def sim():
 
                 if self.last_jump_type == DecodeEmulator.JumpType.Straight:
                     # If the previous instruction somehow generated a branch, this instruction should be cancelled and so no side-effects should be observable
-                    print(f"{simulator.now:4d} Sending branch {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')} should {'branch' if branch else 'NOT branch'}")
+                    simulator.log(f"Sending branch {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')} should {'branch' if branch else 'NOT branch'}")
                     self.pc_result_queue.append(PCResult(
                         spc_out = next_spc,
                         tpc_out = next_tpc,
@@ -468,7 +482,7 @@ def sim():
                         do_branch = branch
                     ))
                 else:
-                    print(f"{simulator.now:4d} Sending CANCELLED branch {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')}")
+                    simulator.log(f"Sending CANCELLED branch {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')}")
                     self.pc_result_queue.append(PCResult())
                 yield from wait_for_transfer()
 
@@ -539,7 +553,7 @@ def sim():
 
                 if self.last_jump_type == DecodeEmulator.JumpType.Straight:
                     # If the previous instruction somehow generated a branch, this instruction should be cancelled and so no side-effects should be observable
-                    print(f"{simulator.now:4d} Sending ldst {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')}")
+                    simulator.log(f"Sending ldst {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')}")
                     self.result_queue.append(Result(
                         data_l = expected_result_l if op == ldst_ops.load else None,
                         data_h = expected_result_h if op == ldst_ops.load else None,
@@ -574,7 +588,7 @@ def sim():
                                 data = None if op == ldst_ops.load else (op_a >> 16) & 0xffff
                             ))
                 else:
-                    print(f"{simulator.now:4d} Sending CANCELLED ldst {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')}")
+                    simulator.log(f"Sending CANCELLED ldst {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')}")
                     self.pc_result_queue.append(PCResult())
 
                 yield from wait_for_transfer()
@@ -720,7 +734,7 @@ def sim():
 
             while True:
                 yield from wait_clk()
-                if self.trigger_port:
+                if ~self.rst & self.trigger_port:
                     expected: PCResult = self.result_queue[0]
                     if expected.do_branch:
                         yield from wait_clk()
@@ -754,7 +768,10 @@ def sim():
                 if self.input_port.valid == 1:
                     expected: Result = self.result_queue.pop(0)
                     if expected.result_valid:
-                        print(f"{simulator.now:4d} Writing REG $r{self.input_port.addr:x} with value {self.input_port.data_h:04x}{self.input_port.data_l:04x} (expected: {expected.data_h:04x}{expected.data_l:04x}) enable: {self.input_port.data_en}")
+                        if expected.data_en:
+                            simulator.log(f"Writing REG $r{self.input_port.addr:x} with value {self.input_port.data_h:04x}{self.input_port.data_l:04x} (expected: {expected.data_h:04x}{expected.data_l:04x}) enable: {self.input_port.data_en}")
+                        else:
+                            simulator.log(f"Writing CANCELLED")
                     assert expected.compare(self.input_port)
 
     class CsrQueueItem(object):
@@ -767,12 +784,12 @@ def sim():
                 self.pwrite = int(pwrite) if pwrite is not None else None
                 self.paddr  = paddr
                 self.pwdata = pwdata
-        def report(self,prefix):
+        def report(self, simulator:Simulator, prefix):
             if not self.pwrite:
-                print(f"{prefix} reading CSR {self.paddr:03x}")
+                simulator.log(f"{prefix} reading CSR {self.paddr:03x}")
             else:
                 data_str = f"{self.pwdata:08x}" if self.pwdata is not None else "--------"
-                print(f"{prefix} writing CSR {self.paddr:03x} data:{data_str}")
+                simulator.log(f"{prefix} writing CSR {self.paddr:03x} data:{data_str}")
         def compare(self, actual: Union[BusIfRequestIf, 'BusIfQueueItem']):
             assert self.pwrite is None or actual.pwrite == self.pwrite
             assert self.paddr is None or actual.paddr == self.paddr
@@ -808,7 +825,7 @@ def sim():
                         if self.input_port.pwrite == 0:
                             # Read request
                             actual = CsrQueueItem(self.input_port)
-                            actual.report(f"{simulator.now:4d}")
+                            actual.report(simulator,f"    ")
                             if(self.input_port.penable == 0):
                                 expected = self.queue.pop(0)
                             expected.compare(actual)
@@ -817,7 +834,7 @@ def sim():
                             if self.input_port.pwrite == 1:
                                 # Write request
                                 actual = CsrQueueItem(self.input_port)
-                                actual.report(f"{simulator.now:4d}")
+                                actual.report(simulator,f"    ")
                                 expected = self.queue.pop(0)
                                 expected.compare(actual)
                                 self.input_port.prdata <<= None
@@ -837,15 +854,15 @@ def sim():
                 self.byte_en         = byte_en
                 self.addr            = addr
                 self.data            = data
-        def report(self,prefix):
+        def report(self,simulator:Simulator,prefix):
             assert self.addr is not None
             assert self.byte_en is not None
             access_type = 'BUS'
             if self.read_not_write == 1:
-                print(f"{prefix} reading {access_type} {self.addr:08x} byte_en:{self.byte_en:02b}")
+                simulator.log(f"{prefix} reading {access_type} {self.addr:08x} byte_en:{self.byte_en:02b}")
             else:
                 data_str = f"{self.data:04x}" if self.data is not None else "NONE"
-                print(f"{prefix} writing {access_type} {self.addr:08x} byte_en:{self.byte_en:02b} data:{data_str}")
+                simulator.log(f"{prefix} writing {access_type} {self.addr:08x} byte_en:{self.byte_en:02b} data:{data_str}")
         def compare(self, actual: Union[BusIfRequestIf, 'BusIfQueueItem']):
             assert self.read_not_write is None or actual.read_not_write == self.read_not_write
             assert self.byte_en is None or actual.byte_en == self.byte_en
@@ -899,7 +916,7 @@ def sim():
                     if self.input_port.valid == 1 and self.input_port.ready == 1:
                         # Start of burst, record signals so we can check further beats
                         first_beat = BusIfQueueItem(self.input_port)
-                        first_beat.report(f"{simulator.now:4d} REQUEST first")
+                        first_beat.report(simulator, f"    REQUEST first")
                         expected: BusIfQueueItem = self.expect_queue.pop(0)
                         expected.compare(first_beat)
                         self.queue.push(first_beat)
@@ -907,7 +924,7 @@ def sim():
                         beat_cnt = 1
                         while self.input_port.valid == 1:
                             next_beat = BusIfQueueItem(self.input_port)
-                            next_beat.report(f"{simulator.now:4d} REQUEST {beat_cnt:5d} ")
+                            next_beat.report(simulator, f"    REQUEST {beat_cnt:5d} ")
                             assert first_beat.read_not_write == next_beat.read_not_write
                             assert first_beat.addr & ~255 == next_beat.addr & ~255
                             assert first_beat.byte_en == 3
@@ -921,7 +938,7 @@ def sim():
                         while len(self.queue) > 0:
                             self.queue.push(None)
                             yield from wait_clk()
-                        print(f"{simulator.now:4d} done waiting")
+                        simulator.log(f"    done waiting")
                         self.queue.push(None)
                     else:
                         self.queue.push(None)
@@ -952,7 +969,7 @@ def sim():
                 else:
                     item: BusIfQueueItem = self.queue.head()
                     if item is not None:
-                        item.report(f"{simulator.now:4d} SERVICING ")
+                        item.report(simulator, f"    SERVICING ")
                         if item.read_not_write:
                             data = item.addr & 0xffff
                             self.output_port.data <<= data
@@ -961,13 +978,16 @@ def sim():
                             self.output_port.data <<= None
                             self.output_port.valid <<= 0
                     else:
-                        print(f"{simulator.now:4d} SERVICING nothing")
+                        simulator.log(f"    SERVICING nothing")
                         self.output_port.data <<= None
                         self.output_port.valid <<= 0
 
-    class top(Module):
+    class top(GenericModule):
         clk = ClkPort()
         rst = RstPort()
+
+        def construct(self, simulator_ref):
+            self.simulator_ref = simulator_ref
 
         def body(self):
             seed(0)
@@ -1018,14 +1038,16 @@ def sim():
             dut.ecause_in <<= decode_emulator.ecause_in
             dut.interrupt <<= decode_emulator.interrupt
 
-            pc_checker.trigger_port <<= decode_emulator.output_port.ready & decode_emulator.output_port.valid
+            #pc_checker.trigger_port <<= decode_emulator.output_port.ready & decode_emulator.output_port.valid
+            pc_checker.trigger_port <<= dut.output_port.valid
             pc_checker.spc_out <<= dut.spc_out
             pc_checker.tpc_out <<= dut.tpc_out
             pc_checker.task_mode_out <<= dut.task_mode_out
             pc_checker.ecause_out <<= dut.ecause_out
             pc_checker.do_branch <<= dut.do_branch
 
-        def simulate(self) -> TSimEvent:
+        def simulate(self, simulator: 'Simulator') -> TSimEvent:
+            self.simulator_ref.append(simulator)
             def clk() -> int:
                 yield 5
                 self.clk <<= ~self.clk & self.clk
@@ -1033,7 +1055,7 @@ def sim():
                 self.clk <<= ~self.clk
                 yield 0
 
-            print("Simulation started")
+            simulator.log("Simulation started")
 
             self.rst <<= 1
             self.clk <<= 1
@@ -1045,9 +1067,11 @@ def sim():
             for i in range(1000):
                 yield from clk()
             now = yield 10
-            print(f"Done at {now}")
+            simulator.log("Done")
 
-    Build.simulation(top, "execute.vcd", add_unnamed_scopes=True)
+    def sim_top():
+        return top(simulator)
+    Build.simulation(sim_top, "execute.vcd", add_unnamed_scopes=True)
 
 if __name__ == "__main__":
     sim()
