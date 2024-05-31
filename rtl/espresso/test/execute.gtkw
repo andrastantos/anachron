@@ -1,15 +1,15 @@
 [*]
-[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Thu May 30 21:05:04 2024
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Fri May 31 17:29:19 2024
 [*]
 [dumpfile] "/home/tantos/anachron/rtl/espresso/test/execute.vcd"
-[dumpfile_mtime] "Thu May 30 21:03:43 2024"
-[dumpfile_size] 229373
+[dumpfile_mtime] "Fri May 31 17:28:19 2024"
+[dumpfile_size] 256694
 [savefile] "/home/tantos/anachron/rtl/espresso/test/execute.gtkw"
-[timestart] 0
-[size] 1920 1097
+[timestart] 227
+[size] 1920 990
 [pos] -1 -1
-*-6.253119 134 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-4.953119 124 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
 [treeopen] top.dut.stage1.
@@ -17,40 +17,15 @@
 [sst_width] 278
 [signals_width] 432
 [sst_expanded] 1
-[sst_vpaned_height] 664
+[sst_vpaned_height] 590
 @28
 top.dut.clk
 top.dut.rst
-@22
-top.dut.tpc_in[30:0]
-top.dut.tpc_out[30:0]
-@23
-top.dut.stage1.tpc_in[30:0]
-@22
-top.dut.stage1.tpc_out[30:0]
-@28
-top.dut.stage2.tpc_changed
-@22
-top.dut.spc_in[30:0]
-top.dut.spc_out[30:0]
-@28
-top.dut.stage2.spc_changed
-top.dut.task_mode_in
-top.dut.task_mode_out
-top.dut.do_branch
-@22
-top.dut.stage2.eaddr_out[31:0]
-@28
-top.dut.stage2.ecause_out
-top.dut.do_branch_immediate
 @800200
 -EXEC_INPUT_PORT
 @28
 top.dut.input_port_valid
 top.dut.input_port_ready
-@c00200
--SIGNALS
-@28
 top.dut.input_port_alu_op
 top.dut.input_port_branch_op
 top.dut.input_port_do_bse
@@ -71,18 +46,25 @@ top.dut.input_port_result_reg_addr[3:0]
 top.dut.input_port_result_reg_addr_valid
 top.dut.input_port_shifter_op
 top.dut.input_port_woi
-@1401200
--SIGNALS
 @1000200
 -EXEC_INPUT_PORT
+@22
+top.dut.stage1.tpc_out[30:0]
+top.dut.tpc_in[30:0]
+top.dut.tpc_out[30:0]
+top.dut.spc_in[30:0]
+top.dut.spc_out[30:0]
+top.dut.stage1.output_port_spc[30:0]
+@28
+top.dut.task_mode_in
+top.dut.task_mode_out
+top.dut.do_branch
+top.dut.do_branch_immediate
 @800200
 -EXEC_12_IF
 @28
 top.dut.exec_12_if_valid
 top.dut.exec_12_if_ready
-@c00200
--SIGNALS
-@28
 top.dut.exec_12_if_access_len[1:0]
 top.dut.exec_12_if_bit_test_bit
 @22
@@ -118,22 +100,22 @@ top.dut.exec_12_if_result_reg_addr[3:0]
 @28
 top.dut.exec_12_if_result_reg_addr_valid
 @22
+top.dut.exec_12_if_spc[30:0]
 top.dut.exec_12_if_straight_addr[30:0]
+@28
+top.dut.exec_12_if_task_mode
+@22
+top.dut.exec_12_if_tpc[30:0]
 @28
 top.dut.exec_12_if_woi
 top.dut.stage1.reg_interrupt
 top.dut.stage2.reg_input_port_is_interrupt
 top.dut.interrupt
-@1401200
--SIGNALS
+top.dut.stage1.interrupt
 @1000200
 -EXEC_12_IF
 @800200
 -STAGE2_OUTPUT
-@28
-top.dut.stage2.output_port_valid
-@c00200
--SIGNALS
 @22
 top.dut.stage2.output_port_addr[3:0]
 @28
@@ -146,26 +128,14 @@ top.dut.stage2.output_port_do_bse
 top.dut.stage2.output_port_do_bze
 top.dut.stage2.output_port_do_wse
 top.dut.stage2.output_port_do_wze
-@1401200
--SIGNALS
+top.dut.stage2.output_port_valid
 @1000200
 -STAGE2_OUTPUT
 @28
-top.dut.stage2.reg_input_port_is_mem_op
 top.dut.stage2.memory_unit.input_port_ready
 top.dut.stage2.memory_unit.active
 top.dut.stage2.memory_unit.gap
 top.dut.stage2.memory_unit.next_active
-@800200
--STATE2_FSM
-@28
-top.dut.stage2.state_fsm.output_ready
-top.dut.stage2.state_fsm.output_valid
-top.dut.stage2.state_fsm.input_ready
-top.dut.stage2.state_fsm.input_valid
-top.dut.stage2.state_fsm.out_reg_en
-@1000200
--STATE2_FSM
 @800200
 -BRANCH_UNIT_INPUT
 @28
@@ -203,11 +173,6 @@ top.dut.stage2.branch_unit.is_exception_or_interrupt
 @800200
 -MEM_UNIT_INPUT
 @28
-top.dut.stage2.memory_unit.input_port_ready
-top.dut.stage2.memory_unit.input_port_valid
-@c00200
--SIGNALS
-@28
 top.dut.stage2.memory_unit.input_port_access_len[1:0]
 @22
 top.dut.stage2.memory_unit.input_port_addr[31:0]
@@ -215,13 +180,17 @@ top.dut.stage2.memory_unit.input_port_data[31:0]
 @28
 top.dut.stage2.memory_unit.input_port_is_csr
 top.dut.stage2.memory_unit.input_port_read_not_write
-@1401200
--SIGNALS
+top.dut.stage2.memory_unit.input_port_ready
+top.dut.stage2.memory_unit.input_port_valid
 @1000200
 -MEM_UNIT_INPUT
 @28
-top.dut.stage2.mem_op_valid
+top.dut.stage2.memory_unit.input_port_is_csr
+top.dut.stage2.memory_unit.csr_active
 top.dut.stage2.memory_unit.gap
+top.dut.stage2.memory_unit.active
+top.dut.stage1.addr_calc_unit.input_port_is_csr
+top.dut.stage1.addr_calc_unit.output_port_is_csr
 @800200
 -MEM_UNIT_OUTPUT
 @28
@@ -231,19 +200,5 @@ top.dut.stage2.memory_unit.output_port_data_h[15:0]
 top.dut.stage2.memory_unit.output_port_data_l[15:0]
 @1000200
 -MEM_UNIT_OUTPUT
-@800200
--BUS_REQ
-@22
-top.dut.stage2.memory_unit.bus_req_if_addr[30:0]
-@28
-top.dut.stage2.memory_unit.bus_req_if_byte_en[1:0]
-@22
-top.dut.stage2.memory_unit.bus_req_if_data[15:0]
-@28
-top.dut.stage2.memory_unit.bus_req_if_read_not_write
-top.dut.stage2.memory_unit.bus_req_if_ready
-top.dut.stage2.memory_unit.bus_req_if_valid
-@1000200
--BUS_REQ
 [pattern_trace] 1
 [pattern_trace] 0
