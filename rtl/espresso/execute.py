@@ -27,28 +27,6 @@ except ImportError:
     from exec_branch_target import *
     from exec_branch import *
 
-'''
-Re-thinking PC management.
-
-In stage1, we need $pc to calculate branch-target (for relative jumps). This is done in BranchTargetUnit, in fact, that is all that it's doing these days.
-In stage2, we need $pc to produce eaddr in case of exceptions.
-In stage2, we need $tpc/$spc to fix up mode changes in case of an exception/STM instruction
-
-No other stage should care about the reference point for $pc. The only other stage that is even aware of these is FETCH and that has
-it's own counter: it just needs the values for a branch, i.e. when do_branch goes active.
-
-So, what we need is that $spc/$tpc/task_mode (the registers) should contain the values as they are needed by stage1 execution units.
-This is to say, that they should be updated as data leaves stage1 towards stage2. Stage2 then needs a registered version of $tpc/$spc/task_mode
-to be able to restore them if it needs to.
-
-'''
-'''
-Problem with multiply: Stage1 accepts a new operation while stage 2 is busy handling a read for instance. If, during that time, a multiply comes by,
-it'll be accepted. But multiply is multi-stage and will continue advancing on *that* pipeline; worse, multiply doesn't have back-pressure so it'll just
-assume that stage2 is ready to catch the result as it pops out.
-
-I think I'll brake multiply into two (combinational) stages and integrate them as usual building blocks. That seems the cleanest solution.
-'''
 """
 Execute stage of the V1 pipeline.
 
@@ -82,24 +60,79 @@ It does the following:
     | Multilper |
     +-----------+
 
-PC is cycle-1 relative. If there was a branch, that will be determined in cycle-2,
-though the branch target address is calculated in cycle-1. This means that cycle-1
-executes the instruction in a branch-shadow, if there were no bubbles in the pipeline.
-There is logic in cycle-2 to remember a branch from the previous cycle and cancel
-any instruction that leaks through from cycle-1.
 
-OK, so this is silly. What I should be doing is to build multi-cycle execution
-units, just as with multiply. So, branch target and branch should be just one
-unit, just like address calculation and memory.
+PC management:
+--------------
 
-or... maybe not. Yet, the interfaces should flow-through, no bypass info.
+$pc is stage1 relative. That is to say, TPC and SPC (the registers) contain the
+current instruction address when read by exec1 units.
 
-The counter-argument of course is stageing register reuse. This argument can
-certainly be made for ALU and shifter.
+Exec1 outputs updated TPC and SPC with straight-line execution assumed.
 
-OK, so address calc and branch should certainly be more integrated: a lot
-of calculation for branch can be pre-loaded in which case registers could be
-saved.
+Exec2 consideres interrupt, exceptions and branches. It then, if needs to,
+outputs a change to TPC/SPC and TASK_MODE with a corresponding 'changed' signal.
+
+The exec1 and exec2 outputs are combined into a single output inside execute,
+the outer module.
+
+Let's consider the following isntruction sequence:
+
+    $r0 <- $r0 + $r1
+    $pc <- SOME_ROUTINE
+    $r1 <- $r1 & $r1
+    $r2 <- $r2 | $r2
+
+Here, when the addition is in exec2, the branch is in exec1. In this cycle
+exec2 sees no reason to update TPC, so it doesn't set TPC_CHANGED. As a result,
+execute writes back the value supplied by exec1 into TPC.
+
+In the subsequent cycle, the branch enters exec2, and the target address is
+finally recognized. TPC_CHANGED is asserted, so TPC is updated to the branch
+target. In this same cycle the AND instruction is in exec1.
+
+In cycle 3, do_branch gets asserted, which blocks any TPC/SPC update (i.e. they
+will not change from the branch-target address that was captured in cycle 2).
+In the same time, the AND instruction when was captured in exec2 and the OR
+instruction in exec1; both of which are cancelled. Cancelling in this case means
+that side-effects won't take affect, including the start of memory transactions
+or register write-backs.
+
+This all means that in case of a branch execution (for instance) TPC gets first
+updated to the first branch-shadow instruction address, then corrected for the
+correct target. Same for exceptions and interrupts: first TPC gets to skip
+forward, then adjusted back when at the same time, TASK_MODE changes.
+
+TEST_BENCH PROBLEMS:
+--------------------
+The current TB doesn't quite know how to deal with this in-the-middle-of-execute
+reference point for TPC/SPC and it gets really confused by the potential double-
+update during branches as well. This needs to be corrected, but how?
+
+
+No other stage should care about the reference point for TPC/SPC. The only other
+stage that is even aware of these values is FETCH and that has it's own counter:
+it just needs the values for a branch, i.e. when do_branch goes active.
+
+Problem with multiply:
+----------------------
+Stage1 accepts a new operation while stage 2 is busy handling a read for
+instance. If, during that time, a multiply comes by, it'll be accepted. But
+multiply is multi-stage and will continue advancing on *that* pipeline; worse,
+multiply doesn't have back-pressure so it'll just assume that stage2 is ready to
+catch the result as it pops out.
+
+For now, I simplified multiply (at east in the OPTIMIZED mode) to be
+single-stage. We'll see if this causes timing-closure problems. If it does,
+the stage will get broken into two different modules and incorporated into
+'exec1' and 'exec2' as any other module.
+
+Further optimizations:
+----------------------
+I think there's a lot of stuff that gets unnecessarily registered between
+'exec1' and 'exec2'. This should be reviewed and see if the computation
+can be front-loaded to 'exec1' or if values can be collapsed into muxed
+registres if the use is mutually exclusive.
+
 """
 
 class Exec12If(ReadyValid):
@@ -391,7 +424,7 @@ class ExecStage2(GenericModule):
         #   memory operation in the same cycle
         mem_op_valid = SRReg(state_fsm.out_reg_en, mem_output.valid)
 
-        state_fsm.output_ready <<= Select(reg_input_port.is_mem_op, 1, mem_output.valid) # TODO: this is very weird to hook up 'valid' to 'ready'
+        state_fsm.output_ready <<= Select(reg_input_port.is_mem_op, 1, mem_output.valid) | self.do_branch # TODO: this is very weird to hook up 'valid' to 'ready'
         self.input_port.ready <<= mem_unit_ready # We don't have to combine in do_branch: if there was a branch, we either didn't have a mem-op, or we have waited for it already
         state_fsm.input_valid <<= self.input_port.valid & self.input_port.ready # THIS IS A GIANT HACK
 
@@ -432,6 +465,7 @@ class ExecStage2(GenericModule):
         mem_input.addr <<= self.input_port.phy_addr
         mem_input.is_csr <<= self.input_port.is_csr
         mem_input.access_len <<= self.input_port.access_len
+        mem_input.request_valid <<= ~self.do_branch_immediate
         mem_input.valid <<= self.input_port.valid & self.input_port.is_mem_op
         memory_unit.input_port <<= mem_input
         self.bus_req_if <<= memory_unit.bus_req_if
@@ -575,8 +609,8 @@ class ExecuteStage(GenericModule):
         # Stage 1 never changes TASK_MODE and always assumes straight-line execution for SPC/TPC
         # Stage 2 corrects for all these assumptions and asserts the corresponding XXX_CHANGED flags as needed
 
-        self.tpc_out <<= Select(stage2.tpc_changed & stage2.output_strobe, stage1.tpc_out, stage2.tpc_out)
-        self.spc_out <<= Select(stage2.spc_changed & stage2.output_strobe, stage1.spc_out, stage2.spc_out)
+        self.tpc_out <<= Select(self.do_branch, Select(stage2.tpc_changed & stage2.output_strobe, stage1.tpc_out, stage2.tpc_out), self.tpc_in)
+        self.spc_out <<= Select(self.do_branch, Select(stage2.spc_changed & stage2.output_strobe, stage1.spc_out, stage2.spc_out), self.spc_in)
         self.task_mode_out <<= Select(stage2.task_mode_changed, self.task_mode_in, stage2.task_mode_out)
         self.ecause_out <<= Select(stage2.ecause_changed & stage2.output_strobe, self.ecause_in, stage2.ecause_out)
         # TODO: this is silly: we have all of these are in/outs with external registers, except for this one, which is internal. Make up your mind!!!

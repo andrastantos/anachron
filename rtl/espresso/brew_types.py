@@ -154,6 +154,7 @@ class MemInputIf(ReadyValid):
     data = BrewData
     addr = BrewAddr
     is_csr = logic
+    request_valid = logic # if this is set, don't generate a request - needed for branches to cancel requests in the branch-shadow
     access_len = Unsigned(2) # 0 for 8-bit, 1 for 16-bit, 2 for 32-bit
 
 class MemOutputIf(Interface):

@@ -136,7 +136,7 @@ class MemoryStage(Module):
 
         is_csr = Wire(logic)
 
-        input_advance = (self.input_port.ready & self.input_port.valid)
+        input_advance = (self.input_port.ready & self.input_port.valid) & self.input_port.request_valid
         bus_request_advance = (self.bus_req_if.ready & self.bus_req_if.valid)
         bus_response_advance = self.bus_rsp_if.valid
         output_advance = self.output_port.valid
@@ -190,7 +190,7 @@ class MemoryStage(Module):
         # We are saying that we're not ready to accept a requeset unless we can hand it over to bus_req. But bus_req.ready depends on arbitration, which in turn
         # depends on a valid request. So, I think we need an input ForwardBuf here - like in many other places to deal with this.
         self.input_port.ready <<= (self.bus_req_if.ready & ~active & ~gap) | (csr_select & self.input_port.valid & ~csr_active) # this is not ideal: we won't accept a CSR access if the bus is occupied. Yet, I don't think we should depend on is_dram here.
-        self.bus_req_if.valid <<= ((self.input_port.valid & ~csr_select) | active) & ~gap
+        self.bus_req_if.valid <<= ((self.input_port.valid & self.input_port.request_valid & ~csr_select) | active) & ~gap
         self.output_port.valid <<= (self.bus_rsp_if.valid & ~pending) | (csr_pen & self.csr_if.pready & ~self.csr_if.pwrite)
 
         first_addr = self.input_port.addr[BrewBusAddr.length:1]
