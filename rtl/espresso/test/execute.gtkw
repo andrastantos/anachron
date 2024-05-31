@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Fri May 31 19:09:07 2024
+[*] Fri May 31 21:04:21 2024
 [*]
 [dumpfile] "/home/tantos/anachron/rtl/espresso/test/execute.vcd"
-[dumpfile_mtime] "Fri May 31 19:01:21 2024"
-[dumpfile_size] 278401
+[dumpfile_mtime] "Fri May 31 21:03:19 2024"
+[dumpfile_size] 4216526
 [savefile] "/home/tantos/anachron/rtl/espresso/test/execute.gtkw"
-[timestart] 164
+[timestart] 0
 [size] 1920 1097
 [pos] -1 -1
-*-5.519852 394 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-10.019852 1536 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
 [treeopen] top.dut.stage1.shifter_unit.
@@ -17,7 +17,7 @@
 [sst_width] 278
 [signals_width] 432
 [sst_expanded] 1
-[sst_vpaned_height] 718
+[sst_vpaned_height] 459
 @28
 top.dut.clk
 top.dut.rst
@@ -60,24 +60,22 @@ top.dut.task_mode_in
 top.dut.task_mode_out
 top.dut.do_branch
 top.dut.do_branch_immediate
-@800201
+@800200
 -EXEC_12_IF
-@29
-top.dut.exec_12_if_valid
-top.dut.exec_12_if_ready
+@28
 top.dut.exec_12_if_access_len[1:0]
 top.dut.exec_12_if_bit_test_bit
-@23
+@22
 top.dut.exec_12_if_branch_addr[30:0]
-@29
+@28
 top.dut.exec_12_if_branch_op
 top.dut.exec_12_if_do_bse
 top.dut.exec_12_if_do_bze
 top.dut.exec_12_if_do_wse
 top.dut.exec_12_if_do_wze
-@23
+@22
 top.dut.exec_12_if_eff_addr[31:0]
-@29
+@28
 top.dut.exec_12_if_f_carry
 top.dut.exec_12_if_f_overflow
 top.dut.exec_12_if_f_sign
@@ -86,29 +84,35 @@ top.dut.exec_12_if_fetch_av
 top.dut.exec_12_if_is_branch_ind
 top.dut.exec_12_if_is_branch_insn
 top.dut.exec_12_if_is_csr
+top.dut.exec_12_if_is_exception
+top.dut.exec_12_if_is_interrupt
+@29
 top.dut.exec_12_if_is_mem_op
+@28
 top.dut.exec_12_if_mem_av
 top.dut.exec_12_if_mem_unaligned
-@23
+@22
 top.dut.exec_12_if_op_a[31:0]
 top.dut.exec_12_if_phy_addr[31:0]
-@29
+@28
 top.dut.exec_12_if_read_not_write
-@23
+top.dut.exec_12_if_ready
+@22
 top.dut.exec_12_if_result[31:0]
 top.dut.exec_12_if_result_reg_addr[3:0]
-@29
+@28
 top.dut.exec_12_if_result_reg_addr_valid
-@23
+@22
 top.dut.exec_12_if_spc[30:0]
 top.dut.exec_12_if_straight_addr[30:0]
-@29
+@28
 top.dut.exec_12_if_task_mode
-@23
+@22
 top.dut.exec_12_if_tpc[30:0]
-@29
+@28
+top.dut.exec_12_if_valid
 top.dut.exec_12_if_woi
-@1000201
+@1000200
 -EXEC_12_IF
 @800200
 -STAGE2_OUTPUT

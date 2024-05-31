@@ -470,7 +470,7 @@ class ExecStage2(GenericModule):
         # TODO: this I hope is not an issue anymore, but needs to be tested.
         self.output_strobe <<= Select(reg_input_port.is_mem_op & mem_op_valid, state_fsm.output_valid, memory_unit.output_port.valid)
 
-        self.do_branch_immediate <<= branch_output.do_branch & self.output_strobe
+        self.do_branch_immediate <<= branch_output.do_branch & self.output_strobe & ~self.do_branch
         self.do_branch <<= Reg(self.do_branch_immediate)
 
         self.spc_out <<= branch_output.spc

@@ -142,6 +142,7 @@ def sim():
         ecause_in     = Output(EnumNet(exceptions))
         ecause_out    = Input(EnumNet(exceptions))
         interrupt     = Output(logic)
+        last_last_jump_type_wire = Output(EnumNet(JumpType))
         last_jump_type_wire = Output(EnumNet(JumpType))
         this_jump_type_wire = Output(EnumNet(JumpType))
         last_jump_type_input = Input(EnumNet(JumpType))
@@ -154,8 +155,12 @@ def sim():
             self.bus_req_queue = bus_req_queue
 
         def simulate(self, simulator) -> TSimEvent:
+            self.last_last_jump_type = DecodeEmulator.JumpType.Straight
             self.last_jump_type = DecodeEmulator.JumpType.Straight
             self.this_jump_type = DecodeEmulator.JumpType.Straight
+
+            def is_cancelled():
+                return self.last_jump_type != DecodeEmulator.JumpType.Straight or self.last_last_jump_type != DecodeEmulator.JumpType.Straight
 
             def wait_clk():
                 yield (self.clk, )
@@ -167,8 +172,10 @@ def sim():
                 self.sideband_state.tpc = self.tpc_out
                 self.sideband_state.spc = self.spc_out
                 self.sideband_state.task_mode = self.task_mode_out
+                self.last_last_jump_type = self.last_jump_type
                 self.last_jump_type = self.this_jump_type
                 self.this_jump_type = DecodeEmulator.JumpType.Straight
+                self.last_last_jump_type_wire <<= self.last_last_jump_type
                 self.last_jump_type_wire <<= self.last_jump_type
                 self.this_jump_type_wire <<= self.this_jump_type
 
@@ -290,9 +297,10 @@ def sim():
                     else:
                         next_tpc += inst_len +1
 
-                if self.last_jump_type == DecodeEmulator.JumpType.Straight:
+                if not is_cancelled():
                     # If the previous instruction somehow generated a branch, this instruction should be cancelled and so no side-effects should be observable
-                    simulator.log(f"Sending {unit} {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')}")
+                    av_str = "FETCH_AV" if fetch_av else ""
+                    simulator.log(f"Sending {unit} {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {av_str}")
                     if not fetch_av:
                         self.result_queue.append(Result(
                             data_l = result & 0xffff,
@@ -471,7 +479,7 @@ def sim():
                         next_spc = 0
                     next_task_mode = 0
 
-                if self.last_jump_type == DecodeEmulator.JumpType.Straight:
+                if not is_cancelled():
                     # If the previous instruction somehow generated a branch, this instruction should be cancelled and so no side-effects should be observable
                     simulator.log(f"Sending branch {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')} should {'branch' if branch else 'NOT branch'}")
                     self.pc_result_queue.append(PCResult(
@@ -480,6 +488,13 @@ def sim():
                         task_mode_out = next_task_mode,
                         ecause_out = self.sideband_state.ecause if ecause == 0 else ecause,
                         do_branch = branch
+                    ))
+                    self.result_queue.append(Result(
+                        data_l=None,
+                        data_h=None,
+                        data_en=0,
+                        addr=None,
+                        result_valid=1
                     ))
                 else:
                     simulator.log(f"Sending CANCELLED branch {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')}")
@@ -551,15 +566,15 @@ def sim():
                         next_spc = 0
                     next_task_mode = 0
 
-                if self.last_jump_type == DecodeEmulator.JumpType.Straight:
+                if not is_cancelled():
                     # If the previous instruction somehow generated a branch, this instruction should be cancelled and so no side-effects should be observable
                     simulator.log(f"Sending ldst {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')}")
                     self.result_queue.append(Result(
                         data_l = expected_result_l if op == ldst_ops.load else None,
                         data_h = expected_result_h if op == ldst_ops.load else None,
-                        data_en = None,
+                        data_en = result_reg_valid if op == ldst_ops.load else 0,
                         addr = result_reg if op == ldst_ops.load else None,
-                        result_valid = result_reg_valid if op == ldst_ops.load else None,
+                        result_valid = 1,
                         do_bse = do_bse,
                         do_wse = do_wse,
                         do_bze = do_bze,
@@ -626,7 +641,8 @@ def sim():
             yield from send_alu_op(alu_ops.a_xor_b, 23, 12)
             set_side_band()
             yield from send_alu_op(alu_ops.a_plus_b, 4, 3, fetch_av=True)
-            yield from send_mult_op(41,43)
+            yield from send_mult_op(41,43) # Should get cancelled
+            yield from send_alu_op(alu_ops.a_or_b, 0x1234, 0x5678) # Should get cancelled
             yield from send_shifter_op(shifter_ops.shll,0xf0000001,2)
             yield from send_shifter_op(shifter_ops.shll,0xf0000001,31)
             yield from send_shifter_op(shifter_ops.shll,0xf0000001,32)
