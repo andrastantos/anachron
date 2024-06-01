@@ -154,6 +154,10 @@ def sim():
             self.sideband_state = sideband_state
             self.bus_req_queue = bus_req_queue
 
+        def append_pc_result(self, result: PCResult):
+            first(simulator).log(f"    RESULT TPC: 0x{result.tpc_out:08x} SPC: 0x{result.spc_out:08x} TASK_MODE: {result.task_mode_out}")
+            self.pc_result_queue.append(result)
+
         def simulate(self, simulator) -> TSimEvent:
             self.last_last_jump_type = DecodeEmulator.JumpType.Straight
             self.last_jump_type = DecodeEmulator.JumpType.Straight
@@ -169,9 +173,9 @@ def sim():
                 self.spc_in <<= self.spc_out
                 self.tpc_in <<= self.tpc_out
                 self.task_mode_in <<= self.task_mode_out
-                self.sideband_state.tpc = self.tpc_out
-                self.sideband_state.spc = self.spc_out
-                self.sideband_state.task_mode = self.task_mode_out
+                #self.sideband_state.tpc = self.tpc_out
+                #self.sideband_state.spc = self.spc_out
+                #self.sideband_state.task_mode = self.task_mode_out
                 self.last_last_jump_type = self.last_jump_type
                 self.last_jump_type = self.this_jump_type
                 self.this_jump_type = DecodeEmulator.JumpType.Straight
@@ -321,16 +325,19 @@ def sim():
                             addr=None,
                             result_valid=1
                         ))
-                    self.pc_result_queue.append(PCResult(
+                    self.append_pc_result(PCResult(
                         spc_out = next_spc,
                         tpc_out = next_tpc,
                         task_mode_out = next_task_mode,
                         ecause_out = self.sideband_state.ecause if ecause == 0 else ecause,
                         do_branch = next_do_branch
                     ))
+                    self.sideband_state.tpc = next_tpc
+                    self.sideband_state.spc = next_spc
+                    self.sideband_state.task_mode = next_task_mode
                 else:
                     simulator.log(f"Sending CANCELLED {unit} {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')}")
-                    self.pc_result_queue.append(PCResult())
+                    self.append_pc_result(PCResult())
                 yield from wait_for_transfer()
 
             def send_alu_op(op: alu_ops, op_a: int, op_b: int, op_c: int = None, *, result_reg = 0, result_reg_valid = True, fetch_av = False, inst_len = inst_len_16):
@@ -482,7 +489,7 @@ def sim():
                 if not is_cancelled():
                     # If the previous instruction somehow generated a branch, this instruction should be cancelled and so no side-effects should be observable
                     simulator.log(f"Sending branch {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')} should {'branch' if branch else 'NOT branch'}")
-                    self.pc_result_queue.append(PCResult(
+                    self.append_pc_result(PCResult(
                         spc_out = next_spc,
                         tpc_out = next_tpc,
                         task_mode_out = next_task_mode,
@@ -496,9 +503,12 @@ def sim():
                         addr=None,
                         result_valid=1
                     ))
+                    self.sideband_state.tpc = next_tpc
+                    self.sideband_state.spc = next_spc
+                    self.sideband_state.task_mode = next_task_mode
                 else:
                     simulator.log(f"Sending CANCELLED branch {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')}")
-                    self.pc_result_queue.append(PCResult())
+                    self.append_pc_result(PCResult())
                 yield from wait_for_transfer()
 
 
@@ -580,13 +590,16 @@ def sim():
                         do_bze = do_bze,
                         do_wze = do_wze
                     ))
-                    self.pc_result_queue.append(PCResult(
+                    self.append_pc_result(PCResult(
                         spc_out = next_spc,
                         tpc_out = next_tpc,
                         task_mode_out = next_task_mode,
                         ecause_out = self.sideband_state.ecause if ecause == 0 else ecause,
                         do_branch = is_exception
                     ))
+                    self.sideband_state.tpc = next_tpc
+                    self.sideband_state.spc = next_spc
+                    self.sideband_state.task_mode = next_task_mode
 
                     if not is_exception:
                         self.bus_req_queue.append(BusIfQueueItem(
@@ -604,7 +617,7 @@ def sim():
                             ))
                 else:
                     simulator.log(f"Sending CANCELLED ldst {op} {safe_fmt(op_a, '08x')} {safe_fmt(op_b, '08x')} {safe_fmt(op_c, '08x')}")
-                    self.pc_result_queue.append(PCResult())
+                    self.append_pc_result(PCResult())
 
                 yield from wait_for_transfer()
 
@@ -765,6 +778,7 @@ def sim():
             while True:
                 yield from wait_clk()
                 if ~self.rst & self.trigger_port:
+                    first(simulator).log("CHECKING PC")
                     expected: PCResult = self.result_queue[0]
                     if expected.do_branch:
                         yield from wait_clk()

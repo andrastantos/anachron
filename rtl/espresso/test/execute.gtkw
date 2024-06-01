@@ -1,15 +1,15 @@
 [*]
-[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Fri May 31 22:28:29 2024
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Sat Jun  1 21:38:16 2024
 [*]
 [dumpfile] "/home/tantos/anachron/rtl/espresso/test/execute.vcd"
-[dumpfile_mtime] "Fri May 31 22:28:29 2024"
-[dumpfile_size] 1694272
+[dumpfile_mtime] "Sat Jun  1 21:29:08 2024"
+[dumpfile_size] 213336
 [savefile] "/home/tantos/anachron/rtl/espresso/test/execute.gtkw"
-[timestart] 109
-[size] 1920 1097
+[timestart] 110
+[size] 1920 990
 [pos] -1 -1
-*-7.019852 590 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-5.095512 264 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
 [treeopen] top.dut.stage1.shifter_unit.
@@ -26,6 +26,9 @@ top.dut.rst
 @28
 top.dut.input_port_valid
 top.dut.input_port_ready
+@c00200
+-DATA
+@28
 top.dut.input_port_alu_op
 top.dut.input_port_branch_op
 top.dut.input_port_do_bse
@@ -48,23 +51,18 @@ top.dut.input_port_result_reg_addr[3:0]
 top.dut.input_port_result_reg_addr_valid
 top.dut.input_port_shifter_op
 top.dut.input_port_woi
+@1401200
+-DATA
 @1000200
 -EXEC_INPUT_PORT
-@22
-top.dut.tpc_in[30:0]
-top.dut.tpc_out[30:0]
-top.dut.spc_in[30:0]
-top.dut.spc_out[30:0]
-@28
-top.dut.task_mode_in
-top.dut.task_mode_out
-top.dut.do_branch
-top.dut.do_branch_immediate
 @c00200
 -EXEC_12_IF
 @28
 top.dut.exec_12_if_valid
 top.dut.exec_12_if_ready
+@c00200
+-SIGNALS
+@28
 top.dut.exec_12_if_access_len[1:0]
 top.dut.exec_12_if_bit_test_bit
 @22
@@ -111,25 +109,43 @@ top.dut.exec_12_if_tpc[30:0]
 @28
 top.dut.exec_12_if_woi
 @1401200
+-SIGNALS
 -EXEC_12_IF
 @800200
+-SIDEBAND_SIGNALS
+@22
+top.dut.tpc_in[30:0]
+top.dut.tpc_out[30:0]
+top.dut.spc_in[30:0]
+top.dut.spc_out[30:0]
+@28
+top.dut.task_mode_in
+top.dut.task_mode_out
+@22
+top.dut.eaddr_out[31:0]
+@28
+top.dut.ecause_in
+top.dut.ecause_out
+top.dut.do_branch
+top.dut.do_branch_immediate
+@1000200
+-SIDEBAND_SIGNALS
+@c00200
 -STAGE2_FSM
 @28
 top.dut.stage2.state_fsm.input_ready
 top.dut.stage2.state_fsm.input_valid
 top.dut.stage2.state_fsm.out_reg_en
 top.dut.stage2.state_fsm.output_ready
-@29
 top.dut.stage2.state_fsm.output_valid
-@1000200
+@1401200
 -STAGE2_FSM
-@28
-top.dut.stage2.reg_input_port_fetch_av
-top.dut.stage2.spc_changed
-top.dut.stage2.task_mode_changed
-top.dut.stage2.tpc_changed
-@c00200
+@800200
 -STAGE2_OUTPUT
+@28
+top.dut.stage2.output_port_valid
+@c00200
+-DATA
 @22
 top.dut.stage2.output_port_addr[3:0]
 @28
@@ -142,9 +158,9 @@ top.dut.stage2.output_port_do_bse
 top.dut.stage2.output_port_do_bze
 top.dut.stage2.output_port_do_wse
 top.dut.stage2.output_port_do_wze
-top.dut.stage2.output_port_valid
-top.dut.stage2.do_branch
 @1401200
+-DATA
+@1000200
 -STAGE2_OUTPUT
 @c00200
 -BRANCH_UNIT_INPUT
@@ -195,8 +211,13 @@ top.dut.stage2.branch_unit.output_port_tpc[30:0]
 top.dut.stage2.branch_unit.output_port_tpc_changed
 @1401200
 -BRANC_UNIT_OUTPUT
-@800200
+@c00200
 -MEM_UNIT_INPUT
+@28
+top.dut.stage2.memory_unit.input_port_ready
+top.dut.stage2.memory_unit.input_port_valid
+@c00200
+-SIGNALS
 @28
 top.dut.stage2.memory_unit.input_port_access_len[1:0]
 @22
@@ -205,13 +226,17 @@ top.dut.stage2.memory_unit.input_port_data[31:0]
 @28
 top.dut.stage2.memory_unit.input_port_is_csr
 top.dut.stage2.memory_unit.input_port_read_not_write
-top.dut.stage2.memory_unit.input_port_ready
-top.dut.stage2.memory_unit.input_port_valid
 top.dut.stage2.memory_unit.input_port_request_valid
-@1000200
+@1401200
+-SIGNALS
 -MEM_UNIT_INPUT
-@800200
+@c00200
 -BUS_REQ_IF
+@28
+top.dut.stage2.memory_unit.bus_req_if_ready
+top.dut.stage2.memory_unit.bus_req_if_valid
+@c00200
+-DATA
 @22
 top.dut.stage2.memory_unit.bus_req_if_addr[30:0]
 @28
@@ -220,9 +245,8 @@ top.dut.stage2.memory_unit.bus_req_if_byte_en[1:0]
 top.dut.stage2.memory_unit.bus_req_if_data[15:0]
 @28
 top.dut.stage2.memory_unit.bus_req_if_read_not_write
-top.dut.stage2.memory_unit.bus_req_if_ready
-top.dut.stage2.memory_unit.bus_req_if_valid
-@1000200
+@1401200
+-DATA
 -BUS_REQ_IF
 @c00200
 -MEM_UNIT_OUTPUT
@@ -233,20 +257,20 @@ top.dut.stage2.memory_unit.output_port_data_h[15:0]
 top.dut.stage2.memory_unit.output_port_data_l[15:0]
 @1401200
 -MEM_UNIT_OUTPUT
-@800200
+@c00200
 -SHIFTER_UNIT_INPUT
 @22
 top.dut.stage1.shifter_unit.input_port_op_a[31:0]
 top.dut.stage1.shifter_unit.input_port_op_b[31:0]
 @28
 top.dut.stage1.shifter_unit.input_port_opcode
-@1000200
+@1401200
 -SHIFTER_UNIT_INPUT
-@800200
+@c00200
 -SHIFTER_UNIT_OUTPUT
 @22
 top.dut.stage1.shifter_unit.output_port_result[31:0]
-@1000200
+@1401200
 -SHIFTER_UNIT_OUTPUT
 [pattern_trace] 1
 [pattern_trace] 0

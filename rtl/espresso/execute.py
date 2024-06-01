@@ -131,7 +131,7 @@ Further optimizations:
 I think there's a lot of stuff that gets unnecessarily registered between
 'exec1' and 'exec2'. This should be reviewed and see if the computation
 can be front-loaded to 'exec1' or if values can be collapsed into muxed
-registres if the use is mutually exclusive.
+registers if the use is mutually exclusive.
 
 """
 
