@@ -217,14 +217,6 @@ class ExecStage1(GenericModule):
         reg_input_port = Wire(DecodeExecIf)
         reg_input_port <<= input_buf(self.input_port)
 
-        # Have to capture all the side-band ports that are needed in stage 2:
-        # SPC/TPC all the others are stage-1 relative
-        # TODO: do we? I'm not actually certain now that we register the input into stages...
-        #reg_tpc = Reg(self.tpc_in, clock_en=input_buf_en)
-        #reg_spc = Reg(self.spc_in, clock_en=input_buf_en)
-        #reg_task_mode = Reg(self.task_mode_in, clock_en=input_buf_en)
-        #reg_pc = Select(reg_task_mode, reg_spc, reg_tpc)
-        #reg_interrupt = Reg(self.interrupt, clock_en=input_buf_en)
         pc = Select(self.task_mode_in, self.spc_in, self.tpc_in)
 
         # Handshake
@@ -271,7 +263,7 @@ class ExecStage1(GenericModule):
         addr_calc_unit.input_port.op_c           <<= reg_input_port.op_c
         addr_calc_unit.input_port.mem_base       <<= self.mem_base # I don't think this needs registering: if this was changed by a previous instruction, we should pick it up immediately
         addr_calc_unit.input_port.mem_limit      <<= self.mem_limit # I don't think this needs registering: if this was changed by a previous instruction, we should pick it up immediately
-        addr_calc_unit.input_port.task_mode      <<= self.task_mode_in # I don't think this needs registering: if this was changed by a previous instruction, we would be branching
+        addr_calc_unit.input_port.task_mode      <<= self.task_mode_in
         addr_calc_unit.input_port.mem_access_len <<= reg_input_port.mem_access_len
         addr_calc_output <<= addr_calc_unit.output_port
 
