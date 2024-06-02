@@ -220,11 +220,12 @@ class ExecStage1(GenericModule):
         # Have to capture all the side-band ports that are needed in stage 2:
         # SPC/TPC all the others are stage-1 relative
         # TODO: do we? I'm not actually certain now that we register the input into stages...
-        reg_tpc = Reg(self.tpc_in, clock_en=input_buf_en)
-        reg_spc = Reg(self.spc_in, clock_en=input_buf_en)
-        reg_task_mode = Reg(self.task_mode_in, clock_en=input_buf_en)
-        reg_pc = Select(reg_task_mode, reg_spc, reg_tpc)
-        reg_interrupt = Reg(self.interrupt, clock_en=input_buf_en)
+        #reg_tpc = Reg(self.tpc_in, clock_en=input_buf_en)
+        #reg_spc = Reg(self.spc_in, clock_en=input_buf_en)
+        #reg_task_mode = Reg(self.task_mode_in, clock_en=input_buf_en)
+        #reg_pc = Select(reg_task_mode, reg_spc, reg_tpc)
+        #reg_interrupt = Reg(self.interrupt, clock_en=input_buf_en)
+        pc = Select(self.task_mode_in, self.spc_in, self.tpc_in)
 
         # Handshake
         # TODO: not sure about the double-clear here: we clear stage 1 for two cycles on a branch...
@@ -237,8 +238,8 @@ class ExecStage1(GenericModule):
         alu_unit.input_port.opcode <<= reg_input_port.alu_op
         alu_unit.input_port.op_a   <<= reg_input_port.op_a
         alu_unit.input_port.op_b   <<= reg_input_port.op_b
-        alu_unit.input_port.pc     <<= reg_pc
-        alu_unit.input_port.tpc    <<= reg_tpc
+        alu_unit.input_port.pc     <<= pc
+        alu_unit.input_port.tpc    <<= self.tpc_in
         alu_output <<= alu_unit.output_port
 
         result_selectors = []
@@ -270,7 +271,7 @@ class ExecStage1(GenericModule):
         addr_calc_unit.input_port.op_c           <<= reg_input_port.op_c
         addr_calc_unit.input_port.mem_base       <<= self.mem_base # I don't think this needs registering: if this was changed by a previous instruction, we should pick it up immediately
         addr_calc_unit.input_port.mem_limit      <<= self.mem_limit # I don't think this needs registering: if this was changed by a previous instruction, we should pick it up immediately
-        addr_calc_unit.input_port.task_mode      <<= reg_task_mode # I don't think this needs registering: if this was changed by a previous instruction, we would be branching
+        addr_calc_unit.input_port.task_mode      <<= self.task_mode_in # I don't think this needs registering: if this was changed by a previous instruction, we would be branching
         addr_calc_unit.input_port.mem_access_len <<= reg_input_port.mem_access_len
         addr_calc_output <<= addr_calc_unit.output_port
 
@@ -278,7 +279,7 @@ class ExecStage1(GenericModule):
         branch_target_output = Wire(BranchTargetUnitOutputIf)
         branch_target_unit = BranchTargetUnit()
         branch_target_unit.input_port.op_c       <<= reg_input_port.op_c
-        branch_target_unit.input_port.pc         <<= reg_pc
+        branch_target_unit.input_port.pc         <<= pc
         #branch_target_unit.input_port.inst_len   <<= reg_input_port.inst_len
         branch_target_output <<= branch_target_unit.output_port
 
@@ -294,14 +295,12 @@ class ExecStage1(GenericModule):
 
         self.output_strobe <<= self.output_port.ready & self.output_port.valid
         # Side-band interface
-        pc = Select(self.task_mode_in, self.spc_in, self.tpc_in)
         # If we could figure out here in this stage if there was going to be an exception,
         # we wouldn't need to pass along both TPC and SPC. We could make sure not to update
         # TPC.
         straight_addr = (pc + reg_input_port.inst_len + 1)[30:0]
         self.spc_out                           <<= Select(~self.task_mode_in & self.output_strobe, self.spc_in, straight_addr)
         self.tpc_out                           <<= Select( self.task_mode_in & self.output_strobe, self.tpc_in, straight_addr)
-        #self.tpc_out                           <<= Select(is_exception | reg_interrupt, Select(reg_task_mode, reg_tpc, branch_target_output.straight_addr), reg_tpc)
         reg_straight_addr = Reg(straight_addr, clock_en=self.input_port.ready & self.input_port.valid)
 
         # Combining the unit outputs into a single interface
@@ -342,7 +341,7 @@ class ExecStage1(GenericModule):
         self.output_port.do_wze                <<= reg_input_port.do_wze
         ################ HELP WITH INTERRUPTS AND EXCEPTIONS
         self.output_port.is_exception          <<= is_exception
-        self.output_port.is_interrupt          <<= reg_interrupt
+        self.output_port.is_interrupt          <<= self.interrupt
         self.output_port.spc                   <<= self.spc_in
         self.output_port.tpc                   <<= self.tpc_in
         self.output_port.task_mode             <<= self.task_mode_in
@@ -570,9 +569,11 @@ class ExecuteStage(GenericModule):
     ecause_out = Output(EnumNet(exceptions))
     eaddr_out = Output(BrewAddr)
     do_branch = Output(logic)
+    do_branch_immediate = Output(logic)
     interrupt = Input(logic)
 
-    complete = Output(logic) # goes high for 1 cycle when an instruction completes. Used for verification
+    stage2_complete = Output(logic) # goes high for 1 cycle when an instruction completes. Used for verification
+    stage1_complete = Output(logic) # goes high for 1 cycle when an instruction transfers from stage1 to stage2. Used for verification
 
     def construct(self, has_multiply: bool = True, has_shift: bool = True):
         self.has_multiply = has_multiply
@@ -581,7 +582,6 @@ class ExecuteStage(GenericModule):
     def body(self):
         exec_12_if = Wire(Exec12If)
         do_branch = Wire()
-        do_branch_immediate = Wire()
 
         stage1 = ExecStage1(has_multiply=self.has_multiply, has_shift=self.has_shift)
         stage1.input_port <<= self.input_port
@@ -592,7 +592,7 @@ class ExecuteStage(GenericModule):
         stage1.tpc_in              <<= self.tpc_in
         stage1.task_mode_in        <<= self.task_mode_in
         stage1.interrupt           <<= self.interrupt
-        stage1.do_branch_immediate <<= do_branch_immediate
+        stage1.do_branch_immediate <<= self.do_branch_immediate
         stage1.do_branch           <<= do_branch
 
         stage2 = ExecStage2(has_multiply=self.has_multiply, has_shift=self.has_shift)
@@ -601,9 +601,11 @@ class ExecuteStage(GenericModule):
         self.bus_req_if            <<= stage2.bus_req_if
         stage2.bus_rsp_if          <<= self.bus_rsp_if
         self.csr_if                <<= stage2.csr_if
-        do_branch_immediate        <<= stage2.do_branch_immediate
+        self.do_branch_immediate   <<= stage2.do_branch_immediate
         do_branch                  <<= stage2.do_branch
-        self.complete              <<= stage2.output_strobe
+
+        self.stage1_complete       <<= exec_12_if.ready & exec_12_if.valid
+        self.stage2_complete       <<= stage2.output_strobe
 
         # Generate SPC/TPC and TASK_MOD outputs
         # Stage 1 never changes TASK_MODE and always assumes straight-line execution for SPC/TPC

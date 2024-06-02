@@ -59,8 +59,51 @@ class BranchUnit(Module):
         #  ge: f_carry = 0
         #  lts: f_sign != f_overflow
         #  ges: f_sign == f_overflow
-        # Some explanation: WOI is decoded into a branch_eq that's always true to the same address as the instruction. So we should branch, unless there's an interrupt and we're in a WOI
-        # Exceptions in SCHEUDLER mode result in jump to 0, which is technically an in-mode branch
+        #
+        # Some details for WOI
+        # --------------------
+        #
+        # WOI is decoded into a branch_eq that's always true
+        # to the same address as the instruction. So we should branch, unless
+        # there's an interrupt and we're in a WOI.
+        #
+        # Exception handling in SCHEDULER mode
+        # ------------------------------------
+        #
+        # Exceptions in SCHEUDLER mode result in jump to 0, which is technically
+        # an in-mode branch.
+        #
+        # TPC write complexities
+        # ----------------------
+        #
+        # $tpc writes are always considered an (in-mode) branch. Consider the
+        # following instruction sequence:
+        #    $tpc <- 3
+        #    $r0 <- $tpc
+        # Since we don't track reservations for $tpc, the second instruction
+        # would pick up the wrong (old) $tpc because it would only get written
+        # in stage2. In TASK mode this is not a problem as the second
+        # instruction would get cancelled, but it won't be in scheduler mode.
+        # A similar problem exists with indirect loads of $tpc. Consider this:
+        #    $tpc <- mem32[33]
+        #    $r0 <- $tpc
+        # So, what should happen is that writing of $tpc should always be
+        # considered a branch and thus the pipeline should be flushed, resulting
+        # in a re-load of the subsequent instruction in scheduler mode.
+        #
+        # We have to be careful with Xpc_changed generation though: we should
+        # only assert tpc_changed, no matter which mode (TASK or SCHEDULER) we
+        # are in.
+        #
+        # What we do here is to assert do_branch for all tcp_w variants
+        # independent of task_mode.
+
+        is_tcp_w = ~self.input_port.is_exception & self.input_port.is_branch_insn & (
+            (self.input_port.opcode == branch_ops.tpc_w) |
+            (self.input_port.opcode == branch_ops.tpc_w_ind)
+        )
+
+
         in_mode_branch = Select(
             self.input_port.is_exception,
             self.input_port.is_branch_insn & SelectOne(
@@ -122,7 +165,7 @@ class BranchUnit(Module):
         )
         self.output_port.task_mode  <<= self.input_port.task_mode ^ self.output_port.task_mode_changed
 
-        self.output_port.do_branch  <<= in_mode_branch | self.output_port.task_mode_changed
+        self.output_port.do_branch  <<= in_mode_branch | self.output_port.task_mode_changed | is_tcp_w
 
         swi_exception = self.input_port.is_branch_insn & (self.input_port.opcode == branch_ops.swi)
 

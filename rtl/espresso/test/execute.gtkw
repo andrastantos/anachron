@@ -1,17 +1,18 @@
 [*]
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Sat Jun  1 21:38:16 2024
+[*] Sun Jun  2 21:03:10 2024
 [*]
 [dumpfile] "/home/tantos/anachron/rtl/espresso/test/execute.vcd"
-[dumpfile_mtime] "Sat Jun  1 21:29:08 2024"
-[dumpfile_size] 213336
+[dumpfile_mtime] "Sun Jun  2 21:02:49 2024"
+[dumpfile_size] 4239207
 [savefile] "/home/tantos/anachron/rtl/espresso/test/execute.gtkw"
-[timestart] 110
+[timestart] 0
 [size] 1920 990
 [pos] -1 -1
-*-5.095512 264 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-5.095512 1426 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
+[treeopen] top.dut.stage1.
 [treeopen] top.dut.stage1.shifter_unit.
 [treeopen] top.dut.stage2.
 [sst_width] 278
@@ -26,7 +27,7 @@ top.dut.rst
 @28
 top.dut.input_port_valid
 top.dut.input_port_ready
-@c00200
+@800200
 -DATA
 @28
 top.dut.input_port_alu_op
@@ -51,31 +52,33 @@ top.dut.input_port_result_reg_addr[3:0]
 top.dut.input_port_result_reg_addr_valid
 top.dut.input_port_shifter_op
 top.dut.input_port_woi
-@1401200
--DATA
 @1000200
+-DATA
 -EXEC_INPUT_PORT
-@c00200
+@28
+top.dut.stage1_complete
+top.dut.stage2_complete
+@800200
 -EXEC_12_IF
 @28
 top.dut.exec_12_if_valid
 top.dut.exec_12_if_ready
-@c00200
+@800200
 -SIGNALS
-@28
+@29
 top.dut.exec_12_if_access_len[1:0]
 top.dut.exec_12_if_bit_test_bit
-@22
+@23
 top.dut.exec_12_if_branch_addr[30:0]
-@28
+@29
 top.dut.exec_12_if_branch_op
 top.dut.exec_12_if_do_bse
 top.dut.exec_12_if_do_bze
 top.dut.exec_12_if_do_wse
 top.dut.exec_12_if_do_wze
-@22
+@23
 top.dut.exec_12_if_eff_addr[31:0]
-@28
+@29
 top.dut.exec_12_if_f_carry
 top.dut.exec_12_if_f_overflow
 top.dut.exec_12_if_f_sign
@@ -89,26 +92,26 @@ top.dut.exec_12_if_is_interrupt
 top.dut.exec_12_if_is_mem_op
 top.dut.exec_12_if_mem_av
 top.dut.exec_12_if_mem_unaligned
-@22
+@23
 top.dut.exec_12_if_op_a[31:0]
 top.dut.exec_12_if_phy_addr[31:0]
-@28
+@29
 top.dut.exec_12_if_read_not_write
-@22
+@23
 top.dut.exec_12_if_result[31:0]
 top.dut.exec_12_if_result_reg_addr[3:0]
-@28
+@29
 top.dut.exec_12_if_result_reg_addr_valid
-@22
+@23
 top.dut.exec_12_if_spc[30:0]
 top.dut.exec_12_if_straight_addr[30:0]
-@28
+@29
 top.dut.exec_12_if_task_mode
-@22
+@23
 top.dut.exec_12_if_tpc[30:0]
-@28
+@29
 top.dut.exec_12_if_woi
-@1401200
+@1000200
 -SIGNALS
 -EXEC_12_IF
 @800200
@@ -130,6 +133,8 @@ top.dut.do_branch
 top.dut.do_branch_immediate
 @1000200
 -SIDEBAND_SIGNALS
+@22
+top.dut.stage1.branch_target_unit.input_port_pc[30:0]
 @c00200
 -STAGE2_FSM
 @28
