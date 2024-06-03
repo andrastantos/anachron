@@ -194,8 +194,10 @@ class ExecStage1(GenericModule):
     mem_limit = Input(BrewMemBase)
     spc_in  = Input(BrewInstAddr)
     spc_out = Output(BrewInstAddr) # Output only straight-line updates. Branches come from stage 2
+    spc_changed = Output(logic)
     tpc_in  = Input(BrewInstAddr)
     tpc_out = Output(BrewInstAddr) # Output only straight-line updates. Branches come from stage 2
+    tpc_changed = Output(logic)
     task_mode_in  = Input(logic)
     interrupt = Input(logic)
 
@@ -291,8 +293,10 @@ class ExecStage1(GenericModule):
         # we wouldn't need to pass along both TPC and SPC. We could make sure not to update
         # TPC.
         straight_addr = (pc + reg_input_port.inst_len + 1)[30:0]
-        self.spc_out                           <<= Select(~self.task_mode_in & self.output_strobe, self.spc_in, straight_addr)
-        self.tpc_out                           <<= Select( self.task_mode_in & self.output_strobe, self.tpc_in, straight_addr)
+        self.spc_out                           <<= straight_addr
+        self.spc_changed                       <<= ~self.task_mode_in & self.output_strobe
+        self.tpc_out                           <<= straight_addr
+        self.tpc_changed                       <<=  self.task_mode_in & self.output_strobe
         reg_straight_addr = Reg(straight_addr, clock_en=self.input_port.ready & self.input_port.valid)
 
         # Combining the unit outputs into a single interface
@@ -310,7 +314,6 @@ class ExecStage1(GenericModule):
         self.output_port.is_csr                <<= addr_calc_output.is_csr
         ################ BRANCH TARGET
         self.output_port.branch_addr           <<= branch_target_output.branch_addr
-        #self.output_port.straight_addr         <<= branch_target_output.straight_addr
         self.output_port.straight_addr         <<= reg_straight_addr
         ################ BRANCH INPUT
         self.output_port.branch_op             <<= reg_input_port.branch_op
@@ -499,13 +502,13 @@ class ExecStage2(GenericModule):
         self.do_branch <<= Reg(self.do_branch_immediate)
 
         self.spc_out <<= branch_output.spc
-        self.spc_changed <<= self.output_strobe & branch_output.spc_changed
+        self.spc_changed <<= self.output_strobe & branch_output.spc_changed & ~self.do_branch
         self.tpc_out <<= branch_output.tpc
-        self.tpc_changed <<= self.output_strobe & branch_output.tpc_changed
+        self.tpc_changed <<= self.output_strobe & branch_output.tpc_changed & ~self.do_branch
         self.task_mode_out <<= branch_output.task_mode
-        self.task_mode_changed <<= self.output_strobe & branch_output.task_mode_changed
+        self.task_mode_changed <<= self.output_strobe & branch_output.task_mode_changed & ~self.do_branch
         self.ecause_out <<= branch_output.ecause
-        self.ecause_changed <<= self.output_strobe & branch_output.ecause_changed
+        self.ecause_changed <<= self.output_strobe & branch_output.ecause_changed & ~self.do_branch
         self.eaddr_out <<= Reg(
             SelectOne(
                 #branch_output.ecause == exceptions.exc_reset,           0, <-- this never happens, it's just the default on POR
@@ -603,15 +606,20 @@ class ExecuteStage(GenericModule):
         # Stage 1 never changes TASK_MODE and always assumes straight-line execution for SPC/TPC
         # Stage 2 corrects for all these assumptions and asserts the corresponding XXX_CHANGED flags as needed
 
-        self.tpc_out <<= Select(self.do_branch, Select(stage2.tpc_changed & stage2.output_strobe, stage1.tpc_out, stage2.tpc_out), self.tpc_in)
-        self.spc_out <<= Select(self.do_branch, Select(stage2.spc_changed & stage2.output_strobe, stage1.spc_out, stage2.spc_out), self.spc_in)
-        self.task_mode_out <<= Select(stage2.task_mode_changed, self.task_mode_in, stage2.task_mode_out)
-        self.ecause_out <<= Select(stage2.ecause_changed & stage2.output_strobe, self.ecause_in, stage2.ecause_out)
-        # TODO: this is silly: we have all of these are in/outs with external registers, except for this one, which is internal. Make up your mind!!!
-        self.eaddr_out <<= Reg(
-            Select(stage2.eaddr_changed & stage2.output_strobe, self.eaddr_out, stage2.eaddr_out)
+        self.tpc_out <<= SelectFirst(
+            stage2.tpc_changed, stage2.tpc_out,
+            stage1.tpc_changed, stage1.tpc_out,
+            default_port = self.tpc_in
         )
-
+        self.spc_out <<= SelectFirst(
+            stage2.spc_changed, stage2.spc_out,
+            stage1.spc_changed, stage1.spc_out,
+            default_port = self.spc_in
+        )
+        self.task_mode_out <<= Select(stage2.task_mode_changed, self.task_mode_in, stage2.task_mode_out)
+        self.ecause_out <<= Select(stage2.ecause_changed, self.ecause_in, stage2.ecause_out)
+        # TODO: this is silly: we have all of these are in/outs with external registers, except for this one, which is internal. Make up your mind!!!
+        self.eaddr_out <<= Reg(stage2.eaddr_out, clock_en = stage2.eaddr_changed)
         self.do_branch             <<= do_branch
 
 
