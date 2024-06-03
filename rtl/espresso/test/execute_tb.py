@@ -138,7 +138,6 @@ def sim():
         tpc_out       = Input(BrewInstAddr)
         task_mode_in  = Output(logic)
         task_mode_out = Input(logic)
-        ecause_in     = Output(EnumNet(exceptions))
         ecause_out    = Input(EnumNet(exceptions))
         interrupt     = Output(logic)
         last_last_jump_type_wire = Output(EnumNet(JumpType))
@@ -208,11 +207,10 @@ def sim():
                 simulator.log(f"  input transfer accepted")
 
 
-            def set_side_band(*, task_mode = True, mem_base = None, mem_limit = None, interrupt = False, ecause = 0):
+            def set_side_band(*, task_mode = True, mem_base = None, mem_limit = None, interrupt = False):
                 self.sideband_state.mem_base = randint(0,0x3fff) if mem_base is None else mem_base
                 self.sideband_state.mem_limit = randint(0,0x3fff) if mem_limit is None else mem_limit
                 self.sideband_state.task_mode = 1 if task_mode else 0
-                self.sideband_state.ecause = ecause
                 self.sideband_state.interrupt = 1 if interrupt else 0
 
                 self.mem_base <<= self.sideband_state.mem_base
@@ -626,6 +624,7 @@ def sim():
             for i in range(5): yield from wait_clk()
             self.sideband_state.tpc = 0
             self.sideband_state.spc = 0
+            self.sideband_state.ecause = 0
             set_side_band()
 
 
@@ -1115,8 +1114,8 @@ def sim():
             decode_emulator.tpc_out <<= dut.tpc_out
             dut.task_mode_in <<= decode_emulator.task_mode_in
             decode_emulator.task_mode_out <<= dut.task_mode_out
-            dut.ecause_in <<= decode_emulator.ecause_in
             dut.interrupt <<= decode_emulator.interrupt
+            dut.ecause_clear_pulse <<= 1
 
             #pc_checker.trigger_port <<= decode_emulator.output_port.ready & decode_emulator.output_port.valid
             pc_checker.stage1_complete <<= dut.stage1_complete

@@ -556,11 +556,11 @@ class ExecuteStage(GenericModule):
     mem_limit = Input(BrewMemBase)
     spc_out = Output(BrewInstAddr)
     tpc_out = Output(BrewInstAddr)
+    ecause_out = Output(EnumNet(exceptions))
+    ecause_clear_pulse = Input(logic)
+    eaddr_out = Output(BrewAddr)
     task_mode_in  = Input(logic)
     task_mode_out = Output(logic)
-    ecause_in = Input(EnumNet(exceptions))
-    ecause_out = Output(EnumNet(exceptions))
-    eaddr_out = Output(BrewAddr)
     do_branch = Output(logic)
     do_branch_immediate = Output(logic)
     interrupt = Input(logic)
@@ -611,7 +611,7 @@ class ExecuteStage(GenericModule):
         self.eaddr_out <<= Reg(stage2.eaddr_out, clock_en = stage2.eaddr_changed)
         # TODO: this is silly: we have all of these are in/outs with external registers, except for this one, which is internal. Make up your mind!!!
         self.task_mode_out <<= Select(stage2.task_mode_changed, self.task_mode_in, stage2.task_mode_out)
-        self.ecause_out <<= Select(stage2.ecause_changed, self.ecause_in, stage2.ecause_out)
+        self.ecause_out <<= Reg(Select(stage2.ecause_changed, exceptions.exc_reset, stage2.ecause_out), clock_en = stage2.ecause_changed | self.ecause_clear_pulse)
         self.do_branch             <<= do_branch
 
 
