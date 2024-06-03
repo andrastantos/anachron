@@ -1,15 +1,15 @@
 [*]
-[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Sun Jun  2 21:03:10 2024
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Mon Jun  3 23:16:34 2024
 [*]
 [dumpfile] "/home/tantos/anachron/rtl/espresso/test/execute.vcd"
-[dumpfile_mtime] "Sun Jun  2 21:02:49 2024"
-[dumpfile_size] 4239207
+[dumpfile_mtime] "Mon Jun  3 22:43:14 2024"
+[dumpfile_size] 3548932
 [savefile] "/home/tantos/anachron/rtl/espresso/test/execute.gtkw"
 [timestart] 0
-[size] 1920 990
+[size] 1920 1097
 [pos] -1 -1
-*-5.095512 1426 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-6.595512 506 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
 [treeopen] top.dut.stage1.
@@ -19,8 +19,9 @@
 [signals_width] 432
 [sst_expanded] 1
 [sst_vpaned_height] 459
-@28
+@29
 top.dut.clk
+@28
 top.dut.rst
 @800200
 -EXEC_INPUT_PORT
@@ -58,27 +59,27 @@ top.dut.input_port_woi
 @28
 top.dut.stage1_complete
 top.dut.stage2_complete
-@800200
+@c00200
 -EXEC_12_IF
 @28
 top.dut.exec_12_if_valid
 top.dut.exec_12_if_ready
 @800200
 -SIGNALS
-@29
+@28
 top.dut.exec_12_if_access_len[1:0]
 top.dut.exec_12_if_bit_test_bit
-@23
+@22
 top.dut.exec_12_if_branch_addr[30:0]
-@29
+@28
 top.dut.exec_12_if_branch_op
 top.dut.exec_12_if_do_bse
 top.dut.exec_12_if_do_bze
 top.dut.exec_12_if_do_wse
 top.dut.exec_12_if_do_wze
-@23
+@22
 top.dut.exec_12_if_eff_addr[31:0]
-@29
+@28
 top.dut.exec_12_if_f_carry
 top.dut.exec_12_if_f_overflow
 top.dut.exec_12_if_f_sign
@@ -92,34 +93,43 @@ top.dut.exec_12_if_is_interrupt
 top.dut.exec_12_if_is_mem_op
 top.dut.exec_12_if_mem_av
 top.dut.exec_12_if_mem_unaligned
-@23
+@22
 top.dut.exec_12_if_op_a[31:0]
 top.dut.exec_12_if_phy_addr[31:0]
-@29
+@28
 top.dut.exec_12_if_read_not_write
-@23
+@22
 top.dut.exec_12_if_result[31:0]
 top.dut.exec_12_if_result_reg_addr[3:0]
-@29
+@28
 top.dut.exec_12_if_result_reg_addr_valid
-@23
+@22
 top.dut.exec_12_if_spc[30:0]
 top.dut.exec_12_if_straight_addr[30:0]
-@29
+@28
 top.dut.exec_12_if_task_mode
-@23
+@22
 top.dut.exec_12_if_tpc[30:0]
-@29
+@28
 top.dut.exec_12_if_woi
 @1000200
 -SIGNALS
+@1401200
 -EXEC_12_IF
 @800200
 -SIDEBAND_SIGNALS
 @22
-top.dut.tpc_in[30:0]
+top.dut.stage1.tpc_in[30:0]
+top.dut.stage1.tpc_out[30:0]
+@28
+top.dut.stage1_tpc_changed
+@22
+top.dut.stage1_tpc_out[30:0]
+@28
+top.dut.stage2_tpc_changed
+@22
+[color] 2
 top.dut.tpc_out[30:0]
-top.dut.spc_in[30:0]
 top.dut.spc_out[30:0]
 @28
 top.dut.task_mode_in
@@ -127,7 +137,6 @@ top.dut.task_mode_out
 @22
 top.dut.eaddr_out[31:0]
 @28
-top.dut.ecause_in
 top.dut.ecause_out
 top.dut.do_branch
 top.dut.do_branch_immediate
