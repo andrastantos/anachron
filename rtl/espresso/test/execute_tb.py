@@ -75,8 +75,8 @@ def sim():
             self,
             result: Junction,
         ):
-            test("data_l",        self.data_l,        result.data_l,   "04x")
-            test("data_h",        self.data_h,        result.data_h,   "04x")
+            test("data_l",        self.data_l,        result.data_l,   "#04x")
+            test("data_h",        self.data_h,        result.data_h,   "#04x")
             test("data_en",       self.data_en,       result.data_en)
             test("addr",          self.addr,          result.addr,     "1x")
             test("result_valid",  self.result_valid,  result.valid)
@@ -111,11 +111,11 @@ def sim():
             ecause_out: Junction,
             do_branch: Junction,
         ):
-            test("spc_out",       self.spc_out,       spc_out,         "08x", fatal=True)
-            test("tpc_out",       self.tpc_out,       tpc_out,         "08x", fatal=True)
-            test("task_mode_out", self.task_mode_out, task_mode_out,          fatal=True)
-            test("ecause_out",    self.ecause_out,    ecause_out,       None, fatal=True)
-            test("do_branch",     self.do_branch,     do_branch, fatal=False)
+            test("spc_out",       self.spc_out,       spc_out,         "#08x", fatal=False)
+            test("tpc_out",       self.tpc_out,       tpc_out,         "#08x", fatal=False)
+            test("task_mode_out", self.task_mode_out, task_mode_out,           fatal=False)
+            test("ecause_out",    self.ecause_out,    ecause_out,       None,  fatal=False)
+            test("do_branch",     self.do_branch,     do_branch,               fatal=False)
 
             return True
 
@@ -134,9 +134,7 @@ def sim():
 
         mem_base      = Output(BrewMemBase)
         mem_limit     = Output(BrewMemBase)
-        spc_in        = Output(BrewInstAddr)
         spc_out       = Input(BrewInstAddr)
-        tpc_in        = Output(BrewInstAddr)
         tpc_out       = Input(BrewInstAddr)
         task_mode_in  = Output(logic)
         task_mode_out = Input(logic)
@@ -175,11 +173,7 @@ def sim():
                 yield (self.clk, )
                 while self.clk.get_sim_edge() != EdgeType.Positive:
                     yield (self.clk, )
-                self.spc_in <<= self.spc_out
-                self.tpc_in <<= self.tpc_out
                 self.task_mode_in <<= self.task_mode_out
-                #self.sideband_state.tpc = self.tpc_out
-                #self.sideband_state.spc = self.spc_out
                 #self.sideband_state.task_mode = self.task_mode_out
                 self.last_last_jump_type = self.last_jump_type
                 self.last_jump_type = self.this_jump_type
@@ -214,21 +208,16 @@ def sim():
                 simulator.log(f"  input transfer accepted")
 
 
-            def set_side_band(*, tpc = None, spc = None, task_mode = True, mem_base = None, mem_limit = None, interrupt = False, ecause = 0):
+            def set_side_band(*, task_mode = True, mem_base = None, mem_limit = None, interrupt = False, ecause = 0):
                 self.sideband_state.mem_base = randint(0,0x3fff) if mem_base is None else mem_base
                 self.sideband_state.mem_limit = randint(0,0x3fff) if mem_limit is None else mem_limit
-                self.sideband_state.tpc = randint(0,0x3fff) | 0x10000000 if tpc is None else tpc
-                self.sideband_state.spc = randint(0,0x3fff) | 0x50000000 if spc is None else spc
                 self.sideband_state.task_mode = 1 if task_mode else 0
                 self.sideband_state.ecause = ecause
                 self.sideband_state.interrupt = 1 if interrupt else 0
 
                 self.mem_base <<= self.sideband_state.mem_base
                 self.mem_limit <<= self.sideband_state.mem_limit
-                self.tpc_in <<= self.sideband_state.tpc
-                self.spc_in <<= self.sideband_state.spc
                 self.task_mode_in <<= self.sideband_state.task_mode
-                self.ecause_in <<= self.sideband_state.ecause
                 self.interrupt <<= self.sideband_state.interrupt
 
             def safe_fmt(what, fmt = None):
@@ -635,6 +624,8 @@ def sim():
             while self.rst:
                 yield from wait_clk()
             for i in range(5): yield from wait_clk()
+            self.sideband_state.tpc = 0
+            self.sideband_state.spc = 0
             set_side_band()
 
 
@@ -678,7 +669,7 @@ def sim():
             yield from send_shifter_op(shifter_ops.shar,0xff00ff00,8)
             for i in range(5):
                 yield from send_bubble()
-            set_side_band(tpc=0xddccbba, spc=0x2233445, task_mode=True)
+            set_side_band(task_mode=True)
             for i in range(5):
                 yield from send_bubble()
             yield from send_alu_op(alu_ops.tpc, 3, 2, 1)
@@ -702,7 +693,7 @@ def sim():
             yield from send_bubble()
             for i in range(5):
                 yield from send_bubble()
-            set_side_band(tpc=0xddccbba, spc=0x2233445, task_mode=False)
+            set_side_band(task_mode=False)
             for i in range(5):
                 yield from send_bubble()
             yield from send_alu_op(alu_ops.tpc, 3, 2, 1)
@@ -735,7 +726,7 @@ def sim():
             yield from send_bubble()
             for i in range(5):
                 yield from send_bubble()
-            set_side_band(tpc=0xddccbba, spc=0x2233445, task_mode=True)
+            set_side_band(task_mode=True)
             for i in range(5):
                 yield from send_bubble()
             yield from send_cbranch_op(branch_ops.swi, 2, None, None)
@@ -746,7 +737,7 @@ def sim():
             yield from send_bubble()
             for i in range(5):
                 yield from send_bubble()
-            set_side_band(tpc=0xddccbba, spc=0x2233445, task_mode=False)
+            set_side_band(task_mode=False)
             for i in range(5):
                 yield from send_bubble()
             yield from send_cbranch_op(branch_ops.pc_w, 0x2222, None, None)
@@ -756,7 +747,7 @@ def sim():
             yield from send_bubble()
             for i in range(5):
                 yield from send_bubble()
-            set_side_band(tpc=0xddccbba, spc=0x2233445, task_mode=True)
+            set_side_band(task_mode=True)
             for i in range(5):
                 yield from send_bubble()
             yield from send_cbranch_op(branch_ops.stm, None, None, None)
@@ -854,7 +845,7 @@ def sim():
                     expected: Result = self.result_queue.pop(0)
                     if expected.result_valid:
                         if expected.data_en:
-                            simulator.log(f"Writing REG $r{self.input_port.addr:x} with value {self.input_port.data_h:04x}{self.input_port.data_l:04x} (expected: {expected.data_h:04x}{expected.data_l:04x}) enable: {self.input_port.data_en}")
+                            simulator.log(f"Writing REG $r{self.input_port.addr:x} with value 0x{self.input_port.data_h:04x}{self.input_port.data_l:04x} (expected: 0x{expected.data_h:04x}{expected.data_l:04x}) enable: {self.input_port.data_en}")
                         else:
                             simulator.log(f"Writing CANCELLED")
                     assert expected.compare(self.input_port)
@@ -1115,9 +1106,7 @@ def sim():
             # side-band interfaces
             dut.mem_base <<= decode_emulator.mem_base
             dut.mem_limit <<= decode_emulator.mem_limit
-            dut.spc_in <<= decode_emulator.spc_in
             decode_emulator.spc_out <<= dut.spc_out
-            dut.tpc_in  <<= decode_emulator.tpc_in
             decode_emulator.tpc_out <<= dut.tpc_out
             dut.task_mode_in <<= decode_emulator.task_mode_in
             decode_emulator.task_mode_out <<= dut.task_mode_out

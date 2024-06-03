@@ -554,9 +554,7 @@ class ExecuteStage(GenericModule):
     # side-band interfaces
     mem_base = Input(BrewMemBase)
     mem_limit = Input(BrewMemBase)
-    spc_in  = Input(BrewInstAddr)
     spc_out = Output(BrewInstAddr)
-    tpc_in  = Input(BrewInstAddr)
     tpc_out = Output(BrewInstAddr)
     task_mode_in  = Input(logic)
     task_mode_out = Output(logic)
@@ -583,8 +581,8 @@ class ExecuteStage(GenericModule):
         exec_12_if <<= stage1.output_port
         stage1.mem_base            <<= self.mem_base
         stage1.mem_limit           <<= self.mem_limit
-        stage1.spc_in              <<= self.spc_in
-        stage1.tpc_in              <<= self.tpc_in
+        stage1.spc_in              <<= self.spc_out
+        stage1.tpc_in              <<= self.tpc_out
         stage1.task_mode_in        <<= self.task_mode_in
         stage1.interrupt           <<= self.interrupt
         stage1.do_branch_immediate <<= self.do_branch_immediate
@@ -606,20 +604,14 @@ class ExecuteStage(GenericModule):
         # Stage 1 never changes TASK_MODE and always assumes straight-line execution for SPC/TPC
         # Stage 2 corrects for all these assumptions and asserts the corresponding XXX_CHANGED flags as needed
 
-        self.tpc_out <<= SelectFirst(
-            stage2.tpc_changed, stage2.tpc_out,
-            stage1.tpc_changed, stage1.tpc_out,
-            default_port = self.tpc_in
-        )
-        self.spc_out <<= SelectFirst(
-            stage2.spc_changed, stage2.spc_out,
-            stage1.spc_changed, stage1.spc_out,
-            default_port = self.spc_in
-        )
+        tpc_changed = stage1.tpc_changed | stage2.tpc_changed
+        spc_changed = stage1.spc_changed | stage2.spc_changed
+        self.tpc_out <<= Reg(Select(stage2.tpc_changed, stage1.tpc_out, stage2.tpc_out), clock_en = tpc_changed)
+        self.spc_out <<= Reg(Select(stage2.spc_changed, stage1.spc_out, stage2.spc_out), clock_en = spc_changed)
+        self.eaddr_out <<= Reg(stage2.eaddr_out, clock_en = stage2.eaddr_changed)
+        # TODO: this is silly: we have all of these are in/outs with external registers, except for this one, which is internal. Make up your mind!!!
         self.task_mode_out <<= Select(stage2.task_mode_changed, self.task_mode_in, stage2.task_mode_out)
         self.ecause_out <<= Select(stage2.ecause_changed, self.ecause_in, stage2.ecause_out)
-        # TODO: this is silly: we have all of these are in/outs with external registers, except for this one, which is internal. Make up your mind!!!
-        self.eaddr_out <<= Reg(stage2.eaddr_out, clock_en = stage2.eaddr_changed)
         self.do_branch             <<= do_branch
 
 
