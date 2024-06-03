@@ -111,10 +111,10 @@ def sim():
             ecause_out: Junction,
             do_branch: Junction,
         ):
-            test("spc_out",       self.spc_out,       spc_out,         "#08x", fatal=False)
-            test("tpc_out",       self.tpc_out,       tpc_out,         "#08x", fatal=False)
-            test("task_mode_out", self.task_mode_out, task_mode_out,           fatal=False)
-            test("ecause_out",    self.ecause_out,    ecause_out,       None,  fatal=False)
+            test("spc_out",       self.spc_out,       spc_out,         "#08x", fatal=True)
+            test("tpc_out",       self.tpc_out,       tpc_out,         "#08x", fatal=True)
+            test("task_mode_out", self.task_mode_out, task_mode_out,           fatal=True)
+            test("ecause_out",    self.ecause_out,    ecause_out,       None,  fatal=True)
             test("do_branch",     self.do_branch,     do_branch,               fatal=False)
 
             return True
@@ -158,7 +158,7 @@ def sim():
                 if num is not None: return f"{num:{fmt}}"
                 return "None"
 
-            first(simulator).log(f"    RESULT TPC: 0x{fmt_none(result.tpc_out,'08x')} SPC: 0x{fmt_none(result.spc_out,'08x')} TASK_MODE: {result.task_mode_out}")
+            first(simulator).log(f"    RESULT TPC: {fmt_none(result.tpc_out,'#08x')} SPC: {fmt_none(result.spc_out,'#08x')} TASK_MODE: {result.task_mode_out}")
             self.pc_result_queue.append(result)
 
         def simulate(self, simulator) -> TSimEvent:
@@ -261,10 +261,10 @@ def sim():
                     elif op == alu_ops.a_xor_b:
                         result = op_a ^ op_b
                     elif op == alu_ops.tpc:
-                        result = self.tpc_out << 1
+                        result = self.sideband_state.tpc << 1
                     elif op == alu_ops.pc_plus_b:
                         yield 0
-                        result = ((self.tpc_out << 1 if self.task_mode_out else self.spc_out << 1) + op_b) & mask
+                        result = ((self.sideband_state.tpc << 1 if self.sideband_state.task_mode else self.sideband_state.spc << 1) + op_b) & mask
                 elif unit == op_class.shift:
                     if op == shifter_ops.shll:
                         result = (op_a << (op_b & 31)) & mask
@@ -793,10 +793,15 @@ def sim():
         #    self.ecause <<= Reg(self.ecause_out)
 
         def simulate(self) -> TSimEvent:
+            self.sideband_results = None
+
             def wait_clk():
                 yield (self.clk, )
                 while self.clk.get_sim_edge() != EdgeType.Positive:
                     yield (self.clk, )
+                if self.sideband_results is not None:
+                    assert self.sideband_results.compare(self.spc_out, self.tpc_out, self.task_mode_out, self.ecause_out, self.do_branch)
+                    self.sideband_results = None
 
             while True:
                 yield from wait_clk()
@@ -807,7 +812,7 @@ def sim():
                         if not expected.do_branch:
                             first(simulator).log("    CHECKING PC")
                             self.result_queue.pop(0)
-                            assert expected.compare(self.spc_out, self.tpc_out, self.task_mode_out, self.ecause_out, self.do_branch)
+                            self.sideband_results = expected # Test in next clock cycle
                         else:
                             # Wait for stage2 to override PC and the reset
                             yield from wait_clk()
@@ -820,7 +825,7 @@ def sim():
                                     pass
                             first(simulator).log("    CHECKING PC AFTER BRANCH")
                             self.result_queue.pop(0)
-                            assert expected.compare(self.spc_out, self.tpc_out, self.task_mode_out, self.ecause_out, self.do_branch)
+                            self.sideband_results = expected # Test in next clock cycle
 
     class ResultChecker(GenericModule):
         clk = ClkPort()
