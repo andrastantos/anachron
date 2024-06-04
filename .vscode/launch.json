@@ -123,5 +123,23 @@
             "cwd": "${workspaceFolder}/rtl/espresso/test",
             "justMyCode": false,
         },
+        {
+            "name": "ESPRESSO bus_if GEN",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "bus_if.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/rtl/espresso",
+            "justMyCode": false,
+        },
+        {
+            "name": "ESPRESSO bus_if TB",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "bus_if_tb.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/rtl/espresso/test",
+            "justMyCode": false,
+        },
     ]
 }
