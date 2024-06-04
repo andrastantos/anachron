@@ -189,11 +189,21 @@ class RegFile(Module):
 
 def gen():
     def top():
-        return ScanWrapper(RegFile, {"clk", "rst"})
+        #return ScanWrapper(RegFile, {"clk", "rst"})
+        return RegFile()
 
-    netlist = Build.generate_rtl(top, "reg_file.sv")
+    netlist = Build.generate_rtl(top, "synth/reg_file.sv")
     top_level_name = netlist.get_module_class_name(netlist.top_level)
-    flow = QuartusFlow(target_dir="q_reg_file", top_level=top_level_name, source_files=("reg_file.sv",), clocks=(("clk", 10), ("top_clk", 100)), project_name="reg_file")
+    flow = QuartusFlow(
+        target_dir="synth/q_reg_file",
+        top_level=top_level_name,
+        source_files=("synth/reg_file.sv",),
+        clocks=(("clk", 10),),# ("top_clk", 100)),
+        project_name="reg_file",
+        no_timing_report_clocks="clk",
+        family="MAX 10",
+        device="10M50DAF672C7G" # Something large with a ton of pins
+    )
     flow.generate()
     flow.run()
 

@@ -1171,13 +1171,13 @@ def gen():
         #return ScanWrapper(DecodeStage, {"clk", "rst"})
         return DecodeStage(support_exc_unknown_inst = True)
 
-    netlist = Build.generate_rtl(top, "decode.sv")
+    netlist = Build.generate_rtl(top, "synth/decode.sv")
     top_level_name = netlist.get_module_class_name(netlist.top_level)
     top_level_name = "DecodeStage"
     flow = QuartusFlow(
-        target_dir="q_decode",
+        target_dir="synth/q_decode",
         top_level=top_level_name,
-        source_files=("decode.sv",),
+        source_files=("synth/decode.sv",),
         clocks=(("clk", 10),),# ("top_clk", 100)),
         project_name="decode",
         no_timing_report_clocks="clk",

@@ -622,12 +622,12 @@ def gen():
 
     #back_end = SystemVerilog()
     #back_end.yosys_fix = True
-    netlist = Build.generate_rtl(top, "execute.sv")
+    netlist = Build.generate_rtl(top, "synth/execute.sv")
     top_level_name = netlist.get_module_class_name(netlist.top_level)
     flow = QuartusFlow(
-        target_dir="q_execute",
+        target_dir="synth/q_execute",
         top_level=top_level_name,
-        source_files=("execute.sv",),
+        source_files=("synth/execute.sv",),
         clocks=(("clk", 10), ),#("top_clk", 100)),
         project_name="execute",
         family="MAX 10",

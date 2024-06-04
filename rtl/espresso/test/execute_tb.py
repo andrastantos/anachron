@@ -1151,7 +1151,7 @@ def sim():
 
     def sim_top():
         return top(simulator)
-    Build.simulation(sim_top, "execute.vcd", add_unnamed_scopes=True)
+    Build.simulation(sim_top, "execute_tb.vcd", add_unnamed_scopes=True)
 
 if __name__ == "__main__":
     sim()

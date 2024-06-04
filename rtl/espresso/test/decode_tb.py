@@ -321,7 +321,7 @@ def sim():
             now = yield 10
             print(f"Done at {now}")
 
-    Build.simulation(top, "decode.vcd", add_unnamed_scopes=True)
+    Build.simulation(top, "decode_tb.vcd", add_unnamed_scopes=True)
 
 if __name__ == "__main__":
     sim()

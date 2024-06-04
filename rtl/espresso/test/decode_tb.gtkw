@@ -2,10 +2,10 @@
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
 [*] Thu May 23 01:23:17 2024
 [*]
-[dumpfile] "/home/tantos/anachron/rtl/espresso/test/decode.vcd"
+[dumpfile] "/home/tantos/anachron/rtl/espresso/test/decode_tb.vcd"
 [dumpfile_mtime] "Thu May 23 01:20:22 2024"
 [dumpfile_size] 1048791
-[savefile] "/home/tantos/anachron/rtl/espresso/test/decode.gtkw"
+[savefile] "/home/tantos/anachron/rtl/espresso/test/decode_tb.gtkw"
 [timestart] 0
 [size] 1920 990
 [pos] -1 -1
