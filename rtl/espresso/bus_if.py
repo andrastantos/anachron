@@ -645,8 +645,61 @@ class BusIf(GenericModule):
 
 def gen():
     def top():
+        class BusIfWrapperDmaRequestIf(ReadyValid):
+            read_not_write  = logic
+            one_hot_channel = Unsigned(4)
+            byte_en         = Unsigned(2)
+            addr            = BrewBusAddr
+            is_master       = logic
+            terminal_count  = logic
+
+        class BusIfWrapper(GenericModule):
+            clk = ClkPort()
+            rst = RstPort()
+
+            # Interface to fetch and memory
+            fetch_request  = Input(BusIfRequestIf)
+            fetch_response = Output(BusIfResponseIf)
+            mem_request  = Input(BusIfRequestIf)
+            mem_response = Output(BusIfResponseIf)
+            dma_request = Input(BusIfWrapperDmaRequestIf)
+            dma_response = Output(BusIfDmaResponseIf)
+
+            # CRS interface for config registers
+            reg_if = Input(ApbIf(BrewCsrData, Unsigned(4)))
+
+            # DRAM interface
+            dram = Output(ExternalBusIf)
+
+            # Events
+            event_bus_idle = Output(logic)
+
+            def construct(self, nram_base: int = 0):
+                self.nram_base = nram_base
+
+            def body(self):
+                bus_if = BusIf(self.nram_base)
+                bus_if.fetch_request <<= self.fetch_request
+                self.fetch_response <<= bus_if.fetch_response
+
+                bus_if.mem_request <<= self.mem_request
+                self.mem_response <<= bus_if.mem_response
+
+                bus_if.dma_request.read_not_write <<= self.dma_request.read_not_write
+                bus_if.dma_request.one_hot_channel <<= self.dma_request.one_hot_channel
+                bus_if.dma_request.byte_en <<= self.dma_request.byte_en
+                bus_if.dma_request.addr <<= self.dma_request.addr
+                bus_if.dma_request.is_master <<= self.dma_request.is_master
+                bus_if.dma_request.terminal_count <<= self.dma_request.terminal_count
+                bus_if.dma_request.valid <<= self.dma_request.valid
+                self.dma_request.ready <<= bus_if.dma_request.ready
+                self.dma_response <<= bus_if.dma_response
+                bus_if.reg_if <<= self.reg_if
+                self.dram <<= bus_if.dram
+                self.event_bus_idle <<= bus_if.event_bus_idle
+
         #return ScanWrapper(BusIf, {"clk", "rst"})
-        return BusIf()
+        return BusIfWrapper()
 
     netlist = Build.generate_rtl(top, "bus_if.sv")
     top_level_name = netlist.get_module_class_name(netlist.top_level)
