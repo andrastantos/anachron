@@ -159,16 +159,15 @@ class BusIf(Module):
     """
     Address map:
 
-        0x?000_0000 ... 0x?3ff_ffff: NRAM space 0
-        0x?400_0000 ... 0x?7ff_ffff: NRAM space 1 (aliased to NRAM space 0)
-        0x?800_0000 ... 0x?bff_ffff: DRAM space 0
-        0x?c00_0000 ... 0x?fff_ffff: DRAM space 1
+        0x?000_0000 ... 0x?7ff_ffff: NRAM space (aliased twice due to lack of address pins)
+        0x?800_0000 ... 0x?fff_ffff: DRAM space (divided into two banks based on CSR config)
 
         NOTE: addresses here are 16-bit word addresses.
 
         Address bits 30:27 determine the number of wait-states.
-        Address bits 26:25 determine which space we're talking about
-        Address bits 24:0  determine the location to address within a space, leaving 64MB of addressable space.
+        Address bits 26    determine which space we're talking about
+        Address bits 22:0  determine the location to address within a space, leaving 16MB of addressable space.
+                           NOTE: for DRAM space, the A/B bank decode depends on CSR settings
 
         TODO: really what should happen is that address bit 30 should not partake in wait-state selection, instead
               it should be used by the address calculation unit to determine if logical-to-physical translation needs
