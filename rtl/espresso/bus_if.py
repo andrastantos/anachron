@@ -135,7 +135,7 @@ to somehow auto-detect the number of DRAM banks installed and set up the
 CSRs accordingly. I think there is a way to auto-detect this as unused banks
 will not work in read/write tests.
 """
-class BusIf(GenericModule):
+class BusIf(Module):
     clk = ClkPort()
     rst = RstPort()
 
@@ -156,19 +156,23 @@ class BusIf(GenericModule):
     # Events
     event_bus_idle = Output(logic)
 
-    def construct(self, nram_base: int = 0):
-        self.nram_base = nram_base
-
     """
     Address map:
 
-        0x0000000 ... 0x03fffff: NRAM space
-        0x4000000 ... 0x43fffff: CSR space (not of concern for the bus interface)
-        0x8000000 ... 0x83fffff: DRAM space 0
-        0xc000000 ... 0xc3fffff: DRAM space 1 (aliased to DRAM space 0)
+        0x?000_0000 ... 0x?3ff_ffff: NRAM space 0
+        0x?400_0000 ... 0x?7ff_ffff: NRAM space 1 (aliased to NRAM space 0)
+        0x?800_0000 ... 0x?bff_ffff: DRAM space 0
+        0x?c00_0000 ... 0x?fff_ffff: DRAM space 1
 
-        In each space, bits 30:27 determine the number of wait-states.
-        In each space, bits 24:0 determine the location to address, leaving 64MB of addressable space.
+        NOTE: addresses here are 16-bit word addresses.
+
+        Address bits 30:27 determine the number of wait-states.
+        Address bits 26:25 determine which space we're talking about
+        Address bits 24:0  determine the location to address within a space, leaving 64MB of addressable space.
+
+        TODO: really what should happen is that address bit 30 should not partake in wait-state selection, instead
+              it should be used by the address calculation unit to determine if logical-to-physical translation needs
+              to happen.
 
         NOTE: wait-states are actually ignored by the bus-interface when interacting with non-DMA DRAM transfers.
               however, DMA transactions do need wait-state designation, so in reality no more than 64MB of DRAM
@@ -176,17 +180,7 @@ class BusIf(GenericModule):
         NOTE: addressing more than 64MB of DRAM is a bit problematic because they can't be contiguous. This isn't
               a big deal for this controller as there aren't enough external banks to get to that high of memory
               configurations anyway. The maximum addressable memory is 16MB in a 2-bank setup.
-        NOTE: NRAM space base address is controlled through the `nram_base` parameter. Anything that's not NRAM
-              is treated as DRAM by the bus interface (CSR space is expected to not generate requests).
         NOTE: since addresses are in 16-bit quantities inside here, we're counting bits 30 downwards
-
-        TODO: I'm not sure 4-bank support is all that interesting. Really, the only thing it enables
-              (unless we're willing to drive 64 DRAM chips, which sounds ... ambitious) is to support
-              larger memory sizes in 4-bit configurations. And that's only interesting if we're thinking
-              in terms of on-board, soldered memory, which of course is the cheapest, but probably not the
-              best idea. If we 'invent' the 30-pin SIMM from the get-go, we get to choose the memory we
-              we want to drive (1-bit or 4-bit) at installation time, and 2 banks is sufficient.
-              For now, I'll leave the 4-bank setup in place, but ... food for thought.
     """
 
     reg_dram_config_ofs = 0
@@ -320,8 +314,8 @@ class BusIf(GenericModule):
         req_byte_en <<= Select(arb_port_select, self.fetch_request.byte_en, self.mem_request.byte_en, self.dma_request.byte_en)
         req_advance = req_valid & req_ready
 
-        req_dram = (req_addr[26:25] != self.nram_base) & ((arb_port_select == Ports.mem_port) | (arb_port_select == Ports.fetch_port))
-        req_nram = (req_addr[26:25] == self.nram_base) & ((arb_port_select == Ports.mem_port) | (arb_port_select == Ports.fetch_port))
+        req_dram = (req_addr[26:25] != 0) & ((arb_port_select == Ports.mem_port) | (arb_port_select == Ports.fetch_port))
+        req_nram = (req_addr[26:25] == 0) & ((arb_port_select == Ports.mem_port) | (arb_port_select == Ports.fetch_port))
         req_dma  = (arb_port_select == Ports.dma_port) & ~self.dma_request.is_master
         req_ext  = (arb_port_select == Ports.dma_port) &  self.dma_request.is_master
         req_rfsh = (arb_port_select == Ports.refresh_port)
@@ -653,7 +647,7 @@ def gen():
             is_master       = logic
             terminal_count  = logic
 
-        class BusIfWrapper(GenericModule):
+        class BusIfWrapper(Module):
             clk = ClkPort()
             rst = RstPort()
 
@@ -674,11 +668,8 @@ def gen():
             # Events
             event_bus_idle = Output(logic)
 
-            def construct(self, nram_base: int = 0):
-                self.nram_base = nram_base
-
             def body(self):
-                bus_if = BusIf(self.nram_base)
+                bus_if = BusIf()
                 bus_if.fetch_request <<= self.fetch_request
                 self.fetch_response <<= bus_if.fetch_response
 
@@ -701,9 +692,18 @@ def gen():
         #return ScanWrapper(BusIf, {"clk", "rst"})
         return BusIfWrapper()
 
-    netlist = Build.generate_rtl(top, "bus_if.sv")
+    netlist = Build.generate_rtl(top, "synth/bus_if.sv")
     top_level_name = netlist.get_module_class_name(netlist.top_level)
-    flow = QuartusFlow(target_dir="q_bus_if", top_level=top_level_name, source_files=("bus_if.sv",), clocks=(("clk", 10), ("top_clk", 100)), project_name="bus_if")
+    flow = QuartusFlow(
+        target_dir="synth/q_bus_if",
+        top_level=top_level_name,
+        source_files=("synth/bus_if.sv",),
+        clocks=(("clk", 10),),# ("top_clk", 100)),
+        project_name="bus_if",
+        no_timing_report_clocks="clk",
+        family="MAX 10",
+        device="10M50DAF672C7G" # Something large with a ton of pins
+    )
     flow.generate()
     flow.run()
 
