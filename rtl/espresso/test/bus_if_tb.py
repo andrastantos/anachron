@@ -44,9 +44,20 @@ class ExpectedTransaction(object):
     burst_beat: int # 0-based burst index
     byte_idx: int # 0 for low, 1 for high byte
 
+@dataclass
+class ExpectedResponse(object):
+    data: int
+
 expected_transactions: Sequence[ExpectedTransaction] = []
 
 def sim():
+    def mem_content(region: str, addr: int, length: int = 1) -> int:
+        def get_byte(addr):
+            return (addr >> 0) & 0xff if addr & 1 == 0 else (addr >> 8) & 0xff
+        ret_val = 0
+        for i in range(length):
+            ret_val = ret_val | (get_byte(addr + i) << (i * 8))
+        return ret_val
 
     class DRAM_sim(Module):
         addr_bus_len = 11
@@ -81,7 +92,11 @@ def sim():
                 full_addr: int = None
                 burst_cnts: Sequence[int] = None # One for each CAS
 
-            regions = (Region("DRAM_A", self.bus_if.n_ras_a, True, unswizzle_dram_addr), Region("DRAM_B", self.bus_if.n_ras_b, True, unswizzle_dram_addr), Region("NREN", self.bus_if.n_nren, False, unswizzle_nren_addr))
+            regions = (
+                Region("DRAM_A", self.bus_if.n_ras_a, True, unswizzle_dram_addr),
+                Region("DRAM_B", self.bus_if.n_ras_b, True, unswizzle_dram_addr),
+                Region("NREN", self.bus_if.n_nren, False, unswizzle_nren_addr)
+            )
 
             self.bus_if.data_in <<= None
             self.bus_if.n_wait <<= 1
@@ -116,8 +131,7 @@ def sim():
                                         simulator.sim_assert(not data_assigned, "Multiple regions or byte-lanes are written at the same time")
                                         simulator.log(f"{region.name} writing byte {byte} in beat {region.burst_cnts[idx]} to address {region.full_addr:#08x} {data}")
                                     else:
-                                        shift = idx * 8
-                                        data = (region.full_addr >> shift) & 0xff
+                                        data = mem_content(region.name, (region.full_addr << 1) + idx)
                                         simulator.sim_assert(not data_assigned, "Multiple regions or byte-lanes are read at the same time")
                                         simulator.log(f"{region.name} reading byte {byte} in beat {region.burst_cnts[idx]} from address {region.full_addr:#08x} {data:#04x}")
                                         self.bus_if.data_in <<= data
@@ -207,6 +221,7 @@ def sim():
         rst = RstPort()
 
         request_port = Output(BusIfRequestIf)
+        response_port = Input(BusIfResponseIf)
 
         def construct(self) -> None:
             self.mode = None
@@ -222,12 +237,16 @@ def sim():
         #data            = BrewBusData
         #last            = logic
 
+        def post_sim_test(self, simulator: Simulator):
+            simulator.sim_assert(len(self.expected_responses) == 0)
+
         def simulate(self, simulator) -> TSimEvent:
             self.burst_beat = None
             self.burst_cnt = None
             self.burst_addr = None
             self.is_dram = None
-            self.expected_transactions_prep = []
+            self.expected_transactions_prep: Sequence[ExpectedTransaction] = []
+            self.expected_responses: Sequence[ExpectedResponse] = []
 
             def reset():
                 self.request_port.valid <<= 0
@@ -268,6 +287,18 @@ def sim():
                     self.expected_transactions_prep.append(ExpectedTransaction("????", get_region_name(addr), get_bus_addr(addr), data, do_write, self.burst_beat, 0))
                 if byte_en & 2 != 0:
                     self.expected_transactions_prep.append(ExpectedTransaction("????", get_region_name(addr), get_bus_addr(addr), data, do_write, self.burst_beat, 1))
+                if do_write:
+                    pass # I don't think the BUS_IF gives any response to a write.
+                    #self.expected_responses.append(ExpectedResponse(None))
+                else:
+                    if byte_en == 3:
+                        self.expected_responses.append(ExpectedResponse(mem_content(get_region_name(addr), addr << 1, 2)))
+                    elif byte_en == 2:
+                        self.expected_responses.append(ExpectedResponse(mem_content(get_region_name(addr), (addr << 1) + 1, 1)))
+                    elif byte_en == 1:
+                        self.expected_responses.append(ExpectedResponse(mem_content(get_region_name(addr), (addr << 1) + 0, 1)))
+
+
 
                 data_str = f"{data:#04x}" if data is not None else "0x----"
                 simulator.log(f"{self.mode.upper()} {('reading','writing')[do_write]} address {addr:#08x} {interpret_addr(addr)} data {data_str} bytes {byte_en:02b}")
@@ -292,6 +323,14 @@ def sim():
                 yield (self.clk, )
                 while self.clk.get_sim_edge() != EdgeType.Positive:
                     yield (self.clk, )
+                # Check for responses
+                if self.rst == 0:
+                    simulator.sim_assert(self.response_port.valid is not None)
+                    if self.response_port.valid == 1:
+                        simulator.log(f"{self.mode.upper()} response received with data {self.response_port.data:#04x}")
+                        exp = first(self.expected_responses)
+                        self.expected_responses.pop(0)
+                        simulator.sim_assert(exp.data is None or exp.data == self.response_port.data)
 
             def wait_for_advance():
                 global expected_transactions
@@ -344,6 +383,8 @@ def sim():
                 while self.rst == 1:
                     yield from wait_clk()
                 yield from read(0x5678,False,0,3, wait_states=2)
+            while len(self.expected_responses) > 0:
+                yield from wait_clk()
 
     class DmaGenerator(GenericModule):
         clk = ClkPort()
@@ -518,15 +559,17 @@ def sim():
             seed(0)
             fetch_req = Wire(BusIfRequestIf)
             fetch_rsp = Wire(BusIfResponseIf)
-            fetch_generator = Generator()
-            fetch_generator.set_mode("fetch")
-            fetch_req <<= fetch_generator.request_port
+            self.fetch_generator = Generator()
+            self.fetch_generator.set_mode("fetch")
+            fetch_req <<= self.fetch_generator.request_port
+            self.fetch_generator.response_port <<= fetch_rsp
 
             mem_req = Wire(BusIfRequestIf)
             mem_rsp = Wire(BusIfResponseIf)
-            mem_generator = Generator()
-            mem_generator.set_mode("mem")
-            mem_req <<= mem_generator.request_port
+            self.mem_generator = Generator()
+            self.mem_generator.set_mode("mem")
+            mem_req <<= self.mem_generator.request_port
+            self.mem_generator.response_port <<= mem_rsp
 
             dma_req = Wire(BusIfDmaRequestIf)
             dma_generator = DmaGenerator()
@@ -549,7 +592,7 @@ def sim():
             dut.reg_if <<= csr_driver.reg_if
 
 
-        def simulate(self) -> TSimEvent:
+        def simulate(self, simulator: Simulator) -> TSimEvent:
             def clk() -> int:
                 yield 10
                 self.clk <<= ~self.clk & self.clk
@@ -569,7 +612,11 @@ def sim():
             for i in range(150):
                 yield from clk()
             now = yield 10
-            print(f"Done at {now}")
+            print(f"Post sim tests {now}")
+            self.fetch_generator.post_sim_test(simulator)
+            self.mem_generator.post_sim_test(simulator)
+            print(f"Done {now}")
+
 
     Build.simulation(top, "bus_if_tb.vcd", add_unnamed_scopes=True)
 
