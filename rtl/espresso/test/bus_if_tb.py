@@ -13,55 +13,126 @@ from brew_utils import *
 from scan import ScanWrapper
 from synth import *
 from bus_if import *
+from copy import copy
+
+def get_ws(addr: int) -> int:
+    return ((addr >> 27) - 1) & 0xf
+
+def get_region(addr: int) -> int:
+    return (addr >> 25) & 3
+
+def get_region_name(addr: int, add_nren_idx: bool = False) -> str:
+    if not add_nren_idx:
+        return ("NREN", "NREN", "DRAM0", "DRAM1")[get_region(addr)]
+    return ("NREN0", "NREN1", "DRAM0", "DRAM1")[get_region(addr)]
+
+def get_bus_addr(addr: int) -> int:
+    return addr & ((1 << 25) - 1)
+
+def interpret_addr(addr: int) -> str:
+    ws = get_ws(addr)
+    ofs = get_bus_addr(addr)
+    return f"{get_region_name(addr, True)}:{ofs:#08x}-{ws:01x}"
+
+@dataclass
+class ExpectedTransaction(object):
+    kind: str # This would be things like 'DMA' or 'REFRESH', but not sure how to use it at the moment
+    region: str # This is the same as Region.name below
+    addr: int # Full transaction address, or row address for refresh
+    data: int # Expected data (8 bits)
+    is_write: bool
+    burst_beat: int # 0-based burst index
+    byte_idx: int # 0 for low, 1 for high byte
+
+expected_transactions: Sequence[ExpectedTransaction] = []
 
 def sim():
-    inst_stream = []
-
 
     class DRAM_sim(Module):
-        addr_bus_len = 12
+        addr_bus_len = 11
         addr_bus_mask = (1 << addr_bus_len) - 1
 
         bus_if = Input(ExternalBusIf)
 
-        def simulate(self, simulator) -> TSimEvent:
-            full_addr = 0
+        def simulate(self, simulator: Simulator) -> TSimEvent:
+            def unswizzle_nren_addr(row, col):
+                return (row << self.addr_bus_len) | col
+            def unswizzle_dram_addr(row, col):
+                row = int(row)
+                col = int(col)
+                return (
+                    ((col & 0x0ff) << 0) |
+                    ((row & 0x0ff) << 8) |
+                    ((col & 0x100) << (16-8)) |
+                    ((row & 0x100) << (17-8)) |
+                    ((col & 0x200) << (18-9)) |
+                    ((row & 0x200) << (19-9)) |
+                    ((col & 0x400) << (20-10)) |
+                    ((row & 0x400) << (21-10))
+                )
+
+            @dataclass
+            class Region(object):
+                name: str
+                ras: JunctionBase
+                support_refresh: bool
+                unswizzler: Callable
+                row_addr: int = None
+                full_addr: int = None
+                burst_cnts: Sequence[int] = None # One for each CAS
+
+            regions = (Region("DRAM_A", self.bus_if.n_ras_a, True, unswizzle_dram_addr), Region("DRAM_B", self.bus_if.n_ras_b, True, unswizzle_dram_addr), Region("NREN", self.bus_if.n_nren, False, unswizzle_nren_addr))
+
             self.bus_if.data_in <<= None
             self.bus_if.n_wait <<= 1
             while True:
-                yield (self.bus_if.n_ras_a, self.bus_if.n_nren, self.bus_if.n_cas_0, self.bus_if.n_cas_1)
-                data_assigned = False
-                for (byte, cas) in (("low", self.bus_if.n_cas_0), ("high", self.bus_if.n_cas_1)):
-                    if (self.bus_if.n_ras_a.get_sim_edge() == EdgeType.Negative) or (self.bus_if.n_nren.get_sim_edge() == EdgeType.Negative):
-                        #assert self.dram_n_cas_0.get_sim_edge() == EdgeType.NoEdge
-                        #assert self.dram_n_cas_1.get_sim_edge() == EdgeType.NoEdge
-                        #assert self.dram_n_cas_0 == 1
-                        #assert self.dram_n_cas_1 == 1
-                        # Falling edge or nRAS: capture row address
-                        if full_addr is None:
-                            full_addr = 0
-                        full_addr = full_addr & self.addr_bus_mask | (self.bus_if.addr << self.addr_bus_len)
-                        simulator.log("Capturing raw address {self.bus_if.addr:03x} into full address {full_addr:08x}")
-                    else:
-                        if cas.get_sim_edge() == EdgeType.Negative:
-                            #assert self.DRAM_nRAS.get_sim_edge() == EdgeType.NoEdge
-                            #assert self.DRAM_nRAS == 0
-                            # Falling edge of nCAS
-                            full_addr = full_addr & (self.addr_bus_mask << self.addr_bus_len) | self.bus_if.addr
-                            if self.bus_if.n_we == 0:
-                                # Write to the address
-                                data = f"{self.bus_if.data_out:04x}"
-                                simulator.log(f"Writing byte {byte} to address {full_addr:08x} {data}")
-                            else:
-                                shift = 8 if byte == "high" else 0
-                                data = (full_addr >> shift) & 0xff
-                                if data_assigned:
-                                    simulator.log(f"Driving both bytes at the same time")
-                                simulator.log(f"Reading byte {byte} from address {full_addr:08x} {data:04x}")
-                                self.bus_if.data_in <<= data
-                                data_assigned = True
-                if not data_assigned:
-                    self.bus_if.data_in <<= None
+                yield (self.bus_if.n_ras_a, self.bus_if.n_ras_b, self.bus_if.n_nren, self.bus_if.n_cas_0, self.bus_if.n_cas_1, self.bus_if.bus_en)
+                if self.bus_if.bus_en == 0:
+                    pass
+                else:
+                    data_assigned = False
+                    for region in regions:
+                        if region.ras.get_sim_edge() == EdgeType.Negative:
+                            region.row_addr = copy(self.bus_if.addr.sim_value)
+                            region.burst_cnts = [0,0]
+                        elif region.ras.get_sim_edge() == EdgeType.Positive:
+                            if region.full_addr is None:
+                                # We didn't get a CAS pulse, so treat is a refresh
+                                simulator.sim_assert(region.support_refresh, f"{region.name} doesn't support refresh cycles")
+                                simulator.log(f"{region.name} refresh at row {region.row_addr:#03x}")
+                            region.row_addr = None
+                            region.full_addr = None
+                        else:
+                            for idx, (byte, cas) in enumerate((("low ", self.bus_if.n_cas_0), ("high", self.bus_if.n_cas_1))):
+                                if region.ras == 1: continue
+                                if cas.get_sim_edge() == EdgeType.Negative:
+                                    # This is needed for now to ensure address also updates
+                                    yield 0
+                                    # Falling edge of nCAS
+                                    region.full_addr = region.unswizzler(region.row_addr, self.bus_if.addr)
+                                    if self.bus_if.n_we == 0:
+                                        # Write to the address
+                                        data = f"{self.bus_if.data_out:#04x}"
+                                        simulator.sim_assert(not data_assigned, "Multiple regions or byte-lanes are written at the same time")
+                                        simulator.log(f"{region.name} writing byte {byte} in beat {region.burst_cnts[idx]} to address {region.full_addr:#08x} {data}")
+                                    else:
+                                        shift = idx * 8
+                                        data = (region.full_addr >> shift) & 0xff
+                                        simulator.sim_assert(not data_assigned, "Multiple regions or byte-lanes are read at the same time")
+                                        simulator.log(f"{region.name} reading byte {byte} in beat {region.burst_cnts[idx]} from address {region.full_addr:#08x} {data:#04x}")
+                                        self.bus_if.data_in <<= data
+                                    data_assigned = True
+
+                                    try:
+                                        expected_transaction: ExpectedTransaction = first(expected_transactions)
+                                        expected_transactions.pop(0)
+                                    except:
+                                        simulator.sim_assert(False, "No expectation for memory transaction")
+                                    simulator.sim_assert(expected_transaction.addr is None or expected_transaction.addr == region.full_addr)
+                                    simulator.sim_assert(expected_transaction.is_write is None or expected_transaction.is_write == (self.bus_if.n_we == 0))
+                                    simulator.sim_assert(expected_transaction.burst_beat is None or expected_transaction.burst_beat == region.burst_cnts[idx])
+                                    simulator.sim_assert(expected_transaction.byte_idx is None or expected_transaction.byte_idx == idx)
+                                    region.burst_cnts[idx] += 1
 
     class CsrDriver(Module):
         clk = ClkPort()
@@ -137,10 +208,10 @@ def sim():
 
         request_port = Output(BusIfRequestIf)
 
-        def construct(self, nram_base: int = 0) -> None:
+        def construct(self) -> None:
             self.mode = None
-            self.nram_base = nram_base
-            self.dram_base = 2 if nram_base == 0 else 0
+            self.nram_base = 0x0000_0000
+            self.dram_base = 0x0800_0000
 
         def set_mode(self, mode):
             self.mode = mode
@@ -151,10 +222,12 @@ def sim():
         #data            = BrewBusData
         #last            = logic
 
-        def simulate(self) -> TSimEvent:
+        def simulate(self, simulator) -> TSimEvent:
+            self.burst_beat = None
             self.burst_cnt = None
             self.burst_addr = None
             self.is_dram = None
+            self.expected_transactions_prep = []
 
             def reset():
                 self.request_port.valid <<= 0
@@ -169,20 +242,35 @@ def sim():
                     assert is_dram is not None
                     self.burst_cnt = burst_len
                     self.burst_addr = addr
+                    self.burst_beat = 0
                     self.is_dram = is_dram
                     self.wait_states = wait_states
                 else:
                     assert addr is None
                     assert is_dram is None
                     self.burst_addr += 1
+                    self.burst_beat += 1
                     self.burst_cnt -= 1
                 assert self.burst_cnt >= 0
 
+                addr = self.burst_addr | ((self.dram_base if self.is_dram else self.nram_base) >> 1) | (((self.wait_states + 1) & 0xf) << 27)
                 self.request_port.valid <<= 1
                 self.request_port.read_not_write <<= not do_write
                 self.request_port.byte_en <<= byte_en
-                self.request_port.addr <<= self.burst_addr | ((self.dram_base if self.is_dram else self.nram_base) << (29-4)) | ((self.wait_states + 1) << (29))
+                self.request_port.addr <<= addr
                 self.request_port.data <<= data
+
+                # We can prepare the expectation here but can only drop it in
+                # the queue when it gets accepted by the BusIf. This is because
+                # servicing can be out-of-order from requesting between the
+                # various requestors (fetch/mem/dma)
+                if byte_en & 1 != 0:
+                    self.expected_transactions_prep.append(ExpectedTransaction("????", get_region_name(addr), get_bus_addr(addr), data, do_write, self.burst_beat, 0))
+                if byte_en & 2 != 0:
+                    self.expected_transactions_prep.append(ExpectedTransaction("????", get_region_name(addr), get_bus_addr(addr), data, do_write, self.burst_beat, 1))
+
+                data_str = f"{data:#04x}" if data is not None else "0x----"
+                simulator.log(f"{self.mode.upper()} {('reading','writing')[do_write]} address {addr:#08x} {interpret_addr(addr)} data {data_str} bytes {byte_en:02b}")
 
             def start_read(addr, is_dram, burst_len, byte_en, wait_states):
                 if burst_len > 0:
@@ -206,9 +294,13 @@ def sim():
                     yield (self.clk, )
 
             def wait_for_advance():
+                global expected_transactions
                 yield from wait_clk()
                 while not (self.request_port.ready & self.request_port.valid):
                     yield from wait_clk()
+                assert len(self.expected_transactions_prep) > 0
+                expected_transactions += self.expected_transactions_prep
+                self.expected_transactions_prep.clear()
 
             def write(addr, is_dram, burst_len, byte_en, data, wait_states=0):
                 idx = 0
@@ -259,10 +351,10 @@ def sim():
 
         request_port = Output(BusIfDmaRequestIf)
 
-        def construct(self, nram_base: int = 0) -> None:
+        def construct(self) -> None:
             self.mode = None
-            self.nram_base = nram_base
-            self.dram_base = 2 if nram_base == 0 else 0
+            self.nram_base = 0x0000_0000
+            self.dram_base = 0x8000_0000
 
         def body(self):
             self.request_port.one_hot_channel.set_net_type(Unsigned(4))
@@ -276,7 +368,9 @@ def sim():
         #data            = BrewBusData
         #last            = logic
 
-        def simulate(self) -> TSimEvent:
+        def simulate(self, simulator: Simulator) -> TSimEvent:
+            self.expected_transactions_prep = []
+
             def reset():
                 self.request_port.valid <<= 0
                 self.request_port.read_not_write <<= None
@@ -286,16 +380,20 @@ def sim():
                 self.request_port.terminal_count <<= None
 
             def read_or_write(addr, is_dram, byte_en, channel, terminal_count, wait_states, do_write, is_master):
+                assert byte_en in (1,2) or is_master
                 assert addr is not None or is_master
                 assert is_dram is not None or is_master
 
                 self.request_port.valid <<= 1
                 self.request_port.read_not_write <<= not do_write
                 self.request_port.byte_en <<= byte_en
-                self.request_port.addr <<= None if is_master else addr | ((self.dram_base if is_dram else self.nram_base) << (29-4)) | ((wait_states + 1) << (29))
+                self.request_port.addr <<= None if is_master else addr | ((self.dram_base if is_dram else self.nram_base) >> 1) | ((wait_states + 1) << (28))
                 self.request_port.one_hot_channel <<= 1 << channel
                 self.request_port.terminal_count <<= terminal_count
                 self.request_port.is_master <<= is_master
+
+                if not is_master:
+                    self.expected_transactions_prep.append(ExpectedTransaction("????", get_region_name(addr), get_bus_addr(addr), None, do_write, 0, 1 if byte_en == 2 else 0))
 
             def start_read(addr, is_dram, byte_en, channel, terminal_count, wait_states):
                 read_or_write(addr, is_dram, byte_en, channel, terminal_count, wait_states, do_write=False, is_master=False)
@@ -312,9 +410,13 @@ def sim():
                     yield (self.clk, )
 
             def wait_for_advance():
+                global expected_transactions
                 yield from wait_clk()
                 while not (self.request_port.ready & self.request_port.valid):
                     yield from wait_clk()
+                #assert len(self.expected_transactions_prep) > 0
+                expected_transactions += self.expected_transactions_prep
+                self.expected_transactions_prep.clear()
 
             def write(addr, is_dram, byte_en, channel, terminal_count, wait_states=0):
                 start_write(addr, is_dram, byte_en, channel, terminal_count, wait_states)
@@ -329,7 +431,6 @@ def sim():
                 yield from wait_clk()
 
             reset()
-            #if self.mode == "fetch":
             yield from wait_clk()
             while self.rst == 1:
                 yield from wait_clk()
@@ -343,6 +444,9 @@ def sim():
                 yield from wait_clk()
             reset()
             yield from wait_clk()
+
+
+
 
             #    yield from read(0x12,True,1,3)
             #    yield from read(0x24,True,3,3)
