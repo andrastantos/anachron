@@ -176,7 +176,7 @@ class DramEmu(Module):
             self.mem_request.valid, Ports.mem_port,
             default_port = Ports.fetch_port
         )
-        arb_port_select <<= hold(arb_port_comb, enable=state == BusIfStates.idle)
+        arb_port_select <<= LatchReg(arb_port_comb, enable=state == BusIfStates.idle)
 
         req_ready = Wire()
         req_ready <<= (state == BusIfStates.idle) | (state == BusIfStates.first) | (state == BusIfStates.middle)
@@ -291,7 +291,7 @@ class DramEmu(Module):
         data_out_en = Wire()
         data_out_en <<= Reg(~req_read_not_write & (arb_port_select != Ports.dma_port), clock_en=start) # reads and writes can't mix within a burst
         byte_en = Wire()
-        byte_en <<= hold(req_byte_en, enable=req_advance)
+        byte_en <<= LatchReg(req_byte_en, enable=req_advance)
         data_out = Wire()
         data_out <<= Reg(
             Select(
