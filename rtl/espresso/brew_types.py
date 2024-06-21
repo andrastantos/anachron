@@ -85,26 +85,24 @@ access_len_8 = 0
 access_len_16 = 1
 access_len_32 = 2
 
+class RequestType(PyEnum):
+    refresh = 0
+    master = 1
+    dma = 2
+    pipeline = 3 # Fetch or load/store
+
 class BusIfRequestIf(ReadyValid):
     read_not_write  = logic
+    client_id       = GenericMember
     byte_en         = Unsigned(2)
     addr            = BrewBusAddr
     data            = BrewBusData
+    request_type    = EnumNet(RequestType)
+    terminal_count  = logic
 
 class BusIfResponseIf(Interface):
     valid           = logic
     data            = BrewBusData
-
-class BusIfDmaRequestIf(ReadyValid):
-    read_not_write  = logic
-    one_hot_channel = GenericMember
-    byte_en         = Unsigned(2)
-    addr            = BrewBusAddr
-    is_master       = logic
-    terminal_count  = logic
-
-class BusIfDmaResponseIf(Interface):
-    valid           = logic
 
 class ExternalBusIf(Interface):
     n_ras_a       = logic

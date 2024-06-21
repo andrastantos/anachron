@@ -53,6 +53,7 @@ It does the following:
     DRAM_DATA       --------------<>-<>-<>-<>-<>-<>-<>-<>-------------<>-<>--------------<>-<>-------------<>-<>-<>-<>-<>-<>-<>-<>------------------------
     DRAM_nWE        ^^^^^^^^^\_____________________________/^^^^^\___________/^^^^^\___________/^^^^^\_____________________________/^^^^^\-----/^^^^^^^^^^
     DRAM_DATA       ------------<==X==X==X==X==X==X==X==>-----------<==X==>-----------<==X==>-----------<==X==X==X==X==X==X==X==>-------------------------
+    n_wait          --------/^^^^^^^^^^^^^^^^^^^^^^^^^^^\-------/^^^^^^^^^\-------/^^^^^^^^^\-------/^^^^^^^^^^^^^^^^^^^^^^^^^^^\-------------------------
     CLK             \__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\_
     req_valid       ___/^^^^^^^^^^^^^^^^^^^^^^^\___________/^^^^^\___________/^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\_____________________________/^^^^
     req_ready       ^^^^^^^^^^^^^^^^^^^^^^^^^^^\___________/^^^^^\___________/^^^^^\___________/^^^^^^^^^^^^^^^^^^^^^^^\_______________________/^^^^^^^^^^
@@ -64,6 +65,53 @@ It does the following:
     rsp_ready       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     rsp_data        ---------------------<=====X=====X=====X=====>-----------<=====>-----------<=====>----------------------------------------------------
 
+                        <----------- delayed 4-beat burst -------------><---- abandonded burst ----><---- single ----><---------- 4-beat burst ----------><- refresh->
+    CLK             \__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\_
+    DRAM_nRAS       ^^^^^^^^^^^^^^^^^^^^^\_____________________________/^^^^^\___________/^^^^^\___________/^^^^^\_____________________________/^^^^^\_____/^^^^^^^^^^
+    DRAM_nCAS_A     ^^^^^^^^^^^^^^^^^^^^^^^^\__/^^\__/^^\__/^^\__/^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\__/^^^^^^^^^^^^^^\__/^^\__/^^\__/^^\__/^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    DRAM_nCAS_B     ^^^^^^^^^^^^^^^^^^^^^^^^^^^\__/^^\__/^^\__/^^\__/^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\__/^^^^^^^^^^^^^^\__/^^\__/^^\__/^^\__/^^^^^^^^^^^^^^^^^^^^^^^^^
+    DRAM_ADDR       ---------------------<==X=====X=====X=====X=====>--------------------------<==X=====>--------<==X=====X=====X=====X=====>--------<==>-------------
+    DRAM_nWE        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    DRAM_DATA       --------------------------<>-<>-<>-<>-<>-<>-<>-<>-------------------------------<>-<>-------------<>-<>-<>-<>-<>-<>-<>-<>------------------------
+    DRAM_nWE        ^^^^^^^^^^^^^^^^^^^^^\_____________________________/^^^^^^^^^^^^^^^^^^^^^^^\___________/^^^^^\_____________________________/^^^^^\-----/^^^^^^^^^^
+    DRAM_DATA       ------------------------<==X==X==X==X==X==X==X==>------------------------------<==X==>-----------<==X==X==X==X==X==X==X==>-------------------------
+    n_wait          --\______________/^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\-------\___^^^^^^^\-------/^^^^^^^^^\-------/^^^^^^^^^^^^^^^^^^^^^^^^^^^\-------------------------
+    CLK             \__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\_
+    req_valid       ___/^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\___________/^^^^^\___________/^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\_____________________________/^^^^
+    req_ready       ^^^^^^\___________/^^^^^^^^^^^^^^^^^^^^\___________/^^^^^\___________/^^^^^\___________/^^^^^^^^^^^^^^^^^^^^^^^\_______________________/^^^^^^^^^^
+    req_wr          _____________________________________________________________________/^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    req_addr        ---<=====<=====<=====X=====X=====X=====>-----------<=====>-----------<=====X=================X=====X=====X=====>----------------------------------
+    req_data        ---------------------------------------------------------------------------<=================X=====X=====X=====>----------------------------------
+                       |-----|-----|----------------->                 |---------------->|----------------->---------------->
+    rsp_valid       _________________________________/^^^^^^^^^^^^^^^^^^^^^^^\___________/^^^^^\___________/^^^^^\____________________________________________________
+    rsp_ready       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    rsp_data        ---------------------------------<=====X=====X=====X=====>-----------<=====>-----------<=====>----------------------------------------------------
+
+
+    4-beat burst (req_valid is driven on both edges)
+    ================================================
+
+    CLK             \_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\
+    DRAM_nRAS       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\___________________________________________________________/^^^^^^^^^^^^^^^^^^^^^^^^
+    DRAM_nCAS_A     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    DRAM_nCAS_B     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    DRAM_ADDR       -------------------------------< ROW><   COL 0  ><   COL 1  ><   COL 2  ><   COL 3  >--------------------------------
+    DRAM_nWE        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\___________________________________________________________/^^^^^^^^^^^^^^^^^^^^^^^^
+    DRAM_DATA       -------------------------------------< D0 >< D1 >< D2 >< D3 >< D4 >< D5 >< D6 >< D7 >--------------------------------
+    DRAM_nWE        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    DRAM_DATA       ----------------------------------------< D0 >< D1 >< D2 >< D3 >< D4 >< D5 >< D6 >< D7 >-----------------------------
+    DRAM_N_WAIT     *^^^^^^^^\__*________/^^*^^^^^^^^^^^*^^^^^^^^^^^*^^^^^^^^^^^*^^^^^^^^^^^*^^^^^^^^^^^*^^^^^^^^^^^*^^^^^^^^^^^*^^^^^^^^
+    CLK             \_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\_____/^^^^^\
+    req_valid       ______*/^^^^^^^^^^*^^^^^^^^^^^*^^^^^^^^^^^*^^^^^^^^^^^*^^^^^^^^^^^*\__________*___________*___________*___________*__
+    req_ready       ^^^^^^*^^^^^^\____*_______/^^^*^^^^^^^^^^^*^^^^^^^^^^^*^^^^^^^^^^^*^^\________*___________*/^^^^^^^^^^*^^^^^^^^^^^*^^
+    req_wr
+    req_addr
+    req_data
+
+    rsp_valid
+    rsp_ready
+    rsp_data
+
 Notes:
 1. Burst length is not communicated over the interface: only the de-assertion of req_valid/req_ready signals the end of a burst.
 2. write data is captured with the address on every transaction.
@@ -72,18 +120,26 @@ Notes:
 5. Client arbitration happens only during the idle state: i.e. we don't support clients taking over bursts from each other
 
 Contract details:
-1. If requestor lowers req_valid, it means the end of a burst: the bus interface will immediately lower req_ready and go through
-   pre-charge and arbitration cycles.
-2. Bus interface is allowed to de-assert req_ready independent of req_valid. This is the case for non-burst targets, such as
-   ROMs or I/O.
-3. Addresses must be consecutive and must not cross page-boundary within a burst. The bus_if doesn't check for this
-   (maybe it should assert???) and blindly puts the address on the DRAM bus. Address incrementing is the responsibility
-   of the requestor (it probably does it anyway). Bursts don't have to be from/to contiguous addresses, as long as they
-   stay within one page (only lower 8 address bits change).
-4. Reads and writes are not allowed to be mixed within a burst. This is - again - not checked by the bus_if.
-5. Resposes to bursts are uninterrupted, that is to say, rsp_valid will go inactive (and *will* go inactive) only on burst boundaries.
-6. There isn't pipelining between requests and responses. That is to say, that in the cycle the next request is accepted, the
-   previous response is either completed or the last response is provided in the same cycle.
+1. If requestor lowers req_valid, it means the end of a burst: the bus interface
+   will immediately lower req_ready and go through pre-charge and arbitration
+   cycles.
+2. Similarly, if 'client_id' changes, it signals the end of a burst. The bus
+   interface reacts the same was in previous point
+3. Bus interface is allowed to de-assert req_ready independent of req_valid.
+   This is the case for non-burst targets, such as ROMs or I/O.
+4. Addresses must be consecutive and must not cross page-boundary within a
+   burst. The bus_if doesn't check for this (maybe it should assert???) and
+   blindly puts the address on the DRAM bus. Address incrementing is the
+   responsibility of the requestor (it probably does it anyway). Bursts don't
+   have to be from/to contiguous addresses, as long as they stay within one page
+   (only lower 8 address bits change).
+4. Reads and writes are not allowed to be mixed within a burst. This is
+   - again - not checked by the bus_if.
+5. Resposes to bursts are uninterrupted, that is to say, rsp_valid will go
+   inactive (and *will* go inactive) only on burst boundaries.
+6. There isn't pipelining between requests and responses. That is to say, that
+   in the cycle the next request is accepted, the previous response is either
+   completed or the last response is provided in the same cycle.
 
 
 Non-DRAM accesses:
@@ -136,17 +192,19 @@ CSRs accordingly. I think there is a way to auto-detect this as unused banks
 will not work in read/write tests.
 """
 
+"""
+I need to unify all client interfaces to the BusIf module such that
+a single (maybe cascaded) arbiter can deal with all of them
+"""
+
+
+
 class BusIf(Module):
     clk = ClkPort()
     rst = RstPort()
 
-    # Interface to fetch and memory
-    fetch_request  = Input(BusIfRequestIf)
-    fetch_response = Output(BusIfResponseIf)
-    mem_request  = Input(BusIfRequestIf)
-    mem_response = Output(BusIfResponseIf)
-    dma_request = Input(BusIfDmaRequestIf)
-    dma_response = Output(BusIfDmaResponseIf)
+    request = Input(BusIfRequestIf)
+    response = Output(BusIfResponseIf)
 
     # CRS interface for config registers
     reg_if = Input(CsrIf)
@@ -173,6 +231,13 @@ class BusIf(Module):
         TODO: really what should happen is that address bit 30 should not partake in wait-state selection, instead
               it should be used by the address calculation unit to determine if logical-to-physical translation needs
               to happen.
+        TODO: Espresso should (when programmed to) delay the start of a DRAM/I/O/DMA cycle if dram.n_wait is asserted.
+        TODO: Espresso should (when programmed to) back-off DRAM cycle, if dram.n_wait is asserted in the same cycle as dram.n_ras_X is. Then, wait until dram.n_wait is de-asserted and retry.
+        TODO: Espresso should (when programmed to) delay asserting dram.n_dack until after dram.n_ras is asserted and confirmed not-interfering with dram.n_wait
+        TODO: Espresso should delay asserting dram.n_cas_X during DMA cycles until dram.n_wait is de-asserted.
+        TODO: Espresso should sample dram.n_wait on the falling edge of clk.
+        TODO: Espresso should sample DMA requests on the falling edge of clk (this is in cpu_dma.py).
+
 
         NOTE: wait-states are actually ignored by the bus-interface when interacting with non-DMA DRAM transfers.
               however, DMA transactions do need wait-state designation, so in reality no more than 64MB of DRAM
