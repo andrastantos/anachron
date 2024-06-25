@@ -85,14 +85,14 @@ access_len_8 = 0
 access_len_16 = 1
 access_len_32 = 2
 
-class RequestType(PyEnum):
+class RequestTypes(PyEnum):
     refresh = 0
     pipeline = 1 # Fetch or load/store
     dma = 2
     master = 3
 
-assert RequestType.master ^ RequestType.dma == 1, "master and dma request types must have a single-bit difference"
-assert RequestType.master & 1 == 1, "master request type must have LSB set"
+assert RequestTypes.master ^ RequestTypes.dma == 1, "master and dma request types must have a single-bit difference"
+assert RequestTypes.master & 1 == 1, "master request type must have LSB set"
 
 class BusIfRequestIf(ReadyValid):
     read_not_write  = logic
@@ -100,7 +100,7 @@ class BusIfRequestIf(ReadyValid):
     byte_en         = Unsigned(2)
     addr            = BrewBusAddr
     data            = BrewBusData
-    request_type    = EnumNet(RequestType)
+    request_type    = EnumNet(RequestTypes)
     terminal_count  = logic
 
 class BusIfResponseIf(Interface):

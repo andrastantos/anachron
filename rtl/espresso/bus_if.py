@@ -504,6 +504,7 @@ The 32-bit address space is broken up as follows:
    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
    |PHY|  WS_CODE  |MSS|                                           MEM_SPACE_ADDRESS                                           |BS |
    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+         29  28  27  26  25  24  23  22  21  20  19  18  17  16  15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
        +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
        |  WS_CODE  |MSS|                                           MEM_SPACE_ADDRESS                                           |
        +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
@@ -650,67 +651,50 @@ class BusIf(Module):
     event_bus_idle = Output(logic)
 
     def body(self):
+        class MemSpaces(Enum):
+            dram_0 = 0
+            dram_1 = 1
+            nren   = 2
+
         # CSR interface
         #########################
-        csr_reg_write_strobe = self.reg_if.psel & self.reg_if.pwrite & self.reg_if.penable
-        csr_reg_config = 1 # This is where address decoding would happen, would we have multiple CSRs
-        self.reg_if.pready <<= 1
+        csr_busif_config = ApbReg()
+        dram_bank_size = csr_busif_config.add_field("bank_size",  2, 0, ApbReg.Kind.ctrl).ctrl_port
+        dram_bank_swap = csr_busif_config.add_field("bank_swap",  3, 3, ApbReg.Kind.ctrl).ctrl_port
+        dram_0_wait =     csr_busif_config.add_field("ras_a_wait", 4, 4, ApbReg.Kind.ctrl).ctrl_port
+        dram_1_wait =     csr_busif_config.add_field("ras_b_wait", 5, 5, ApbReg.Kind.ctrl).ctrl_port
+        nren_wait =      csr_busif_config.add_field("nren_wait",  6, 6, ApbReg.Kind.ctrl).ctrl_port
 
-        csr_reg_addr = self.reg_if.paddr
+        # Input buffer
+        #########################
 
-        csr_dram_bank_size = Reg(self.reg_if.pwdata[2:0],                 clock_en=csr_reg_config & csr_reg_write_strobe)
-        csr_dram_bank_swap = Reg(self.reg_if.pwdata[3],                   clock_en=csr_reg_config & csr_reg_write_strobe)
-        csr_ras_a_wait     = Reg(self.reg_if.pwdata[4],                   clock_en=csr_reg_config & csr_reg_write_strobe)
-        self.reg_if.prdata <<= concat(
-            dram_single_bank,
-            dram_bank_swap,
-            dram_bank_size,
-            refresh_disable,
-            refresh_counter
-        )
+        # We create a slide-buffer here. This one has 0 forward latency,
+        # but can hold up to one outstanding transfer, if needed.
+        # At least I *think* that's what we need.
 
-        # Refresh logic
-        # We seem to need to generate 256 refresh cycles in 4ms. That would mean a refresh cycle
-        # every 200 or so cycles at least. So, an 8-bit counter should suffice
-        refresh_tc = refresh_counter == 0
-        refresh_rsp = Wire(logic)
-        refresh_req = Wire(logic)
-        refresh_req <<= Reg(Select(
-            refresh_tc & ~refresh_disable,
-            Select(
-                refresh_rsp,
-                refresh_req,
-                0
-            ),
-            1
-        ))
-        refresh_counter <<= Reg(Select(
-                refresh_tc,
-                Select(
-                    refresh_req,
-                    (refresh_counter-1)[self.refresh_counter_size-1:0],
-                    refresh_counter
-                ),
-                refresh_divider
-        ))
-        refresh_addr = Wire(self.dram.addr.get_net_type())
-        refresh_addr <<= Reg(Select(refresh_rsp, refresh_addr, self.dram.addr.get_net_type()(refresh_addr+1)))
+        req = Wire(BusIfRequestIf)
+        req = ReverseBuf(self.request)
 
+        # Bus FSM
+        #########################
+
+        # We have to encode two phases in a single state as
+        # the interface is in essence a DDR affair.
+        # Instead of *why* we're doing things, let's
+        # try to encode *what* we're doing
         class BusIfStates(Enum):
-            idle                 = 0
-            first                = 1
-            middle               = 2
-            external             = 3
-            precharge            = 4
-            non_dram_first       = 5
-            non_dram_wait        = 6
-            non_dram_dual        = 7
-            non_dram_dual_first  = 8
-            non_dram_dual_wait   = 9
-            non_dram_last        = 10
-            dma_first            = 11
-            dma_wait             = 12
-            refresh              = 13
+            idle                 = 0 # idle or precharge
+            ras_cas0             = 3
+            cas0_cas1            = 4
+            cas1_cas0            = 5
+            cas1_none            = 6
+            ras_wait             = 7
+            ras_ras              = 8
+            cas0_ras             = 9
+            cas1_ras             = 10
+            cas0_cas0            = 11
+            ras_cas1             = 12
+            cas1_cas1            = 13
 
         self.fsm = FSM()
 
@@ -722,327 +706,229 @@ class BusIf(Module):
         state <<= self.fsm.state
         next_state <<= self.fsm.next_state
 
-        class Ports(Enum):
-            fetch_port = 0
-            mem_port = 1
-            dma_port = 2
-            refresh_port = 3
-
-        arb_port_select = Wire()
-        arb_port_comb = SelectFirst(
-            refresh_req, Ports.refresh_port,
-            self.dma_request.valid, Ports.dma_port,
-            self.mem_request.valid, Ports.mem_port,
-            default_port = Ports.fetch_port
-        )
-        arb_port_select <<= LatchReg(arb_port_comb, enable=state == BusIfStates.idle)
-
-        req_ready = Wire()
-        req_ready <<= (state == BusIfStates.idle) | (state == BusIfStates.first) | (state == BusIfStates.middle)
-        refresh_rsp <<= (state == BusIfStates.refresh)
-        self.mem_request.ready <<= req_ready & (arb_port_select == Ports.mem_port)
-        self.fetch_request.ready <<= req_ready & (arb_port_select == Ports.fetch_port)
-        self.dma_request.ready <<= (req_ready & (arb_port_select == Ports.dma_port)) | (state == BusIfStates.external)
-
-        req_valid = Wire()
-        start = Wire()
-        req_addr = Wire()
-        req_data = Wire()
-        req_read_not_write = Wire()
-        req_byte_en = Wire()
-
-        req_valid <<= Select(arb_port_select, self.fetch_request.valid, self.mem_request.valid, self.dma_request.valid, 1)
-        start <<= (state == BusIfStates.idle) & req_valid
-        req_addr <<= Select(arb_port_select, self.fetch_request.addr, self.mem_request.addr, self.dma_request.addr)
-        req_data <<= Select(arb_port_select, self.fetch_request.data, self.mem_request.data, None)
-        req_read_not_write <<= Select(arb_port_select, self.fetch_request.read_not_write, self.mem_request.read_not_write, self.dma_request.read_not_write, 1)
-        req_byte_en <<= Select(arb_port_select, self.fetch_request.byte_en, self.mem_request.byte_en, self.dma_request.byte_en)
-        req_advance = req_valid & req_ready
-
-        req_dram = (req_addr[26:25] != 0) & ((arb_port_select == Ports.mem_port) | (arb_port_select == Ports.fetch_port))
-        req_nram = (req_addr[26:25] == 0) & ((arb_port_select == Ports.mem_port) | (arb_port_select == Ports.fetch_port))
-        req_dma  = (arb_port_select == Ports.dma_port) & ~self.dma_request.is_master
-        req_ext  = (arb_port_select == Ports.dma_port) &  self.dma_request.is_master
-        req_rfsh = (arb_port_select == Ports.refresh_port)
-
-        dram_addr_muxing = Select(start, Reg(req_dram | req_dma, clock_en=start), req_dram | req_dma)
-        dma_ch = Reg(self.dma_request.one_hot_channel, clock_en=start)
-        tc = Reg(self.dma_request.terminal_count, clock_en=start)
-
-        req_wait_states = (req_addr[30:27]-1)[3:0]
-        wait_states_store = Reg(req_wait_states, clock_en=start)
+        req_progress = req.ready & req.valid
+        req_wait_states_l = Select(req.addr[29:27], 14,12,8,6,4,2,1,0)
+        req_wait_states = Reg(req_wait_states_l, clock_en = req_progress)
         wait_states = Wire(Unsigned(4))
+        wait_state_start = 0
         wait_states <<= Reg(
             Select(
-                start,
+                wait_state_start,
                 Select(
                     wait_states == 0,
-                    (wait_states - ((state == BusIfStates.dma_wait) | (state == BusIfStates.non_dram_dual_wait) | (state == BusIfStates.non_dram_wait)))[3:0],
-                    Select(
-                        state == BusIfStates.non_dram_dual,
-                        0,
-                        wait_states_store
-                    )
+                    decrement(wait_states),
+                    0
                 ),
                 req_wait_states
             )
         )
-        waiting = ~self.dram.n_wait | (wait_states != 0)
-
-        two_cycle_nram_access = Wire(logic)
-        two_cycle_nram_access <<= Reg((req_byte_en == 3) & req_nram, clock_en=start)
-        nram_access = Wire(logic)
-        nram_access <<= Reg(req_nram, clock_en=start)
 
         self.event_bus_idle <<= (state == BusIfStates.idle) & (next_state == BusIfStates.idle)
 
-        self.fsm.add_transition(BusIfStates.idle,                         req_valid & req_ext,                                  BusIfStates.external)
-        self.fsm.add_transition(BusIfStates.idle,                         req_valid & req_nram,                                 BusIfStates.non_dram_first)
-        self.fsm.add_transition(BusIfStates.idle,                         req_valid & req_dma,                                  BusIfStates.dma_first)
-        self.fsm.add_transition(BusIfStates.idle,                         req_valid & req_dram,                                 BusIfStates.first)
-        self.fsm.add_transition(BusIfStates.idle,                         req_valid & req_rfsh,                                 BusIfStates.refresh)
-        self.fsm.add_transition(BusIfStates.external,                     req_valid & ~req_ext,                                 BusIfStates.idle)
-        self.fsm.add_transition(BusIfStates.external,                    ~req_valid,                                            BusIfStates.idle)
-        self.fsm.add_transition(BusIfStates.first,                       ~req_valid,                                            BusIfStates.precharge)
-        self.fsm.add_transition(BusIfStates.first,                        req_valid,                                            BusIfStates.middle)
-        self.fsm.add_transition(BusIfStates.middle,                      ~req_valid,                                            BusIfStates.precharge)
-        self.fsm.add_transition(BusIfStates.precharge, 1,                                                                       BusIfStates.idle)
-        self.fsm.add_transition(BusIfStates.non_dram_first, 1,                                                                  BusIfStates.non_dram_wait)
-        self.fsm.add_transition(BusIfStates.non_dram_wait,  waiting,                                                            BusIfStates.non_dram_wait)
-        self.fsm.add_transition(BusIfStates.non_dram_wait, ~waiting &  two_cycle_nram_access,                                   BusIfStates.non_dram_dual)
-        self.fsm.add_transition(BusIfStates.non_dram_wait, ~waiting & ~two_cycle_nram_access,                                   BusIfStates.non_dram_last)
-        self.fsm.add_transition(BusIfStates.non_dram_dual, 1,                                                                   BusIfStates.non_dram_dual_first)
-        self.fsm.add_transition(BusIfStates.non_dram_dual_first, 1,                                                             BusIfStates.non_dram_dual_wait)
-        self.fsm.add_transition(BusIfStates.non_dram_dual_wait,  waiting,                                                       BusIfStates.non_dram_dual_wait)
-        self.fsm.add_transition(BusIfStates.non_dram_dual_wait, ~waiting,                                                       BusIfStates.non_dram_last)
-        self.fsm.add_transition(BusIfStates.non_dram_last, 1,                                                                   BusIfStates.idle)
-        self.fsm.add_transition(BusIfStates.dma_first, 1,                                                                       BusIfStates.dma_wait)
-        self.fsm.add_transition(BusIfStates.dma_wait,  waiting,                                                                 BusIfStates.dma_wait)
-        self.fsm.add_transition(BusIfStates.dma_wait, ~waiting,                                                                 BusIfStates.idle)
-        self.fsm.add_transition(BusIfStates.refresh, 1,                                                                         BusIfStates.idle)
+        dram_wait = ~self.dram.n_wait
+        dram_wait_i1 = Reg(dram_wait, clk_port=~self.clk)
+        dram_wait_i2 = Reg(dram_wait_i1)
 
-        dram_bank = Wire()
-        dram_bank_next = Select(
+        # Address space slicing and dicing
+        req_da  = req.addr[25:22] # address presented on data pins during RAS cycle
+        req_mms = req.addr[26]
+        req_ra  = Select( # row address
+            req_mms | (req.request_type == RequestTypes.refresh),
+            req.addr[21:11],
+            concat(req.addr[21], req.addr[19], req.addr[17], req.addr[16], req.addr[13:7])
+        )
+        req_ca  = Select( # col address
+            req_mms,
+            req.addr[10:0],
+            concat(req.addr[20], req.addr[18], req.addr[16], req.addr[14], req.addr[6:0])
+        )
+        req_dbs = Select(
             dram_bank_size,
-            req_addr[16],
-            req_addr[18],
-            req_addr[20],
-            req_addr[22],
+            req.addr[14],
+            req.addr[16],
+            req.addr[18],
+            req.addr[20],
+            req.addr[22],
+            req.addr[22],
+            req.addr[22],
+            req.addr[22]
         )
-        dram_bank <<= Select(start, Reg(dram_bank_next, clock_en=start), dram_bank_next)
-
-        input_row_addr = Wire()
-        input_row_addr <<= Select(
-            dram_addr_muxing,
-            req_addr[21:11],
-            concat(req_addr[21], req_addr[19], req_addr[17], req_addr[15:8])
+        req_page = req.addr[6:0]
+        prev_page = Reg(req_page, clock_en = req_progress)
+        break_burst = req_page != prev_page
+        req_space = Wire(EnumNet(MemSpaces))
+        req_space <<= Select(
+            req_mms,
+            MemSpaces.nren,
+            Select(req_dbs, MemSpaces.dram_0, MemSpaces.dram_1),
         )
-        row_addr = Wire()
-        row_addr <<= Reg(Select(req_rfsh, input_row_addr, refresh_addr), clock_en=start)
-        col_addr = Wire()
-        col_addr <<= Reg(Select(
-            dram_addr_muxing,
-            req_addr[10:0],
-            concat(req_addr[20], req_addr[18], req_addr[16], req_addr[7:0])
-        ), clock_en=req_advance)
-        read_not_write = Wire()
-        read_not_write <<= Reg(req_read_not_write, clock_en=start, reset_value_port=1) # reads and writes can't mix within a burst
-        data_out_en = Wire()
-        data_out_en <<= Reg(~req_read_not_write & (arb_port_select != Ports.dma_port), clock_en=start) # reads and writes can't mix within a burst
-        byte_en = Wire()
-        byte_en <<= LatchReg(req_byte_en, enable=req_advance)
-        data_out = Wire()
-        data_out <<= Reg(
-            Select(
-                req_byte_en[0],
-                concat(req_data[7:0], req_data[7:0]), # low-byte-en is 0 --> 8-bit access to the high-byte
-                req_data, # low-byte-en is 1 --> either 16-bit access or 8-bit access from the low-byte
-            ),
-            clock_en=req_advance
+        ras_wait = SelectOne(
+            req_space == MemSpaces.dram_0, dram_0_wait,
+            req_space == MemSpaces.dram_1, dram_1_wait,
+            req_space == MemSpaces.nren,   nren_wait
         )
+        req_ras_a = (req_mms & (req_dbs == dram_bank_swap)) | (req.req_type == RequestTypes.refresh)
+        req_ras_b = (req_mms & (req_dbs != dram_bank_swap)) | (req.req_type == RequestTypes.refresh)
+        req_nren  = ~req_mms
 
-        #AssertOnClk((input_row_addr == row_addr) | (state == BusIfStates.idle))
 
-        '''
-        CAS generation:
+        self.fsm.add_transition(BusIfStates.idle,                         ~req.valid &  dram_wait_i2,                        BusIfStates.idle)
+        self.fsm.add_transition(BusIfStates.idle,                          req.valid &  dram_wait_i2,                        BusIfStates.idle)
+        self.fsm.add_transition(BusIfStates.idle,                          req.valid & ~dram_wait_i2,                        BusIfStates.ras_cas0)
+        self.fsm.add_transition(BusIfStates.ras_cas0,                      req.valid & ~dram_wait_i2 & ~break_burst,         BusIfStates.cas1_cas0)
+        self.fsm.add_transition(BusIfStates.ras_cas0,                      req.valid & ~dram_wait_i2 &  break_burst,         BusIfStates.cas1_ras)
+        self.fsm.add_transition(BusIfStates.ras_cas0,                     ~req.valid,                                        BusIfStates.cas1_ras)
+        self.fsm.add_transition(BusIfStates.cas1_cas0,                     req.valid & ~dram_wait_i2 & ~break_burst,         BusIfStates.cas1_cas0)
+        self.fsm.add_transition(BusIfStates.cas1_cas0,                     req.valid & ~dram_wait_i2 &  break_burst,         BusIfStates.cas1_ras)
+        self.fsm.add_transition(BusIfStates.cas1_cas0,                    ~req.valid,                                        BusIfStates.cas1_ras)
+        self.fsm.add_transition(BusIfStates.cas1_ras,                      1,                                                BusIfStates.idle)
 
-            CLK             \__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/^^\__/
-            CAS_nWINDOW_A   ^^^^^^^^^\_______________________/^^^^^\_____/^^^^^\_____/^^^^^\_______________________/^^^^^^^^^^^^^^^^^^^^^^^^
-            CAS_nWINDOW_B   ^^^^^^^^^^^^\_______________________/^^^^^\_____/^^^^^\_____/^^^^^\_______________________/^^^^^^^^^^^^^^^^^^^^^
-            CAS_nWINDOW_C   ^^^^^^^^^^^^^^^\_______________________/^^^^^\_____/^^^^^\_____/^^^^^\_______________________/^^^^^^^^^^^^^^^^^^
-            CAS_nEN_A       ^^^^^^^^^^^^\____________________/^^^^^^^^\__/^^^^^^^^\__/^^^^^^^^\____________________/^^^^^^^^^^^^^^^^^^^^^^^^
-            DRAM_nCAS_A     ^^^^^^^^^^^^\__/^^\__/^^\__/^^\__/^^^^^^^^\__/^^^^^^^^\__/^^^^^^^^\__/^^\__/^^\__/^^\__/^^^^^^^^^^^^^^^^^^^^^^^^
-            CAS_nEN_A       ^^^^^^^^^^^^^^^\____________________/^^^^^^^^\__/^^^^^^^^\__/^^^^^^^^\____________________/^^^^^^^^^^^^^^^^^^^^^
-            DRAM_nCAS_B     ^^^^^^^^^^^^^^^\__/^^\__/^^\__/^^\__/^^^^^^^^\__/^^^^^^^^\__/^^^^^^^^\__/^^\__/^^\__/^^\__/^^^^^^^^^^^^^^^^^^^^^
+        def decode_state(state, **kwargs):
+            # This is a neat trick, I think: argument names are matched to enum values
+            for possible_state in BusIfStates:
+                if possible_state.name not in kwargs.keys():
+                    raise SyntaxErrorException(f"Incomplete encoding. State '{possible_state.name}' is not listed")
 
-        We need to avoid changing the enable signal on opposite edges of the clock.
-        That is, CAS_nEN falls with ~CLK falling and rises with ~CLK rising.
+            selectors = []
+            for name, value in kwargs.items():
+                try:
+                    selectors.append((state == BusIfStates[name]), value)
+                except KeyError:
+                    raise SyntaxErrorException(f"Unknown state '{name}' is requested")
 
-        This way timing is not that critical, provided the LUT is just as glitch-free
-        as logic gates would be. That's actually up to debate. Apparently Xilinx only
-        guarantees glitch-free output for single input toggling, but in practice it
-        appears to be true that the output doesn't glitch if normal logic wouldn't.
+            return SelectOne(*selectors)
 
-        From what I've gathered, the glitch-free nature of the output comes from
-        depending on the output capacitance of the read-wire and careful timing of
-        the switching of the pass-gates that make up the LUT read mux. So, fingers
-        crossed, this is a safe circuit...
-        '''
-
-        dram_ras_active = (
-            (next_state == BusIfStates.first) |
-            (next_state == BusIfStates.middle) |
-            (next_state == BusIfStates.precharge) |
-            (next_state == BusIfStates.dma_first) |
-            (next_state == BusIfStates.dma_wait)
+        # 'f' postfix stands for the first half of the clock
+        # 's' postfix stands for the second half of the clock
+        ras_f = decode_state(state,
+            idle                 = 0,
+            ras_cas0             = 1,
+            cas0_cas1            = 1,
+            cas1_cas0            = 1,
+            cas1_none            = 1,
+            ras_wait             = 1,
+            ras_ras              = 1,
+            cas0_ras             = 1,
+            cas1_ras             = 1,
+            cas0_cas0            = 1,
+            ras_cas1             = 1,
+            cas1_cas1            = 1,
         )
-        # Decode DRAM banks as follows:
-        #
-        # dram_bank    bank_swap    single_bank   ras_a     ras_b
-        #     0            0              0         1         0
-        #     1            0              0         0         1
-        #     0            1              0         0         1
-        #     1            1              0         1         0
-        #     0            0              1         1         0
-        #     1            0              1         1         0
-        #     0            1              1         0         1
-        #     1            1              1         0         1
-        dram_ras_a = Reg((dram_ras_active & ((dram_bank == dram_bank_swap) | (~dram_bank_swap & dram_single_bank))) | (next_state == BusIfStates.refresh)) # We re-register the state to remove all glitches
-        dram_ras_b = Reg((dram_ras_active & ((dram_bank != dram_bank_swap) | ( dram_bank_swap & dram_single_bank))) | (next_state == BusIfStates.refresh)) # We re-register the state to remove all glitches
-        dram_n_ras_a = ~dram_ras_a
-        dram_n_ras_b = ~dram_ras_b
-        n_nren = Wire()
-        n_nren <<= Reg(
-            (next_state != BusIfStates.non_dram_first) & (next_state != BusIfStates.non_dram_wait) & (next_state != BusIfStates.non_dram_dual_first) & (next_state != BusIfStates.non_dram_dual_wait),
-            reset_value_port = 1
-        ) # We re-register the state to remove all glitches
-        n_dack = Wire(self.dma_request.one_hot_channel.get_net_type())
-        n_dack <<= ~Reg(
-            Select(
-                (state == BusIfStates.dma_first) | ((state == BusIfStates.dma_wait) & waiting) | ((state == BusIfStates.external) & req_valid & req_ext),
-                0,
-                dma_ch
-            )
+        ras_s = decode_state(state,
+            idle                 = 0,
+            ras_cas0             = 1,
+            cas0_cas1            = 1,
+            cas1_cas0            = 1,
+            cas1_none            = 0,
+            ras_wait             = 1,
+            ras_ras              = 1,
+            cas0_ras             = 1,
+            cas1_ras             = 1,
+            cas0_cas0            = 1,
+            ras_cas1             = 1,
+            cas1_cas1            = 1,
         )
-        nr_cas_logic = (
-            (state == BusIfStates.non_dram_dual_first) | (state == BusIfStates.non_dram_first) | (state == BusIfStates.dma_first) |
-            (waiting & ((state == BusIfStates.non_dram_dual_wait) | (state == BusIfStates.non_dram_wait) | (state == BusIfStates.dma_wait)))
+        cas0_f = decode_state(state,
+            idle                 = 0,
+            ras_cas0             = 0,
+            cas0_cas1            = 1,
+            cas1_cas0            = 0,
+            cas1_none            = 0,
+            ras_wait             = 0,
+            ras_ras              = 0,
+            cas0_ras             = 1,
+            cas1_ras             = 0,
+            cas0_cas0            = 1,
+            ras_cas1             = 0,
+            cas1_cas1            = 0,
         )
-        """
-        BUG BUG BUG
-        for DMA accesses, n_cas needs to be delayed until data is ready on the data-bus, as it gets latched in the falling edge.
-        This probably means that n_cas will have to go down for the last half-cycle of the DMA, after n_wait is sampled high.
-        BUG BUG BUG
-        """
-        nr_cas_logic_0 = nr_cas_logic & (~two_cycle_nram_access | (state == BusIfStates.non_dram_first) | (state == BusIfStates.non_dram_wait) | (state == BusIfStates.dma_first) | (state == BusIfStates.dma_wait))
-        nr_cas_logic_1 = nr_cas_logic & (~two_cycle_nram_access | (state == BusIfStates.non_dram_dual_first) | (state == BusIfStates.non_dram_dual_wait) | (state == BusIfStates.dma_first) | (state == BusIfStates.dma_wait))
-        nr_n_cas_0 = Wire()
-        nr_n_cas_0 <<= Reg(~nr_cas_logic_0 | ~byte_en[0], reset_value_port = 1) # We re-register the state to remove all glitches
-        nr_n_cas_1 = Wire()
-        nr_n_cas_1 <<= Reg(~nr_cas_logic_1 | ~byte_en[1], reset_value_port = 1) # We re-register the state to remove all glitches
-        cas_n_window_a_0 = Wire()
-        cas_n_window_a_0 <<= Reg(
-            ~byte_en[0] |
-            (next_state == BusIfStates.idle) |
-            (next_state == BusIfStates.precharge) |
-            (next_state == BusIfStates.non_dram_first) |
-            (next_state == BusIfStates.non_dram_wait) |
-            (next_state == BusIfStates.non_dram_dual) |
-            (next_state == BusIfStates.non_dram_dual_first) |
-            (next_state == BusIfStates.non_dram_dual_wait) |
-            (next_state == BusIfStates.non_dram_last) |
-            (next_state == BusIfStates.dma_first) |
-            (next_state == BusIfStates.dma_wait) |
-            (next_state == BusIfStates.refresh),
-            reset_value_port = 1
-        ) # We re-register the state to remove all glitches
-        cas_n_window_a_1 = Wire()
-        cas_n_window_a_1 <<= Reg(
-            ~byte_en[1] |
-            (next_state == BusIfStates.idle) |
-            (next_state == BusIfStates.precharge) |
-            (next_state == BusIfStates.non_dram_first) |
-            (next_state == BusIfStates.non_dram_wait) |
-            (next_state == BusIfStates.non_dram_dual) |
-            (next_state == BusIfStates.non_dram_dual_first) |
-            (next_state == BusIfStates.non_dram_dual_wait) |
-            (next_state == BusIfStates.non_dram_last) |
-            (next_state == BusIfStates.dma_first) |
-            (next_state == BusIfStates.dma_wait) |
-            (next_state == BusIfStates.refresh),
-            reset_value_port = 1
-        ) # We re-register the state to remove all glitches
-        #cas_n_window_c_0 = Wire()
-        #cas_n_window_c_0 <<= Reg(cas_n_window_a_0, reset_value_port = 1)
-        cas_n_window_b_0 = Wire()
-        cas_n_window_b_0 <<= NegReg(cas_n_window_a_0, reset_value_port = 1)
-        cas_n_window_c_1 = Wire()
-        cas_n_window_c_1 <<= Reg(cas_n_window_a_1, reset_value_port = 1)
-        cas_n_window_b_1 = Wire()
-        cas_n_window_b_1 <<= NegReg(cas_n_window_a_1, reset_value_port = 1)
-
-        dram_n_cas_0 = cas_n_window_a_0 | cas_n_window_b_0 |  self.clk
-        dram_n_cas_1 = cas_n_window_b_1 | cas_n_window_c_1 | ~self.clk
-
-        self.dram.n_ras_a     <<= dram_n_ras_a
-        self.dram.n_ras_b     <<= dram_n_ras_b
-        self.dram.n_cas_0     <<= dram_n_cas_0 & nr_n_cas_0
-        self.dram.n_cas_1     <<= dram_n_cas_1 & nr_n_cas_1
-        col_addr_nr = NegReg(col_addr)
-        dram_addr = Select(
-            (
-                (state == BusIfStates.first) |
-                (state == BusIfStates.non_dram_first) |
-                (state == BusIfStates.non_dram_dual_first) |
-                (state == BusIfStates.dma_first) |
-                (state == BusIfStates.refresh)
-            ) & self.clk,
-            col_addr_nr,
-            row_addr
+        cas0_s = decode_state(state,
+            idle                 = 0,
+            ras_cas0             = 1,
+            cas0_cas1            = 0,
+            cas1_cas0            = 1,
+            cas1_none            = 0,
+            ras_wait             = 0,
+            ras_ras              = 0,
+            cas0_ras             = 0,
+            cas1_ras             = 0,
+            cas0_cas0            = 1,
+            ras_cas1             = 0,
+            cas1_cas1            = 0,
         )
-        self.dram.addr        <<= dram_addr
-        self.dram.n_we        <<= read_not_write
-        self.dram.data_out_en <<= data_out_en
-        data_out_low = Wire()
-        nr_cas_logic_1_reg = Wire(logic)
-        nr_cas_logic_1_reg <<= Reg(Select(
-            n_nren,
-            nr_cas_logic_1_reg | nr_cas_logic_1,
-            0
-        ))
-        data_out_low <<= NegReg(
-            Select(
-                nram_access,
-                data_out[7:0],
-                Select(
-                    two_cycle_nram_access & (nr_cas_logic_1_reg | nr_cas_logic_1 | ~nr_n_cas_1),
-                    data_out[7:0],
-                    data_out[15:8]
-                )
-            )
+        cas1_f = decode_state(state,
+            idle                 = 0,
+            ras_cas0             = 0,
+            cas0_cas1            = 0,
+            cas1_cas0            = 1,
+            cas1_none            = 1,
+            ras_wait             = 0,
+            ras_ras              = 0,
+            cas0_ras             = 0,
+            cas1_ras             = 1,
+            cas0_cas0            = 0,
+            ras_cas1             = 0,
+            cas1_cas1            = 1,
         )
-        data_out_high = Wire()
-        data_out_high <<= Reg(
-            Select(
-                nram_access,
-                data_out[15:8],
-                Select(
-                    two_cycle_nram_access & (nr_cas_logic_1_reg | nr_cas_logic_1),
-                    data_out[7:0],
-                    data_out[15:8]
-                )
-            )
+        cas1_s = decode_state(state,
+            idle                 = 0,
+            ras_cas0             = 0,
+            cas0_cas1            = 1,
+            cas1_cas0            = 0,
+            cas1_none            = 0,
+            ras_wait             = 0,
+            ras_ras              = 0,
+            cas0_ras             = 0,
+            cas1_ras             = 0,
+            cas0_cas0            = 0,
+            ras_cas1             = 1,
+            cas1_cas1            = 1,
         )
-        self.dram.data_out   <<= Select(
-            self.clk,
-            data_out_low,
-            data_out_high
+        addr_col_sel_f = decode_state(state,
+            idle                 = 0,
+            ras_cas0             = 0,
+            cas0_cas1            = 1,
+            cas1_cas0            = 1,
+            cas1_none            = 1,
+            ras_wait             = 0,
+            ras_ras              = 0,
+            cas0_ras             = 1,
+            cas1_ras             = 1,
+            cas0_cas0            = 1,
+            ras_cas1             = 0,
+            cas1_cas1            = 1,
+        )
+        addr_col_sel_s = decode_state(state,
+            idle                 = 0,
+            ras_cas0             = 1,
+            cas0_cas1            = 1,
+            cas1_cas0            = 1,
+            cas1_none            = 0,
+            ras_wait             = 0,
+            ras_ras              = 0,
+            cas0_ras             = 1,
+            cas1_ras             = 1,
+            cas0_cas0            = 1,
+            ras_cas1             = 1,
+            cas1_cas1            = 1,
         )
 
-        self.dram.n_nren      <<= n_nren
-        self.dram.n_dack      <<= n_dack
-        self.dram.tc         <<= tc
-        self.dram.bus_en     <<= state != BusIfStates.external
+        ras = Select(self.clk, ras_s, ras_f)
+        self.dram.n_ras_a        <<= ~Select(req_ras_a, 0, ras)
+        self.dram.n_ras_b        <<= ~Select(req_ras_b, 0, ras)
+        self.dram.n_cas_0        <<= ~Select(self.clk, cas0_s, cas0_f)
+        self.dram.n_cas_1        <<= ~Select(self.clk, cas1_s, cas1_f)
+        self.dram.addr           <<=  Select(self.clk, addr_col_sel_s, addr_col_sel_f)
+        self.dram.n_we           <<=  Select(ras, 1, req.read_not_write)
+        #self.dram.data_in
+        #self.dram.data_out
+        #self.dram.data_out_en
+        self.dram.n_nren         <<= ~Select(req_nren, 0, ras)
+        #self.dram.n_wait
+        #self.dram.n_dack
+        #self.dram.tc
+        #self.dram.bus_en
+
 
         read_active = Wire()
         read_active <<= (
