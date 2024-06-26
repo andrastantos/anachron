@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Wed Jun 26 17:44:52 2024
+[*] Wed Jun 26 20:51:44 2024
 [*]
 [dumpfile] "/home/tantos/anachron/rtl/espresso/test/bus_if_tb.vcd"
-[dumpfile_mtime] "Wed Jun 26 17:42:22 2024"
-[dumpfile_size] 174539
+[dumpfile_mtime] "Wed Jun 26 20:51:09 2024"
+[dumpfile_size] 338899
 [savefile] "/home/tantos/anachron/rtl/espresso/test/bus_if_tb.gtkw"
 [timestart] 0
 [size] 1920 1097
 [pos] -1 -1
-*-8.506626 110 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-6.001988 150 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
 [sst_width] 282
@@ -18,7 +18,6 @@
 [sst_vpaned_height] 269
 @28
 top.dut.clk
-@29
 top.dut.rst
 @800200
 -DRAM_IF
@@ -69,7 +68,19 @@ top.dut.response_data[15:0]
 @1000200
 -RESPONSE
 @28
+top.dut.req_valid
+top.dut.dram_wait_i2
 top.dut.state
 top.dut.next_state
+top.dut.rbuf.input_port_ready
+top.dut.rbuf.input_port_valid
+top.dut.rbuf.output_port_ready
+top.dut.rbuf.output_port_valid
+top.dut.break_burst
+top.dut.req_ras_a
+top.dut.req_ras_b
+top.dut.req_nren
+@23
+top.dut.prev_page[6:0]
 [pattern_trace] 1
 [pattern_trace] 0
