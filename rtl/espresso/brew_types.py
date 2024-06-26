@@ -91,12 +91,12 @@ class RequestTypes(PyEnum):
     dma = 2
     master = 3
 
-assert RequestTypes.master ^ RequestTypes.dma == 1, "master and dma request types must have a single-bit difference"
-assert RequestTypes.master & 1 == 1, "master request type must have LSB set"
+assert RequestTypes.master.value ^ RequestTypes.dma.value == 1, "master and dma request types must have a single-bit difference"
+assert RequestTypes.master.value & 1 == 1, "master request type must have LSB set"
 
 class BusIfRequestIf(ReadyValid):
     read_not_write  = logic
-    client_id       = GenericMember
+    #client_id       = GenericMember
     byte_en         = Unsigned(2)
     addr            = BrewBusAddr
     data            = BrewBusData

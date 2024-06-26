@@ -642,7 +642,7 @@ class BusIf(Module):
     response = Output(BusIfResponseIf)
 
     # CRS interface for config registers
-    reg_if = Input(CsrIf)
+    reg_if = Input(ApbIf(data_type=BrewCsrData, addr_type=logic))
 
     # DRAM interface
     dram = Output(ExternalBusIf)
@@ -659,6 +659,7 @@ class BusIf(Module):
         # CSR interface
         #########################
         csr_busif_config = ApbReg()
+        csr_busif_config.apb_bus <<= self.reg_if
         dram_bank_size = csr_busif_config.add_field("bank_size",  2, 0, ApbReg.Kind.ctrl).ctrl_port
         dram_bank_swap = csr_busif_config.add_field("bank_swap",  3, 3, ApbReg.Kind.ctrl).ctrl_port
         dram_0_wait =     csr_busif_config.add_field("ras_a_wait", 4, 4, ApbReg.Kind.ctrl).ctrl_port
@@ -673,7 +674,7 @@ class BusIf(Module):
         # At least I *think* that's what we need.
 
         req = Wire(BusIfRequestIf)
-        req = ReverseBuf(self.request)
+        req <<= ReverseBuf(self.request)
 
         # Bus FSM
         #########################
@@ -687,7 +688,6 @@ class BusIf(Module):
             ras_cas0             = 3
             cas0_cas1            = 4
             cas1_cas0            = 5
-            cas1_none            = 6
             ras_wait             = 7
             ras_ras              = 8
             cas0_ras             = 9
@@ -708,7 +708,7 @@ class BusIf(Module):
 
         req_progress = req.ready & req.valid
         req_wait_states_l = Select(req.addr[29:27], 14,12,8,6,4,2,1,0)
-        req_wait_states = Reg(req_wait_states_l, clock_en = req_progress)
+        req_wait_states = Reg(req_wait_states_l, clock_en=req_progress)
         wait_states = Wire(Unsigned(4))
         wait_state_start = 0
         wait_states <<= Reg(
@@ -726,7 +726,7 @@ class BusIf(Module):
         self.event_bus_idle <<= (state == BusIfStates.idle) & (next_state == BusIfStates.idle)
 
         dram_wait = ~self.dram.n_wait
-        dram_wait_i1 = Reg(dram_wait, clk_port=~self.clk)
+        dram_wait_i1 = Reg(dram_wait, clock_port=~self.clk)
         dram_wait_i2 = Reg(dram_wait_i1)
 
         # Address space slicing and dicing
@@ -754,7 +754,7 @@ class BusIf(Module):
             req.addr[22]
         )
         req_page = req.addr[6:0]
-        prev_page = Reg(req_page, clock_en = req_progress)
+        prev_page = Reg(req_page, clock_en=req_progress)
         break_burst = req_page != prev_page
         req_space = Wire(EnumNet(MemSpaces))
         req_space <<= Select(
@@ -767,8 +767,8 @@ class BusIf(Module):
             req_space == MemSpaces.dram_1, dram_1_wait,
             req_space == MemSpaces.nren,   nren_wait
         )
-        req_ras_a = (req_mms & (req_dbs == dram_bank_swap)) | (req.req_type == RequestTypes.refresh)
-        req_ras_b = (req_mms & (req_dbs != dram_bank_swap)) | (req.req_type == RequestTypes.refresh)
+        req_ras_a = (req_mms & (req_dbs == dram_bank_swap)) | (req.request_type == RequestTypes.refresh)
+        req_ras_b = (req_mms & (req_dbs != dram_bank_swap)) | (req.request_type == RequestTypes.refresh)
         req_nren  = ~req_mms
 
 
@@ -792,7 +792,7 @@ class BusIf(Module):
             selectors = []
             for name, value in kwargs.items():
                 try:
-                    selectors.append((state == BusIfStates[name]), value)
+                    selectors += ((state == BusIfStates[name]), value)
                 except KeyError:
                     raise SyntaxErrorException(f"Unknown state '{name}' is requested")
 
@@ -805,7 +805,6 @@ class BusIf(Module):
             ras_cas0             = 1,
             cas0_cas1            = 1,
             cas1_cas0            = 1,
-            cas1_none            = 1,
             ras_wait             = 1,
             ras_ras              = 1,
             cas0_ras             = 1,
@@ -819,7 +818,6 @@ class BusIf(Module):
             ras_cas0             = 1,
             cas0_cas1            = 1,
             cas1_cas0            = 1,
-            cas1_none            = 0,
             ras_wait             = 1,
             ras_ras              = 1,
             cas0_ras             = 1,
@@ -833,7 +831,6 @@ class BusIf(Module):
             ras_cas0             = 0,
             cas0_cas1            = 1,
             cas1_cas0            = 0,
-            cas1_none            = 0,
             ras_wait             = 0,
             ras_ras              = 0,
             cas0_ras             = 1,
@@ -847,7 +844,6 @@ class BusIf(Module):
             ras_cas0             = 1,
             cas0_cas1            = 0,
             cas1_cas0            = 1,
-            cas1_none            = 0,
             ras_wait             = 0,
             ras_ras              = 0,
             cas0_ras             = 0,
@@ -861,7 +857,6 @@ class BusIf(Module):
             ras_cas0             = 0,
             cas0_cas1            = 0,
             cas1_cas0            = 1,
-            cas1_none            = 1,
             ras_wait             = 0,
             ras_ras              = 0,
             cas0_ras             = 0,
@@ -875,7 +870,6 @@ class BusIf(Module):
             ras_cas0             = 0,
             cas0_cas1            = 1,
             cas1_cas0            = 0,
-            cas1_none            = 0,
             ras_wait             = 0,
             ras_ras              = 0,
             cas0_ras             = 0,
@@ -889,7 +883,6 @@ class BusIf(Module):
             ras_cas0             = 0,
             cas0_cas1            = 1,
             cas1_cas0            = 1,
-            cas1_none            = 1,
             ras_wait             = 0,
             ras_ras              = 0,
             cas0_ras             = 1,
@@ -903,7 +896,6 @@ class BusIf(Module):
             ras_cas0             = 1,
             cas0_cas1            = 1,
             cas1_cas0            = 1,
-            cas1_none            = 0,
             ras_wait             = 0,
             ras_ras              = 0,
             cas0_ras             = 1,
@@ -911,6 +903,61 @@ class BusIf(Module):
             cas0_cas0            = 1,
             ras_cas1             = 1,
             cas1_cas1            = 1,
+        )
+        apply_back_pressure = decode_state(state,
+            idle                 = 0,
+            ras_cas0             = 0,
+            cas0_cas1            = 0,
+            cas1_cas0            = 0,
+            ras_wait             = 1,
+            ras_ras              = 0,
+            cas0_ras             = 1,
+            cas1_ras             = 1,
+            cas0_cas0            = 1,
+            ras_cas1             = 0,
+            cas1_cas1            = 1,
+        )
+
+        capture_data_f = decode_state(state,
+            idle                 = 0,
+            ras_cas0             = 0,
+            cas0_cas1            = 1,
+            cas1_cas0            = 1,
+            ras_wait             = 0,
+            ras_ras              = 0,
+            cas0_ras             = 1,
+            cas1_ras             = 1,
+            cas0_cas0            = 0,
+            ras_cas1             = 0,
+            cas1_cas1            = 0,
+        )
+        # This is tricky: we'll need to depend on both state and next_state
+        capture_data_s = (
+            (
+                (
+                    (state == BusIfStates.ras_cas0) |
+                    (state == BusIfStates.cas0_cas0) |
+                    (state == BusIfStates.cas1_cas0)
+                ) & (
+                    (next_state == BusIfStates.ras_cas0) |
+                    (next_state == BusIfStates.ras_cas1) |
+                    (next_state == BusIfStates.cas1_ras) |
+                    (next_state == BusIfStates.cas1_cas0) |
+                    (next_state == BusIfStates.cas1_cas1)
+                )
+            ) | (
+                (  
+                    (state == BusIfStates.ras_cas1) |
+                    (state == BusIfStates.cas0_cas1) |
+                    (state == BusIfStates.cas1_cas1)
+                ) & (
+                    (next_state == BusIfStates.ras_cas0) |
+                    (next_state == BusIfStates.ras_cas1) |
+                    (next_state == BusIfStates.cas0_ras) |
+                    (next_state == BusIfStates.cas0_cas0) |
+                    (next_state == BusIfStates.cas0_cas1)
+                )
+            )
         )
 
         ras = Select(self.clk, ras_s, ras_f)
@@ -930,100 +977,81 @@ class BusIf(Module):
         #self.dram.bus_en
 
 
-        read_active = Wire()
-        read_active <<= (
-            (state == BusIfStates.first) |
-            (state == BusIfStates.middle) |
-            ((state == BusIfStates.dma_wait) & ~waiting) |
-            ((state == BusIfStates.non_dram_wait) & ~waiting & ~two_cycle_nram_access) |
-            ((state == BusIfStates.non_dram_dual_wait) & ~waiting)
-        ) & read_not_write
-        data_in_low = Wire()
-        data_in_low <<= Reg(self.dram.data_in, clock_en=(
-            (state == BusIfStates.non_dram_wait) |
-            (state == BusIfStates.first) |
-            (state == BusIfStates.middle)
-        ))
+        req.ready <<= ~dram_wait_i2 & ~apply_back_pressure
 
-        ndram_data_in_high = Reg(self.dram.data_in, clock_en=(state == BusIfStates.non_dram_dual_wait))
-        data_in_high = Select(
-            nram_access,
-            NegReg(self.dram.data_in),
-            Select(two_cycle_nram_access, data_in_low, ndram_data_in_high)
-        )
+        dram_data_in_i1 = Reg(self.dram.data_in, clock_port=~self.clk)
+        dram_data_in_i2 = Reg(dram_data_in_i1, clock_port=self.clk)
+        dram_data_in_i3 = Reg(dram_data_in_i2, clock_port=~self.clk)
 
-        resp_data = Wire()
-        resp_data <<= Reg(Select(
-            byte_en,
+        dram_data_in_low  = Reg(dram_data_in_i3, clock_en=capture_data_s)
+        dram_data_in_high = Reg(dram_data_in_i2, clock_en=capture_data_f)
+
+        self.response.data <<= Select(
+            req.byte_en,
             None, # Invalid
-            concat("8'b0", data_in_low), # 8-bit read from low-byte
-            concat("8'b0", data_in_high), # 8-bit read from high-byte
-            concat(data_in_high, data_in_low) # 16-bit read
-        ))
-
-        self.mem_response.valid <<= Reg(Reg(read_active & (arb_port_select == Ports.mem_port)))
-        self.fetch_response.valid <<= Reg(Reg(read_active & (arb_port_select == Ports.fetch_port)))
-        self.dma_response.valid <<= (state == BusIfStates.dma_wait) & ~waiting
-        self.mem_response.data <<= resp_data
-        self.fetch_response.data <<= resp_data
-
+            concat("8'b0", dram_data_in_low), # 8-bit read from low-byte
+            concat("8'b0", dram_data_in_high), # 8-bit read from high-byte
+            concat(dram_data_in_high, dram_data_in_low) # 16-bit read
+        )
+        #FIXME: !!!!!!!!!!!!!! THIS IS INCORRECT FOR WAIT_STATES !!!!!!!!!!!!!!
+        self.response.valid <<= Reg(capture_data_f | capture_data_s)
 
 def gen():
-    def top():
-        class BusIfWrapperDmaRequestIf(ReadyValid):
-            read_not_write  = logic
-            one_hot_channel = Unsigned(4)
-            byte_en         = Unsigned(2)
-            addr            = BrewBusAddr
-            is_master       = logic
-            terminal_count  = logic
+    #def top():
+    #   class BusIfWrapperDmaRequestIf(ReadyValid):
+    #       read_not_write  = logic
+    #       one_hot_channel = Unsigned(4)
+    #       byte_en         = Unsigned(2)
+    #       addr            = BrewBusAddr
+    #       is_master       = logic
+    #       terminal_count  = logic
+    #   
+    #   class BusIfWrapper(Module):
+    #       clk = ClkPort()
+    #       rst = RstPort()
+    #   
+    #       # Interface to fetch and memory
+    #       fetch_request  = Input(BusIfRequestIf)
+    #       fetch_response = Output(BusIfResponseIf)
+    #       mem_request  = Input(BusIfRequestIf)
+    #       mem_response = Output(BusIfResponseIf)
+    #       dma_request = Input(BusIfWrapperDmaRequestIf)
+    #       dma_response = Output(BusIfDmaResponseIf)
+    #   
+    #       # CRS interface for config registers
+    #       reg_if = Input(ApbIf(BrewCsrData, Unsigned(4)))
+    #   
+    #       # DRAM interface
+    #       dram = Output(ExternalBusIf)
+    #   
+    #       # Events
+    #       event_bus_idle = Output(logic)
+    #   
+    #       def body(self):
+    #           bus_if = BusIf()
+    #           bus_if.fetch_request <<= self.fetch_request
+    #           self.fetch_response <<= bus_if.fetch_response
+    #   
+    #           bus_if.mem_request <<= self.mem_request
+    #           self.mem_response <<= bus_if.mem_response
+    #   
+    #           bus_if.dma_request.read_not_write <<= self.dma_request.read_not_write
+    #           bus_if.dma_request.one_hot_channel <<= self.dma_request.one_hot_channel
+    #           bus_if.dma_request.byte_en <<= self.dma_request.byte_en
+    #           bus_if.dma_request.addr <<= self.dma_request.addr
+    #           bus_if.dma_request.is_master <<= self.dma_request.is_master
+    #           bus_if.dma_request.terminal_count <<= self.dma_request.terminal_count
+    #           bus_if.dma_request.valid <<= self.dma_request.valid
+    #           self.dma_request.ready <<= bus_if.dma_request.ready
+    #           self.dma_response <<= bus_if.dma_response
+    #           bus_if.reg_if <<= self.reg_if
+    #           self.dram <<= bus_if.dram
+    #           self.event_bus_idle <<= bus_if.event_bus_idle
+    #   
+    #   #return ScanWrapper(BusIf, {"clk", "rst"})
+    #   return BusIfWrapper()
 
-        class BusIfWrapper(Module):
-            clk = ClkPort()
-            rst = RstPort()
-
-            # Interface to fetch and memory
-            fetch_request  = Input(BusIfRequestIf)
-            fetch_response = Output(BusIfResponseIf)
-            mem_request  = Input(BusIfRequestIf)
-            mem_response = Output(BusIfResponseIf)
-            dma_request = Input(BusIfWrapperDmaRequestIf)
-            dma_response = Output(BusIfDmaResponseIf)
-
-            # CRS interface for config registers
-            reg_if = Input(ApbIf(BrewCsrData, Unsigned(4)))
-
-            # DRAM interface
-            dram = Output(ExternalBusIf)
-
-            # Events
-            event_bus_idle = Output(logic)
-
-            def body(self):
-                bus_if = BusIf()
-                bus_if.fetch_request <<= self.fetch_request
-                self.fetch_response <<= bus_if.fetch_response
-
-                bus_if.mem_request <<= self.mem_request
-                self.mem_response <<= bus_if.mem_response
-
-                bus_if.dma_request.read_not_write <<= self.dma_request.read_not_write
-                bus_if.dma_request.one_hot_channel <<= self.dma_request.one_hot_channel
-                bus_if.dma_request.byte_en <<= self.dma_request.byte_en
-                bus_if.dma_request.addr <<= self.dma_request.addr
-                bus_if.dma_request.is_master <<= self.dma_request.is_master
-                bus_if.dma_request.terminal_count <<= self.dma_request.terminal_count
-                bus_if.dma_request.valid <<= self.dma_request.valid
-                self.dma_request.ready <<= bus_if.dma_request.ready
-                self.dma_response <<= bus_if.dma_response
-                bus_if.reg_if <<= self.reg_if
-                self.dram <<= bus_if.dram
-                self.event_bus_idle <<= bus_if.event_bus_idle
-
-        #return ScanWrapper(BusIf, {"clk", "rst"})
-        return BusIfWrapper()
-
-    netlist = Build.generate_rtl(top, "synth/bus_if.sv")
+    netlist = Build.generate_rtl(BusIf, "synth/bus_if.sv")
     top_level_name = netlist.get_module_class_name(netlist.top_level)
     flow = QuartusFlow(
         target_dir="synth/q_bus_if",
