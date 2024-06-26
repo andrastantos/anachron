@@ -15,6 +15,7 @@ from synth import *
 from bus_if import *
 from copy import copy
 
+
 def get_ws(addr: int) -> int:
     return ((addr >> 27) - 1) & 0xf
 
@@ -83,8 +84,6 @@ class ExpectedResponse(object):
     def check(self, simulator: Simulator, data):
         self.check_member(data, "data", simulator)
 
-expected_transactions: Sequence[ExpectedTransaction] = []
-
 def sim():
     def mem_content(region: str, addr: int, length: int = 1) -> int:
         def get_byte(addr):
@@ -94,11 +93,14 @@ def sim():
             ret_val = ret_val | (get_byte(addr + i) << (i * 8))
         return ret_val
 
-    class DRAM_sim(Module):
+    class DRAM_sim(GenericModule):
         addr_bus_len = 11
         addr_bus_mask = (1 << addr_bus_len) - 1
 
         bus_if = Input(ExternalBusIf)
+
+        def construct(self, expected_transactions: Sequence[ExpectedTransaction]):
+            self.expected_transactions = expected_transactions
 
         def simulate(self, simulator: Simulator) -> TSimEvent:
             def unswizzle_nren_addr(row, col):
@@ -159,7 +161,10 @@ def sim():
                                     # This is needed for now to ensure address also updates
                                     yield 0
                                     # Falling edge of nCAS
-                                    region.full_addr = region.unswizzler(region.row_addr, self.bus_if.addr)
+                                    if region.row_addr is not None and self.bus_if.addr is not None:
+                                        region.full_addr = region.unswizzler(region.row_addr, self.bus_if.addr)
+                                    else:
+                                        region.full_addr = None
                                     if self.bus_if.n_we == 0:
                                         # Write to the address
                                         data = f"{self.bus_if.data_out:#04x}"
@@ -173,8 +178,8 @@ def sim():
                                     data_assigned = True
 
                                     try:
-                                        expected_transaction: ExpectedTransaction = first(expected_transactions)
-                                        expected_transactions.pop(0)
+                                        expected_transaction: ExpectedTransaction = first(self.expected_transactions)
+                                        self.expected_transactions.pop(0)
                                     except:
                                         simulator.sim_assert(False, "No expectation for memory transaction")
                                     expected_transaction.check(simulator, region.name, region.full_addr, data, (self.bus_if.n_we == 0), region.burst_cnts[idx], idx)
@@ -242,41 +247,34 @@ def sim():
             yield from wait_rst()
             for _ in range(3):
                 yield from wait_clk()
-            yield from write_reg(0, (1 << 8) | (10))
+            #yield from write_reg(0, (1 << 8) | (10))
 
 
     # These two queues will contain the expected read-back values
     read_data_l = []
     read_data_h = []
+
     class Generator(GenericModule):
         clk = ClkPort()
         rst = RstPort()
 
         request_port = Output(BusIfRequestIf)
-        response_port = Input(BusIfResponseIf)
 
-        def construct(self) -> None:
-            self.mode = None
-            self.nram_base = 0x0000_0000
-            self.dram_base = 0x0800_0000
-
-        def set_mode(self, mode):
-            self.mode = mode
-
-        #read_not_write  = logic
-        #byte_en         = Unsigned(2)
-        #addr            = BrewBusAddr
-        #data            = BrewBusData
-        #last            = logic
+        def construct(self, expected_transactions: Sequence[ExpectedTransaction], expected_responses: Sequence[ExpectedResponse]) -> None:
+            self.expected_transactions = expected_transactions
+            self.expected_responses = expected_responses
 
         def post_sim_test(self, simulator: Simulator):
+            simulator.sim_assert(len(self.expected_transactions) == 0)
             simulator.sim_assert(len(self.expected_responses) == 0)
 
         def simulate(self, simulator) -> TSimEvent:
             self.burst_beat = None
             self.burst_cnt = None
             self.burst_addr = None
-            self.is_dram = None
+            self.burst_request_type = None
+            self.burst_wait_states = None
+            self.burst_do_write = None
             self.expected_transactions_prep: Sequence[ExpectedTransaction] = []
             self.expected_responses: Sequence[ExpectedResponse] = []
 
@@ -286,237 +284,99 @@ def sim():
                 self.request_port.byte_en <<= None
                 self.request_port.addr <<= None
                 self.request_port.data <<= None
+                self.request_port.request_type <<= None
+                self.request_port.terminal_count <<= None
 
-            def read_or_write(addr, is_dram, burst_len, byte_en, data, wait_states, do_write):
+            def read_or_write(addr, burst_len, byte_en, data, wait_states, request_type: RequestTypes, do_write):
                 if burst_len is not None:
                     assert addr is not None
-                    assert is_dram is not None
                     self.burst_cnt = burst_len
                     self.burst_addr = addr
                     self.burst_beat = 0
-                    self.is_dram = is_dram
-                    self.wait_states = wait_states
+                    self.burst_wait_states = wait_states
+                    self.burst_request_type = request_type
+                    self.burst_do_write = do_write
                 else:
                     assert addr is None
-                    assert is_dram is None
-                    self.burst_addr += 1
+                    # burst should not change wait-states
+                    self.burst_addr = (self.burst_addr + 1) & ((1 << 27) - 1)
                     self.burst_beat += 1
                     self.burst_cnt -= 1
+                    if byte_en is None: byte_en = 3 # Bursts default to 16-bit accesses
+                    if wait_states is None: wait_states = self.burst_wait_states
+                    if request_type is None: request_type = self.burst_request_type
+                    if do_write is None: do_write = self.burst_do_write
                 assert self.burst_cnt >= 0
 
-                addr = self.burst_addr | ((self.dram_base if self.is_dram else self.nram_base) >> 1) | (((self.wait_states + 1) & 0xf) << 27)
+                addr = self.burst_addr | ((wait_states & 0x7) << 27)
                 self.request_port.valid <<= 1
                 self.request_port.read_not_write <<= not do_write
                 self.request_port.byte_en <<= byte_en
                 self.request_port.addr <<= addr
                 self.request_port.data <<= data
+                self.request_port.request_type <<= request_type
+                # TODO: add TC field
 
-                # We can prepare the expectation here but can only drop it in
-                # the queue when it gets accepted by the BusIf. This is because
-                # servicing can be out-of-order from requesting between the
-                # various requestors (fetch/mem/dma)
                 if byte_en & 1 != 0:
-                    self.expected_transactions_prep.append(ExpectedTransaction(self.mode.upper(), get_region_name(addr), get_bus_addr(addr), data, do_write, self.burst_beat, 0))
+                    self.expected_transactions.append(ExpectedTransaction(request_type.name.upper(), get_region_name(addr), get_bus_addr(addr), data, do_write, self.burst_beat, 0))
                 if byte_en & 2 != 0:
-                    self.expected_transactions_prep.append(ExpectedTransaction(self.mode.upper(), get_region_name(addr), get_bus_addr(addr), data, do_write, self.burst_beat, 1))
-                if do_write:
-                    pass # I don't think the BUS_IF gives any response to a write.
-                    #self.expected_responses.append(ExpectedResponse(None))
-                else:
-                    if byte_en == 3:
-                        self.expected_responses.append(ExpectedResponse(mem_content(get_region_name(addr), addr << 1, 2)))
-                    elif byte_en == 2:
-                        self.expected_responses.append(ExpectedResponse(mem_content(get_region_name(addr), (addr << 1) + 1, 1)))
-                    elif byte_en == 1:
-                        self.expected_responses.append(ExpectedResponse(mem_content(get_region_name(addr), (addr << 1) + 0, 1)))
+                    self.expected_transactions.append(ExpectedTransaction(request_type.name.upper(), get_region_name(addr), get_bus_addr(addr), data, do_write, self.burst_beat, 1))
 
-
+                if byte_en == 3:
+                    self.expected_responses.append(ExpectedResponse(mem_content(get_region_name(addr), addr << 1, 2)))
+                elif byte_en == 2:
+                    self.expected_responses.append(ExpectedResponse(mem_content(get_region_name(addr), (addr << 1) + 1, 1)))
+                elif byte_en == 1:
+                    self.expected_responses.append(ExpectedResponse(mem_content(get_region_name(addr), (addr << 1) + 0, 1)))
 
                 data_str = f"{data:#04x}" if data is not None else "0x----"
-                simulator.log(f"{self.mode.upper()} {('reading','writing')[do_write]} address {addr:#08x} {interpret_addr(addr)} data {data_str} bytes {byte_en:02b}")
+                simulator.log(f"{request_type.name.upper()} {('reading','writing')[do_write]} address {addr:#08x} {interpret_addr(addr)} data {data_str} bytes {byte_en:02b}")
 
-            def start_read(addr, is_dram, burst_len, byte_en, wait_states):
+            def start_read(addr, burst_len, byte_en, wait_states, request_type):
                 if burst_len > 0:
                     byte_en = 3
-                read_or_write(addr, is_dram, burst_len, byte_en, None, wait_states, do_write=False)
+                read_or_write(addr, burst_len, byte_en, None, wait_states, request_type, do_write=False)
 
-            def cont_read():
-                read_or_write(None, None, None, 3, None, None, False)
-
-            def start_write(addr, is_dram, burst_len, byte_en, data, wait_states):
+            def start_write(addr, burst_len, byte_en, data, wait_states, request_type):
                 if burst_len > 0:
                     byte_en = 3
-                read_or_write(addr, is_dram, burst_len, byte_en, data, wait_states, do_write=True)
+                read_or_write(addr, burst_len, byte_en, data, wait_states, request_type, do_write=True)
 
-            def cont_write(data):
-                read_or_write(None, None, None, 3, data, None, False)
+            def cont_burst(data = None):
+                read_or_write(None, None, None, data, None, None, None)
 
             def wait_clk():
                 yield (self.clk, )
                 while self.clk.get_sim_edge() != EdgeType.Positive:
                     yield (self.clk, )
-                # Check for responses
-                if self.rst == 0:
-                    simulator.sim_assert(self.response_port.valid is not None)
-                    if self.response_port.valid == 1:
-                        simulator.log(f"{self.mode.upper()} response received with data {self.response_port.data:#04x}")
-                        exp = first(self.expected_responses)
-                        self.expected_responses.pop(0)
-                        simulator.sim_assert(exp.data is None or exp.data == self.response_port.data)
+                ## Check for responses
+                #if self.rst == 0:
+                #    simulator.sim_assert(self.response_port.valid is not None)
+                #    if self.response_port.valid == 1:
+                #        simulator.log(f"{self.mode.upper()} response received with data {self.response_port.data:#04x}")
+                #        exp = first(self.expected_responses)
+                #        self.expected_responses.pop(0)
+                #        simulator.sim_assert(exp.data is None or exp.data == self.response_port.data)
 
             def wait_for_advance():
-                global expected_transactions
                 yield from wait_clk()
                 while not (self.request_port.ready & self.request_port.valid):
                     yield from wait_clk()
-                assert len(self.expected_transactions_prep) > 0
-                expected_transactions += self.expected_transactions_prep
-                self.expected_transactions_prep.clear()
 
-            def write(addr, is_dram, burst_len, byte_en, data, wait_states=0):
-                idx = 0
-                start_write(addr, is_dram, burst_len, byte_en, data[idx], wait_states)
+            def write(addr, byte_en, data, wait_states=7, request_type=RequestTypes.pipeline):
+                start_write(addr, len(data), byte_en, data[0], wait_states, request_type)
                 yield from wait_for_advance()
-                while idx < burst_len:
-                    idx += 1
-                    cont_write(data[idx])
+                while self.burst_cnt > 0:
+                    cont_burst(data[self.burst_beat+1])
                     yield from wait_for_advance()
                 reset()
 
-            def read(addr, is_dram, burst_len, byte_en, wait_states=0):
-                idx = 0
-                start_read(addr, is_dram, burst_len, byte_en, wait_states)
+            def read(addr, byte_en, burst_len, wait_states=7, request_type=RequestTypes.pipeline):
+                start_read(addr, burst_len, byte_en, wait_states, request_type)
                 yield from wait_for_advance()
-                while idx < burst_len:
-                    idx += 1
-                    cont_read()
+                while self.burst_cnt > 0:
+                    cont_burst()
                     yield from wait_for_advance()
-                reset()
-                yield from wait_clk()
-
-            reset()
-            if self.mode == "fetch":
-                yield from wait_clk()
-                while self.rst == 1:
-                    yield from wait_clk()
-                yield from read(0x1234,True,0,3)
-                yield from read(0x12,True,1,3)
-                yield from read(0x24,True,3,3)
-                yield from read(0x3,False,0,1)
-                yield from read(0x4,False,0,2, wait_states=5)
-                yield from wait_clk()
-                yield from wait_clk()
-                yield from wait_clk()
-                yield from wait_clk()
-                yield from read(0x34,True,0,2)
-                yield from read(0x4,False,0,3)
-            elif self.mode == "mem":
-                yield from wait_clk()
-                while self.rst == 1:
-                    yield from wait_clk()
-                yield from read(0x5678,False,0,3, wait_states=2)
-            while len(self.expected_responses) > 0:
-                yield from wait_clk()
-
-    class DmaGenerator(GenericModule):
-        clk = ClkPort()
-        rst = RstPort()
-
-        request_port = Output(BusIfDmaRequestIf)
-        response_port = Input(BusIfDmaResponseIf)
-
-        def construct(self) -> None:
-            self.mode = None
-            self.nram_base = 0x0000_0000
-            self.dram_base = 0x8000_0000
-
-        def body(self):
-            self.request_port.one_hot_channel.set_net_type(Unsigned(4))
-
-        def set_mode(self, mode):
-            self.mode = mode
-
-        #read_not_write  = logic
-        #byte_en         = Unsigned(2)
-        #addr            = BrewBusAddr
-        #data            = BrewBusData
-        #last            = logic
-
-        def post_sim_test(self, simulator: Simulator):
-            simulator.sim_assert(len(self.expected_responses) == 0)
-
-        def simulate(self, simulator: Simulator) -> TSimEvent:
-            self.expected_transactions_prep = []
-            self.expected_responses = []
-
-            def reset():
-                self.request_port.valid <<= 0
-                self.request_port.read_not_write <<= None
-                self.request_port.byte_en <<= None
-                self.request_port.addr <<= None
-                self.request_port.one_hot_channel <<= None
-                self.request_port.terminal_count <<= None
-
-            def read_or_write(addr, is_dram, byte_en, channel, terminal_count, wait_states, do_write, is_master):
-                assert byte_en in (1,2) or is_master
-                assert addr is not None or is_master
-                assert is_dram is not None or is_master
-
-                self.request_port.valid <<= 1
-                self.request_port.read_not_write <<= not do_write
-                self.request_port.byte_en <<= byte_en
-                self.request_port.addr <<= None if is_master else addr | ((self.dram_base if is_dram else self.nram_base) >> 1) | ((wait_states + 1) << (28))
-                self.request_port.one_hot_channel <<= 1 << channel
-                self.request_port.terminal_count <<= terminal_count
-                self.request_port.is_master <<= is_master
-
-                if is_master:
-                    simulator.log(f"DMA master request")
-                else:
-                    simulator.log(f"DMA {('reading','writing')[do_write]} address {addr:#08x} {interpret_addr(addr)} bytes {byte_en:02b}")
-                    # FIXME: DMA transfers always target DRAM (for now)
-                    self.expected_transactions_prep.append(ExpectedTransaction("DMA", get_region_name(addr | (0x0800_0000 >> 1)), get_bus_addr(addr), None, do_write, 0, 1 if byte_en == 2 else 0))
-                    self.expected_responses.append(True) # Content doesn't matter, we only get a 'valid' response
-
-            def start_read(addr, is_dram, byte_en, channel, terminal_count, wait_states):
-                read_or_write(addr, is_dram, byte_en, channel, terminal_count, wait_states, do_write=False, is_master=False)
-
-            def start_write(addr, is_dram, byte_en, channel, terminal_count, wait_states):
-                read_or_write(addr, is_dram, byte_en, channel, terminal_count, wait_states, do_write=True, is_master=False)
-
-            def start_master(channel):
-                read_or_write(None, None, None, channel, None, None, do_write=None, is_master=True)
-
-            def wait_clk():
-                yield (self.clk, )
-                while self.clk.get_sim_edge() != EdgeType.Positive:
-                    yield (self.clk, )
-                # Check for responses
-                if self.rst == 0:
-                    simulator.sim_assert(self.response_port.valid is not None)
-                    if self.response_port.valid == 1:
-                        simulator.log(f"DMA response received")
-                        simulator.sim_assert(len(self.expected_responses) > 0, "Unexpected response to DMA channel")
-                        self.expected_responses.pop(0)
-
-            def wait_for_advance():
-                global expected_transactions
-                yield from wait_clk()
-                while not (self.request_port.ready & self.request_port.valid):
-                    yield from wait_clk()
-                #assert len(self.expected_transactions_prep) > 0
-                expected_transactions += self.expected_transactions_prep
-                self.expected_transactions_prep.clear()
-
-            def write(addr, is_dram, byte_en, channel, terminal_count, wait_states=0):
-                start_write(addr, is_dram, byte_en, channel, terminal_count, wait_states)
-                yield from wait_for_advance()
-                reset()
-                yield from wait_clk()
-
-            def read(addr, is_dram, byte_en, channel, terminal_count, wait_states=0):
-                start_read(addr, is_dram, byte_en, channel, terminal_count, wait_states)
-                yield from wait_for_advance()
                 reset()
                 yield from wait_clk()
 
@@ -524,20 +384,31 @@ def sim():
             yield from wait_clk()
             while self.rst == 1:
                 yield from wait_clk()
-            yield from read(0x1000e,True,1,0,0)
-            yield from write(0x10010,True,2,0,0)
-            for _ in range(20):
-                yield from wait_clk()
-            start_master(1)
-            yield from wait_for_advance()
-            for _ in range(40):
-                yield from wait_clk()
-            reset()
+            yield from read(0x10001234,0,3)
+            yield from read(0x10000012,1,3)
+            yield from read(0x10000024,3,3)
+            yield from read(0x00000003,0,1)
+            yield from read(0x00000004,0,2, wait_states=5)
             yield from wait_clk()
+            yield from wait_clk()
+            yield from wait_clk()
+            yield from wait_clk()
+            yield from read(0x10000034,0,2)
+            yield from read(0x00000004,0,3)
+            for _ in range(10):
+                yield from wait_clk()
+            yield from read(0x00005678,0,3, wait_states=2)
 
             while len(self.expected_responses) > 0:
                 yield from wait_clk()
 
+
+
+    #class Generator(GenericModule):
+    #    clk = ClkPort()
+    #    rst = RstPort()
+    #
+    #    response_port = Input(BusIfResponseIf)
     '''
     class Checker(RvSimSink):
         def construct(self, max_wait_state: int = 0):
@@ -589,47 +460,32 @@ def sim():
         rst = RstPort()
 
         def body(self):
+            expected_responses = []
+            expected_transactions = []
+
             seed(0)
-            fetch_req = Wire(BusIfRequestIf)
-            fetch_rsp = Wire(BusIfResponseIf)
-            self.fetch_generator = Generator()
-            self.fetch_generator.set_mode("fetch")
-            fetch_req <<= self.fetch_generator.request_port
-            self.fetch_generator.response_port <<= fetch_rsp
-
-            mem_req = Wire(BusIfRequestIf)
-            mem_rsp = Wire(BusIfResponseIf)
-            self.mem_generator = Generator()
-            self.mem_generator.set_mode("mem")
-            mem_req <<= self.mem_generator.request_port
-            self.mem_generator.response_port <<= mem_rsp
-
-            dma_req = Wire(BusIfDmaRequestIf)
-            dma_rsp = Wire(BusIfDmaResponseIf)
-            self.dma_generator = DmaGenerator()
-            dma_req <<= self.dma_generator.request_port
-            self.dma_generator.response_port <<= dma_rsp
+            req = Wire(BusIfRequestIf)
+            rsp = Wire(BusIfResponseIf)
+            self.req_generator = Generator(expected_transactions, expected_responses)
+            req <<= self.req_generator.request_port
 
             csr_driver = CsrDriver()
 
             dram_if = Wire(ExternalBusIf)
-            dram_sim = DRAM_sim()
+            #dram_sim = DRAM_sim(expected_transactions)
 
             dut = BusIf()
 
-            dut.fetch_request <<= fetch_req
-            fetch_rsp <<= dut.fetch_response
-            dut.mem_request <<= mem_req
-            mem_rsp <<= dut.mem_response
-            dut.dma_request <<= dma_req
-            dma_rsp <<= dut.dma_response
+            dut.request <<= req
+            rsp <<= dut.response
             dram_if <<= dut.dram
-            dram_sim.bus_if <<= dram_if
+            #dram_sim.bus_if <<= dram_if
+            dram_if.n_wait <<= 1
             dut.reg_if <<= csr_driver.reg_if
 
 
         def simulate(self, simulator: Simulator) -> TSimEvent:
-            def clk() -> int:
+            def clk() -> TSimEvent:
                 yield 10
                 self.clk <<= ~self.clk & self.clk
                 yield 10
@@ -649,9 +505,7 @@ def sim():
                 yield from clk()
             now = yield 10
             print(f"Post sim tests {now}")
-            self.fetch_generator.post_sim_test(simulator)
-            self.mem_generator.post_sim_test(simulator)
-            self.dma_generator.post_sim_test(simulator)
+            self.req_generator.post_sim_test(simulator)
             print(f"Done {now}")
 
 

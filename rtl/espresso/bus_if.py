@@ -674,7 +674,8 @@ class BusIf(Module):
         # At least I *think* that's what we need.
 
         req = Wire(BusIfRequestIf)
-        req <<= ReverseBuf(self.request)
+        rbuf = ReverseBuf()
+        req <<= rbuf(self.request)
 
         # Bus FSM
         #########################
@@ -946,7 +947,7 @@ class BusIf(Module):
                     (next_state == BusIfStates.cas1_cas1)
                 )
             ) | (
-                (  
+                (
                     (state == BusIfStates.ras_cas1) |
                     (state == BusIfStates.cas0_cas1) |
                     (state == BusIfStates.cas1_cas1)
@@ -1005,11 +1006,11 @@ def gen():
     #       addr            = BrewBusAddr
     #       is_master       = logic
     #       terminal_count  = logic
-    #   
+    #
     #   class BusIfWrapper(Module):
     #       clk = ClkPort()
     #       rst = RstPort()
-    #   
+    #
     #       # Interface to fetch and memory
     #       fetch_request  = Input(BusIfRequestIf)
     #       fetch_response = Output(BusIfResponseIf)
@@ -1017,24 +1018,24 @@ def gen():
     #       mem_response = Output(BusIfResponseIf)
     #       dma_request = Input(BusIfWrapperDmaRequestIf)
     #       dma_response = Output(BusIfDmaResponseIf)
-    #   
+    #
     #       # CRS interface for config registers
     #       reg_if = Input(ApbIf(BrewCsrData, Unsigned(4)))
-    #   
+    #
     #       # DRAM interface
     #       dram = Output(ExternalBusIf)
-    #   
+    #
     #       # Events
     #       event_bus_idle = Output(logic)
-    #   
+    #
     #       def body(self):
     #           bus_if = BusIf()
     #           bus_if.fetch_request <<= self.fetch_request
     #           self.fetch_response <<= bus_if.fetch_response
-    #   
+    #
     #           bus_if.mem_request <<= self.mem_request
     #           self.mem_response <<= bus_if.mem_response
-    #   
+    #
     #           bus_if.dma_request.read_not_write <<= self.dma_request.read_not_write
     #           bus_if.dma_request.one_hot_channel <<= self.dma_request.one_hot_channel
     #           bus_if.dma_request.byte_en <<= self.dma_request.byte_en
@@ -1047,7 +1048,7 @@ def gen():
     #           bus_if.reg_if <<= self.reg_if
     #           self.dram <<= bus_if.dram
     #           self.event_bus_idle <<= bus_if.event_bus_idle
-    #   
+    #
     #   #return ScanWrapper(BusIf, {"clk", "rst"})
     #   return BusIfWrapper()
 
