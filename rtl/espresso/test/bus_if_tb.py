@@ -389,16 +389,17 @@ def sim():
             DRAM_SEL = 1 << 26
             NREN_SEL = 0
             yield from read(DRAM_SEL | 0x00001234,0,3)
-            yield from read(DRAM_SEL | 0x00000012,1,3)
-            yield from read(DRAM_SEL | 0x00000024,3,3)
-            yield from read(NREN_SEL | 0x00000003,0,1)
-            yield from read(NREN_SEL | 0x00000004,0,2, wait_states=5)
+            yield from read(DRAM_SEL | 0x00000512,1,3)
+            yield from read(DRAM_SEL | 0x00000624,3,3)
+            yield from read(NREN_SEL | 0x00000703,0,1)
+            yield from read(NREN_SEL | 0x00000804,0,2, wait_states=5)
             yield from wait_clk()
             yield from wait_clk()
             yield from wait_clk()
             yield from wait_clk()
-            yield from read(DRAM_SEL | 0x00000034,0,2)
-            yield from read(NREN_SEL | 0x00000004,0,3)
+            yield from read(NREN_SEL | 0x00000103,1,0)
+            yield from read(NREN_SEL | 0x00001204,2,0)
+            yield from read(NREN_SEL | 0x00002304,3,0)
             for _ in range(10):
                 yield from wait_clk()
             yield from read(NREN_SEL | 0x00005678,0,3, wait_states=2)

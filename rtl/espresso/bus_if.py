@@ -730,23 +730,27 @@ class BusIf(Module):
         dram_wait_i1 = Reg(dram_wait, clock_port=~self.clk)
         dram_wait_i2 = Reg(dram_wait_i1)
 
+        req_mms = req.addr[26]
+
+        req_ra  = Select( # row address
+            req_mms | (req.request_type == RequestTypes.refresh),
+            req.addr[21:11],
+            concat(req.addr[21], req.addr[19], req.addr[17], req.addr[16], req.addr[13:7])
+        )
+
         # Address space slicing and dicing
         reg_req = Wire(req.get_data_member_type())
         reg_req <<= Reg(req.get_data_members(), clock_en=req_progress)
 
-        req_da  = reg_req.addr[25:22] # address presented on data pins during RAS cycle
-        req_mms = reg_req.addr[26]
-        req_ra  = Select( # row address
-            req_mms | (reg_req.request_type == RequestTypes.refresh),
-            reg_req.addr[21:11],
-            concat(reg_req.addr[21], reg_req.addr[19], reg_req.addr[17], reg_req.addr[16], reg_req.addr[13:7])
-        )
-        req_ca  = Select( # col address
-            req_mms,
+        reg_req_da  = reg_req.addr[25:22] # address presented on data pins during RAS cycle
+        reg_req_mms = reg_req.addr[26]
+        reg_req_ra  = Reg(req_ra, clock_en=req_progress)
+        reg_req_ca  = Reg(Select( # col address
+            reg_req_mms,
             reg_req.addr[10:0],
             concat(reg_req.addr[20], reg_req.addr[18], reg_req.addr[16], reg_req.addr[14], reg_req.addr[6:0])
-        )
-        req_dbs = Select(
+        ), clock_port=~self.clk, clock_en=Reg(req_progress, clock_port=~self.clk))
+        reg_req_dbs = Select(
             dram_bank_size,
             reg_req.addr[14],
             reg_req.addr[16],
@@ -757,25 +761,23 @@ class BusIf(Module):
             reg_req.addr[22],
             reg_req.addr[22]
         )
-        req_page = reg_req.addr[13:7]
-        prev_page = Reg(req_page, clock_en=req_progress)
-        prev_page_valid = Wire(logic)
-        prev_page_valid <<= Reg(Select(next_state == BusIfStates.idle, Reg(prev_page_valid), 0))
-        break_burst = (req_page != prev_page) & (prev_page_valid)
+        reg_req_page = reg_req.addr[13:7]
+        ras_page = Reg(req_ra, clock_en=(state == BusIfStates.idle) & (next_state != BusIfStates.idle))
+        break_burst = (reg_req_page != ras_page) & (state != BusIfStates.idle)
         req_space = Wire(EnumNet(MemSpaces))
         req_space <<= Select(
-            req_mms,
+            reg_req_mms,
             MemSpaces.nren,
-            Select(req_dbs, MemSpaces.dram_0, MemSpaces.dram_1),
+            Select(reg_req_dbs, MemSpaces.dram_0, MemSpaces.dram_1),
         )
         ras_wait = SelectOne(
             req_space == MemSpaces.dram_0, dram_0_wait,
             req_space == MemSpaces.dram_1, dram_1_wait,
             req_space == MemSpaces.nren,   nren_wait
         )
-        req_ras_a = (req_mms & (req_dbs == dram_bank_swap)) | (reg_req.request_type == RequestTypes.refresh)
-        req_ras_b = (req_mms & (req_dbs != dram_bank_swap)) | (reg_req.request_type == RequestTypes.refresh)
-        req_nren  = ~req_mms
+        req_ras_a = (reg_req_mms & (reg_req_dbs == dram_bank_swap)) | (reg_req.request_type == RequestTypes.refresh)
+        req_ras_b = (reg_req_mms & (reg_req_dbs != dram_bank_swap)) | (reg_req.request_type == RequestTypes.refresh)
+        req_nren  = ~reg_req_mms
 
 
         self.fsm.add_transition(BusIfStates.idle,                         ~req.valid &  dram_wait_i2,                        BusIfStates.idle)
@@ -971,7 +973,7 @@ class BusIf(Module):
         self.dram.n_ras_b        <<= ~Select(req_ras_b, 0, ras)
         self.dram.n_cas_0        <<= ~Select(self.clk, cas0_s, cas0_f)
         self.dram.n_cas_1        <<= ~Select(self.clk, cas1_s, cas1_f)
-        self.dram.addr           <<=  Select(Select(self.clk, addr_col_sel_s, addr_col_sel_f), req_ra, req_ca)
+        self.dram.addr           <<=  Select(Select(self.clk, addr_col_sel_s, addr_col_sel_f), reg_req_ra, reg_req_ca)
         self.dram.n_we           <<=  Select(ras, 1, reg_req.read_not_write)
         #self.dram.data_in
         #self.dram.data_out
