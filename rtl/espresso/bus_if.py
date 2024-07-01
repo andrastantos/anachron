@@ -971,7 +971,7 @@ class BusIf(Module):
         self.dram.n_ras_b        <<= ~Select(req_ras_b, 0, ras)
         self.dram.n_cas_0        <<= ~Select(self.clk, cas0_s, cas0_f)
         self.dram.n_cas_1        <<= ~Select(self.clk, cas1_s, cas1_f)
-        self.dram.addr           <<=  Select(self.clk, addr_col_sel_s, addr_col_sel_f)
+        self.dram.addr           <<=  Select(Select(self.clk, addr_col_sel_s, addr_col_sel_f), req_ra, req_ca)
         self.dram.n_we           <<=  Select(ras, 1, reg_req.read_not_write)
         #self.dram.data_in
         #self.dram.data_out
@@ -985,12 +985,13 @@ class BusIf(Module):
 
         req.ready <<= ~dram_wait_i2 & ~apply_back_pressure
 
-        dram_data_in_i1 = Reg(self.dram.data_in, clock_port=~self.clk)
-        dram_data_in_i2 = Reg(dram_data_in_i1, clock_port=self.clk)
-        dram_data_in_i3 = Reg(dram_data_in_i2, clock_port=~self.clk)
+        dram_data_in_i1s = Reg(self.dram.data_in, clock_port= self.clk, clock_en=capture_data_s)
+        dram_data_in_i1f = Reg(self.dram.data_in, clock_port=~self.clk, clock_en=capture_data_f)
+        dram_data_in_i2s = Reg(dram_data_in_i1s, clock_port=~self.clk)
+        dram_data_in_i2f = Reg(dram_data_in_i1f, clock_port=self.clk)
 
-        dram_data_in_low  = Reg(dram_data_in_i3, clock_en=capture_data_s)
-        dram_data_in_high = Reg(dram_data_in_i2, clock_en=capture_data_f)
+        dram_data_in_low  = Reg(dram_data_in_i2s, clock_port=self.clk)
+        dram_data_in_high = dram_data_in_i2f
 
         self.response.data <<= Select(
             reg_req.byte_en,
@@ -1000,7 +1001,7 @@ class BusIf(Module):
             concat(dram_data_in_high, dram_data_in_low) # 16-bit read
         )
         #FIXME: !!!!!!!!!!!!!! THIS IS INCORRECT FOR WAIT_STATES !!!!!!!!!!!!!!
-        self.response.valid <<= Reg(capture_data_f | capture_data_s)
+        self.response.valid <<= Reg(Reg(capture_data_f | capture_data_s))
 
 def gen():
     #def top():
