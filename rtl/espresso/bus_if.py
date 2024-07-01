@@ -737,6 +737,8 @@ class BusIf(Module):
             req.addr[21:11],
             concat(req.addr[21], req.addr[19], req.addr[17], req.addr[16], req.addr[13:7])
         )
+        ras_page = Reg(req_ra, clock_en=req_progress)
+        break_burst = (req_ra != ras_page) & (state != BusIfStates.idle) & req_progress
 
         # Address space slicing and dicing
         reg_req = Wire(req.get_data_member_type())
@@ -761,9 +763,6 @@ class BusIf(Module):
             reg_req.addr[22],
             reg_req.addr[22]
         )
-        reg_req_page = reg_req.addr[13:7]
-        ras_page = Reg(req_ra, clock_en=(state == BusIfStates.idle) & (next_state != BusIfStates.idle))
-        break_burst = (reg_req_page != ras_page) & (state != BusIfStates.idle)
         req_space = Wire(EnumNet(MemSpaces))
         req_space <<= Select(
             reg_req_mms,

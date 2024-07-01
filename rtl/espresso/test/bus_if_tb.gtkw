@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Mon Jul  1 23:41:25 2024
+[*] Mon Jul  1 23:57:17 2024
 [*]
 [dumpfile] "/home/tantos/anachron/rtl/espresso/test/bus_if_tb.vcd"
-[dumpfile_mtime] "Mon Jul  1 23:38:36 2024"
-[dumpfile_size] 374374
+[dumpfile_mtime] "Mon Jul  1 23:56:40 2024"
+[dumpfile_size] 361899
 [savefile] "/home/tantos/anachron/rtl/espresso/test/bus_if_tb.gtkw"
 [timestart] 0
 [size] 1920 1097
 [pos] -1 -1
-*-7.201988 523 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-7.201988 790 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] top.
 [treeopen] top.dut.
 [sst_width] 282
@@ -43,6 +43,7 @@ top.dut.dram_bus_en
 @1000200
 -DRAM_IF
 @22
+top.dut.reg_req_ra[10:0]
 top.dut.dram_data_in_i1f[7:0]
 top.dut.dram_data_in_i2f[7:0]
 top.dut.dram_data_in_i1s[7:0]
@@ -52,14 +53,18 @@ top.dut.dram_data_in_i1f[7:0]
 @28
 top.dut.capture_data_f
 top.dut.capture_data_s
-top.dut.state
 @22
-top.dut.ras_page[10:0]
-@23
 top.dut.reg_req_ca[10:0]
 @28
 top.dut.req_progress
+top.dut.req_valid
+@23
+top.dut.req_ra[10:0]
+@22
+top.dut.ras_page[10:0]
+@28
 top.dut.break_burst
+top.dut.state
 @800200
 -REQUEST
 @28
