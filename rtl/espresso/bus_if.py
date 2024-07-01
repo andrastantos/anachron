@@ -1001,7 +1001,7 @@ class BusIf(Module):
             concat(dram_data_in_high, dram_data_in_low) # 16-bit read
         )
         #FIXME: !!!!!!!!!!!!!! THIS IS INCORRECT FOR WAIT_STATES !!!!!!!!!!!!!!
-        self.response.valid <<= Reg(Reg(capture_data_f | capture_data_s))
+        self.response.valid <<= Reg(capture_data_f | Reg(capture_data_s))
 
 def gen():
     #def top():
