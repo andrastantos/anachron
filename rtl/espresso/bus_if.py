@@ -686,13 +686,15 @@ class BusIf(Module):
         # try to encode *what* we're doing
         class BusIfStates(Enum):
             idle                 = 0 # idle or precharge
+            idle_break           = 1 # going through precharge due to a previous page break
             ras_cas0             = 3
             cas0_cas1            = 4
             cas1_cas0            = 5
-            ras_wait             = 7
-            ras_ras              = 8
-            cas0_ras             = 9
-            cas1_ras             = 10
+            ras_wait             = 6
+            ras_ras              = 7
+            cas0_ras             = 8
+            cas1_ras             = 9
+            cas1_ras_break       = 10
             cas0_cas0            = 11
             ras_cas1             = 12
             cas1_cas1            = 13
@@ -782,13 +784,16 @@ class BusIf(Module):
         self.fsm.add_transition(BusIfStates.idle,                         ~req.valid &  dram_wait_i2,                        BusIfStates.idle)
         self.fsm.add_transition(BusIfStates.idle,                          req.valid &  dram_wait_i2,                        BusIfStates.idle)
         self.fsm.add_transition(BusIfStates.idle,                          req.valid & ~dram_wait_i2,                        BusIfStates.ras_cas0)
+        self.fsm.add_transition(BusIfStates.idle_break,                                 dram_wait_i2,                        BusIfStates.idle_break)
+        self.fsm.add_transition(BusIfStates.idle_break,                                ~dram_wait_i2,                        BusIfStates.ras_cas0)
         self.fsm.add_transition(BusIfStates.ras_cas0,                      req.valid & ~dram_wait_i2 & ~break_burst,         BusIfStates.cas1_cas0)
-        self.fsm.add_transition(BusIfStates.ras_cas0,                      req.valid & ~dram_wait_i2 &  break_burst,         BusIfStates.cas1_ras)
+        self.fsm.add_transition(BusIfStates.ras_cas0,                      req.valid & ~dram_wait_i2 &  break_burst,         BusIfStates.cas1_ras_break)
         self.fsm.add_transition(BusIfStates.ras_cas0,                     ~req.valid,                                        BusIfStates.cas1_ras)
         self.fsm.add_transition(BusIfStates.cas1_cas0,                     req.valid & ~dram_wait_i2 & ~break_burst,         BusIfStates.cas1_cas0)
-        self.fsm.add_transition(BusIfStates.cas1_cas0,                     req.valid & ~dram_wait_i2 &  break_burst,         BusIfStates.cas1_ras)
+        self.fsm.add_transition(BusIfStates.cas1_cas0,                     req.valid & ~dram_wait_i2 &  break_burst,         BusIfStates.cas1_ras_break)
         self.fsm.add_transition(BusIfStates.cas1_cas0,                    ~req.valid,                                        BusIfStates.cas1_ras)
         self.fsm.add_transition(BusIfStates.cas1_ras,                      1,                                                BusIfStates.idle)
+        self.fsm.add_transition(BusIfStates.cas1_ras_break,                1,                                                BusIfStates.idle_break)
 
         def decode_state(state, **kwargs):
             # This is a neat trick, I think: argument names are matched to enum values
@@ -809,6 +814,7 @@ class BusIf(Module):
         # 's' postfix stands for the second half of the clock
         ras_f = decode_state(state,
             idle                 = 0,
+            idle_break           = 0,
             ras_cas0             = 1,
             cas0_cas1            = 1,
             cas1_cas0            = 1,
@@ -816,12 +822,14 @@ class BusIf(Module):
             ras_ras              = 1,
             cas0_ras             = 1,
             cas1_ras             = 1,
+            cas1_ras_break       = 1,
             cas0_cas0            = 1,
             ras_cas1             = 1,
             cas1_cas1            = 1,
         )
         ras_s = decode_state(state,
             idle                 = 0,
+            idle_break           = 0,
             ras_cas0             = 1,
             cas0_cas1            = 1,
             cas1_cas0            = 1,
@@ -829,12 +837,14 @@ class BusIf(Module):
             ras_ras              = 1,
             cas0_ras             = 1,
             cas1_ras             = 1,
+            cas1_ras_break       = 1,
             cas0_cas0            = 1,
             ras_cas1             = 1,
             cas1_cas1            = 1,
         )
         cas0_f = decode_state(state,
             idle                 = 0,
+            idle_break           = 0,
             ras_cas0             = 0,
             cas0_cas1            = 1,
             cas1_cas0            = 0,
@@ -842,12 +852,14 @@ class BusIf(Module):
             ras_ras              = 0,
             cas0_ras             = 1,
             cas1_ras             = 0,
+            cas1_ras_break       = 0,
             cas0_cas0            = 1,
             ras_cas1             = 0,
             cas1_cas1            = 0,
         )
         cas0_s = decode_state(state,
             idle                 = 0,
+            idle_break           = 0,
             ras_cas0             = 1,
             cas0_cas1            = 0,
             cas1_cas0            = 1,
@@ -855,12 +867,14 @@ class BusIf(Module):
             ras_ras              = 0,
             cas0_ras             = 0,
             cas1_ras             = 0,
+            cas1_ras_break       = 0,
             cas0_cas0            = 1,
             ras_cas1             = 0,
             cas1_cas1            = 0,
         )
         cas1_f = decode_state(state,
             idle                 = 0,
+            idle_break           = 0,
             ras_cas0             = 0,
             cas0_cas1            = 0,
             cas1_cas0            = 1,
@@ -868,12 +882,14 @@ class BusIf(Module):
             ras_ras              = 0,
             cas0_ras             = 0,
             cas1_ras             = 1,
+            cas1_ras_break       = 1,
             cas0_cas0            = 0,
             ras_cas1             = 0,
             cas1_cas1            = 1,
         )
         cas1_s = decode_state(state,
             idle                 = 0,
+            idle_break           = 0,
             ras_cas0             = 0,
             cas0_cas1            = 1,
             cas1_cas0            = 0,
@@ -881,12 +897,14 @@ class BusIf(Module):
             ras_ras              = 0,
             cas0_ras             = 0,
             cas1_ras             = 0,
+            cas1_ras_break       = 0,
             cas0_cas0            = 0,
             ras_cas1             = 1,
             cas1_cas1            = 1,
         )
         addr_col_sel_f = decode_state(state,
             idle                 = 0,
+            idle_break           = 0,
             ras_cas0             = 0,
             cas0_cas1            = 1,
             cas1_cas0            = 1,
@@ -894,12 +912,14 @@ class BusIf(Module):
             ras_ras              = 0,
             cas0_ras             = 1,
             cas1_ras             = 1,
+            cas1_ras_break       = 1,
             cas0_cas0            = 1,
             ras_cas1             = 0,
             cas1_cas1            = 1,
         )
         addr_col_sel_s = decode_state(state,
             idle                 = 0,
+            idle_break           = 0,
             ras_cas0             = 1,
             cas0_cas1            = 1,
             cas1_cas0            = 1,
@@ -907,12 +927,14 @@ class BusIf(Module):
             ras_ras              = 0,
             cas0_ras             = 1,
             cas1_ras             = 1,
+            cas1_ras_break       = 1,
             cas0_cas0            = 1,
             ras_cas1             = 1,
             cas1_cas1            = 1,
         )
         apply_back_pressure = decode_state(state,
             idle                 = 0,
+            idle_break           = 1,
             ras_cas0             = 0,
             cas0_cas1            = 0,
             cas1_cas0            = 0,
@@ -920,6 +942,7 @@ class BusIf(Module):
             ras_ras              = 0,
             cas0_ras             = 1,
             cas1_ras             = 1,
+            cas1_ras_break       = 1,
             cas0_cas0            = 1,
             ras_cas1             = 0,
             cas1_cas1            = 1,
@@ -927,6 +950,7 @@ class BusIf(Module):
 
         capture_data_f = decode_state(state,
             idle                 = 0,
+            idle_break           = 0,
             ras_cas0             = 0,
             cas0_cas1            = 1,
             cas1_cas0            = 1,
@@ -934,6 +958,7 @@ class BusIf(Module):
             ras_ras              = 0,
             cas0_ras             = 1,
             cas1_ras             = 1,
+            cas1_ras_break       = 1,
             cas0_cas0            = 0,
             ras_cas1             = 0,
             cas1_cas1            = 0,
@@ -949,6 +974,7 @@ class BusIf(Module):
                     (next_state == BusIfStates.ras_cas0) |
                     (next_state == BusIfStates.ras_cas1) |
                     (next_state == BusIfStates.cas1_ras) |
+                    (next_state == BusIfStates.cas1_ras_break) |
                     (next_state == BusIfStates.cas1_cas0) |
                     (next_state == BusIfStates.cas1_cas1)
                 )
