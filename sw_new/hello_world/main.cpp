@@ -4,7 +4,7 @@
 
 int main()
 {
-	if (is_sim()) {
+	if (get_environment() != Environment::fpga) {
 		sim_uart_write_str("Hello sim world\n");
 	} else {
 		sim_uart_write_str("Hello real world\n");

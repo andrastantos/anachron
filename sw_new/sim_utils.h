@@ -13,4 +13,14 @@ void sim_uart_wait_tx();
 
 void sim_terminate(uint8_t exit_code);
 
-bool is_sim();
+// Where the software runs. The interrupt GPIO's inputs tell them apart: the RTL
+// ties bit 0 to the 'is_sim' input, which the iverilog test bench
+// (anacron_fpga/sim_top.sv) sets and the FPGA boards tie low; the instruction
+// set simulator (brew-none-elf-run --environment operating) reads 0x02.
+enum class Environment {
+	fpga,    // real hardware
+	rtl_sim, // the RTL under iverilog
+	iss      // the instruction set simulator
+};
+
+Environment get_environment();

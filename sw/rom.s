@@ -321,6 +321,10 @@ uart_wait_tx:
 .global uart_write_char
     .p2align        1
 uart_write_char:
+    # Bit 0 of the interrupt GPIO is set only by the iverilog test bench,
+    # which prints whatever is written to GPIO3. The FPGA (bit 0 clear) and
+    # the instruction set simulator (reads 0x02) use the UART. Keep this in
+    # sync with get_environment() in sim_utils.cpp.
     $r0 <- mem8[gpio_int_base]
     $r0 <- short $r0 & 1
     if $r0 != 0 $pc <- uart_write_char_sim

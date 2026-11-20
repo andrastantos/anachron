@@ -17,9 +17,14 @@ void sim_uart_write_str(const char *message) {
 	}
 }
 
+// The RTL test bench prints every byte written to GPIO3 (simulating the UART
+// at the gate level is far too slow); GPIO3 isn't wired to pins on the boards.
+// The instruction set simulator models the UART, so it uses the real driver
+// like the FPGA does.
 void sim_uart_write_char(char value) {
-	gpio3_base[0] = (uint8_t)value;
-	if (!is_sim())
+	if (get_environment() == Environment::rtl_sim)
+		gpio3_base[0] = (uint8_t)value;
+	else
 		uart_write_char(value);
 }
 
@@ -74,6 +79,9 @@ void sim_uart_write_dec(unsigned int value) {
 	}
 }
 
-bool is_sim() {
-	return (gpio_int_base[0] & 1) != 0;
+Environment get_environment() {
+	uint8_t inputs = gpio_int_base[0];
+	if ((inputs & 2) != 0) return Environment::iss;
+	if ((inputs & 1) != 0) return Environment::rtl_sim;
+	return Environment::fpga;
 }
