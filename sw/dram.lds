@@ -228,6 +228,10 @@ SECTIONS
     *(.stack)
   }
   */
+  /* newlib's crt0 still loads $sp from _stack (and places argv just below
+     it), so it has to be defined: the top of the 64kB TASK-mode window that
+     rom.s sets up (dram_top + 1). Override with -Wl,--defsym=_stack=... */
+  PROVIDE (_stack = 0x08010000);
   /* Stabs debugging sections.  */
   .stab          0 : { *(.stab) }
   .stabstr       0 : { *(.stabstr) }
