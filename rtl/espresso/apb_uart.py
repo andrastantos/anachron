@@ -448,14 +448,14 @@ class ApbUart(Module):
                 ),
                 # Reg 2: config1
                 config_reg,
-                # Reg 3: config2
+                # Reg 3: config2 (concat is MSB first; same layout as the write side)
                 concat(
-                    prescaler_select,
-                    "1'b0",
-                    soft_rts,
-                    rx_enable,
-                    use_hw_tx_en,
                     soft_tx_en,
+                    use_hw_tx_en,
+                    rx_enable,
+                    soft_rts,
+                    "1'b0",
+                    prescaler_select,
                 ),
                 # Reg 4: divider 2
                 divider_limit,
