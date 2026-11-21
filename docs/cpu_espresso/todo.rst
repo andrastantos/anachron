@@ -13,6 +13,9 @@ These are not implemented at the moment:
 
 .. todo:: MEMSC returns a value! I don't think GAS is properly doing this, but I'm sure Espresso doesn't.
 
+.. todo:: implement proper MEMLL MEMSC behavior: Espresso should implement MEMLL and MEMSC instructions in the same way as the ISA simulator does: a single lock-address and a valid bit stored on MEMLL and checked on MEMSC. Any change in operating mode (SCHEDULER->TASK or TASK->SCHEDULER) clears the valid bit. RESET should also clear the valid bit.
+
+
 Toolchain
 ---------
 

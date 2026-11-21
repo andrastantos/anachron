@@ -8,6 +8,8 @@ Memory model operations
 
 In a more complex processor, especially in a multi-core system memory model is a big problem. Write queues, instruction and data-caches, out-of-order execution all mess with the real order of memory operations compared to the SW-apparent one. The Brew architecture has support for 'load-acquire' 'store-release' model of synchronization primitives. It has support for various fence instructions and cache-invalidation operations. None of this makes sense in a single-processor, in-order, cache-less processor, which this simple design is. So these operations either revert to regular loads and stores or just don't do anything.
 
+THIS IS INCORRECT, OR RATHER: A BUG: Espresso should implement MEMLL and MEMSC instructions in the same way as the ISA simulator does: a single lock-address and a valid bit stored on MEMLL and checked on MEMSC. Any change in operating mode (SCHEDULER->TASK or TASK->SCHEDULER) clears the valid bit. RESET should also clear the valid bit.
+
 Floating point operations
 -------------------------
 
