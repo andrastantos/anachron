@@ -12,6 +12,7 @@ Espresso Processor
 
    introduction
    uarch
+   instruction_timing
    exceptions
    address_translation
    boot

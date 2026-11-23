@@ -69,7 +69,7 @@ The execution stage is broken into several execution units:
 
 1. The *ALU* unit deals with integer arithmetic and logical operations. It has a latency of a single cycle
 2. The *Shifter* unit deals with arithmetic and logical shift operations. It also has a single cycle latency
-3. The *Multiplier* unit performs 32-bit multiplies (with 32-bit results) in two cycles. It is fully pipelined, capable of accepting a new operation in every cycle.
+3. The *Multiplier* unit performs 32-bit multiplies (with 32-bit results) in two cycles. The unit itself is pipelined, but the execute stage locks out the next instruction for one cycle after a multiply, so it accepts a new operation every other cycle (see :doc:`instruction_timing`).
 4. The *Load-store* unit is responsible for generating the physical address for loads and stores as well as checking for access violations and alignment problems. This is a single-cycle latency unit, occupying the first cycle of the execution stage
 5. The *Memory* unit generates the right transactions for loads and stores towards the bus interface. This is a variable latency unit, starting execution in the second cycle of the execution stage.
 6. The *Branch target* unit which computes the branch target address for branch instruction in the first cycle of the execution stage
