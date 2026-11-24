@@ -37,7 +37,7 @@ Instruction fetch
 ================================================= ================== =================================================================
 Item                                              Cycles             Notes
 ================================================= ================== =================================================================
-Fetch burst                                       up to 10 beats     A new burst starts when more than 8 entries of the 11-entry instruction queue are free; the burst is cut short when a fetched word could be a branch.
+Fetch burst                                       up to 10 beats     A new burst starts when more than 8 entries of the 11-entry instruction queue are free, counting requests still outstanding; it is cut short when decode passes a load or store on to execute, so that the access doesn't wait behind it.
 Sustained fetch rate                              12 per 10 words    10 instruction words per 12 cycles (bursts of 10 beats plus 2 turn-around cycles), about 1.2 cycles per 16-bit word.
 16-bit instruction (fetch-bound)                  1.2                Independent 16-bit instructions execute at one per cycle until the queue drains, then wait 2-3 cycles every 10 instructions.
 32-bit instruction (fetch-bound)                  2.4
@@ -99,4 +99,4 @@ Differences from the micro-architecture description
 The measurements disagree with :doc:`uarch` in two places:
 
 * The multiplier is not fully pipelined at the issue level: the execute stage locks out the instruction after a multiply for one cycle.
-* Branches to a target in the same 512-byte page do not continue the running fetch burst in practice: the fetch unit cuts the burst as soon as it sees a word that could be a branch, so every taken branch restarts fetch.
+* Branches to a target in the same 512-byte page do not continue the running fetch burst in practice: a taken branch empties the instruction queue and drops the responses still outstanding, so fetch restarts at the target either way. (The fetch unit could also end a burst at a fetched word that could be a branch, but that option, :code:`break_on_branch_early`, is off; bursts end at loads and stores instead.)
