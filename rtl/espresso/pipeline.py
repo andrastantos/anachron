@@ -94,8 +94,8 @@ class Pipeline(GenericModule):
 
         # Stages
         fetch_stage = FetchStage(page_bits=self.page_bits)
-        decode_stage = DecodeStage(has_multiply=self.has_multiply, has_shift=self.has_multiply)
-        execute_stage = ExecuteStage(has_multiply=self.has_multiply, has_shift=self.has_multiply)
+        decode_stage = DecodeStage(has_multiply=self.has_multiply, has_shift=self.has_shift)
+        execute_stage = ExecuteStage(has_multiply=self.has_multiply, has_shift=self.has_shift)
         result_extend_stage = ResultExtendStage()
         reg_file = RegFile()
 
