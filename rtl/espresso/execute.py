@@ -473,17 +473,22 @@ class ExecuteStage(GenericModule):
         stage_2_ready = Wire(logic)
 
         multi_cycle_exec_lockout = Reg(self.input_port.ready & self.input_port.valid & (self.input_port.exec_unit == op_class.mult) & ~self.input_port.fetch_av)
+        # An indirect branch ($pc <- mem32[...]) is decided only when its load returns, and the branch unit
+        # reads the stage-1 registers (s1_*) then: keep the next instruction out of stage 1 until that
+        # happens, so those registers still hold the branch. (The instruction would be flushed anyway when
+        # the branch is taken.)
+        indirect_branch_lockout = Wire(logic)
 
         stage_1_fsm = ForwardBufLogic()
         stage_1_fsm.clear <<= self.do_branch
-        stage_1_fsm.input_valid <<= ~multi_cycle_exec_lockout & ~s1_was_branch & ~self.do_branch & self.input_port.valid
+        stage_1_fsm.input_valid <<= ~multi_cycle_exec_lockout & ~indirect_branch_lockout & ~s1_was_branch & ~self.do_branch & self.input_port.valid
         # we 'bite out' a cycle for two-cycle units, such as multiply
-        self.input_port.ready <<= ~multi_cycle_exec_lockout & ~s1_was_branch  & stage_1_fsm.input_ready
+        self.input_port.ready <<= ~multi_cycle_exec_lockout & ~indirect_branch_lockout & ~s1_was_branch  & stage_1_fsm.input_ready
         stage_1_valid <<= stage_1_fsm.output_valid
         stage_1_fsm.output_ready <<= stage_2_ready
 
         stage_1_reg_en = Wire(logic)
-        stage_1_reg_en <<= ~multi_cycle_exec_lockout & ~s1_was_branch  & stage_1_fsm.out_reg_en
+        stage_1_reg_en <<= ~multi_cycle_exec_lockout & ~indirect_branch_lockout & ~s1_was_branch  & stage_1_fsm.out_reg_en
 
         # ALU
         alu_output = Wire(AluOutputIf)
@@ -687,7 +692,11 @@ class ExecuteStage(GenericModule):
         # xxx:
         #   $pc <- yyy
         # These back-to-back jumps would fail without the intervention
-        s2_exec_unit <<= Reg(Select(self.do_branch, Select(stage_2_reg_en, s2_exec_unit, s1_exec_unit), op_class.invalid))
+        # An indirect branch leaves stage 2 once it is decided (its load returned), so that the instruction after
+        # it gets its own branch decision (sideband_strobe) and isn't locked out of stage 1 any longer.
+        s2_indirect_branch_done = (s2_exec_unit == op_class.branch_ind) & s2_mem_output.valid
+        s2_exec_unit <<= Reg(Select(self.do_branch, Select(stage_2_reg_en, Select(s2_indirect_branch_done, s2_exec_unit, op_class.invalid), s1_exec_unit), op_class.invalid))
+        indirect_branch_lockout <<= (stage_1_valid & (s1_exec_unit == op_class.branch_ind)) | (s2_exec_unit == op_class.branch_ind)
         s2_ldst_op <<= Reg(s1_ldst_op, clock_en = stage_2_reg_en)
 
         self.output_port.data_l <<= Select(s2_exec_unit == op_class.ld_st, Reg(result[15: 0], clock_en = stage_2_reg_en), Select(s2_ldst_op == ldst_ops.store, s2_mem_output.data_l, 0))

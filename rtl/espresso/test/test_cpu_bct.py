@@ -959,6 +959,92 @@ def test_ldst(top):
     terminate()
 
 
+@prog_wrapper
+def test_branch_ind(top):
+    """
+    Test indirect branches through memory ($pc <- mem32[...], $tpc <- mem32[...], call mem32[...]) back to back
+    with other branches: an indirect branch is decided when its load returns, so the instructions behind it must
+    not take its place in execute. Every wrong path fails; $r9 collects one bit per block on the right path.
+    """
+
+    top.set_timeout(6000)
+
+    startup()
+    load_reg("$r6", 0x0800_8000) # jump table
+    load_reg("$r9", 0)
+    for i, target in enumerate(("ind_a1", "ind_a2", "ind_b1", "ind_c1", "ind_d1", "ind_e1", "ind_f1", "ind_fn", "ind_g1")):
+        r_eq_I("$r1", target)
+        mem32_r_plus_i_eq_r("$r6", 4*i, "$r1")
+    load_reg("$r1", 0x1234)
+    mem32_r_plus_i_eq_r("$r6", 36, "$r1") # a $tpc value
+
+    # Two indirect jumps back to back; the target of the first is another one
+    pc_eq_mem32_r_plus_i("$r6", 0)
+    pc_eq_mem32_r_plus_i("$r6", 4) # wrong path
+    fail()
+    place_symbol("ind_a1")
+    r_eq_r_plus_t("$r9", "$r9", 1)
+    pc_eq_mem32_r_plus_i("$r6", 4)
+    fail()
+    place_symbol("ind_a2")
+    r_eq_r_plus_t("$r9", "$r9", 2)
+    # An indirect jump to a direct jump; back-to-back calls to a function that returns at once
+    pc_eq_mem32_r_plus_i("$r6", 8)
+    fail()
+    place_symbol("ind_b1")
+    pc_eq_I("ind_b2")
+    fail()
+    place_symbol("ind_b2")
+    r_eq_r_plus_t("$r9", "$r9", 4)
+    call_mem32_r_plus_i("$r6", 28)
+    call_mem32_r_plus_i("$r6", 28)
+    r_eq_I_plus_r("$r9", 8, "$r9")
+    # $tpc <- mem32[...] doesn't branch in SCHEDULER mode: the branches right after it must still work
+    tpc_eq_mem32_r_plus_i("$r6", 36)
+    if_r_eq_r("$r9", "$r9", "ind_c0")
+    fail()
+    place_symbol("ind_c0")
+    tpc_eq_mem32_r_plus_i("$r6", 36)
+    pc_eq_mem32_r_plus_i("$r6", 12)
+    fail()
+    place_symbol("ind_c1")
+    r_eq_I_plus_r("$r9", 16, "$r9")
+    tpc_eq_mem32_r_plus_i("$r6", 36)
+    tpc_eq_mem32_r_plus_i("$r6", 36)
+    r_eq_I_plus_r("$r9", 32, "$r9")
+    # Direct and conditional branches with an indirect jump at the target or in the fall-through
+    pc_eq_I("ind_d0")
+    fail()
+    place_symbol("ind_d0")
+    pc_eq_mem32_r_plus_i("$r6", 16)
+    fail()
+    place_symbol("ind_d1")
+    r_eq_I_plus_r("$r9", 64, "$r9")
+    if_r_ne_r("$r9", "$r9", "ind_e0") # not taken: falls into the indirect jump
+    pc_eq_mem32_r_plus_i("$r6", 20)
+    place_symbol("ind_e0")
+    fail()
+    place_symbol("ind_e1")
+    r_eq_I_plus_r("$r9", 128, "$r9")
+    if_r_eq_r("$r9", "$r9", "ind_f0") # taken: the indirect jump in its shadow must not run
+    pc_eq_mem32_r_plus_i("$r6", 32)
+    fail()
+    place_symbol("ind_f0")
+    r_eq_I_plus_r("$r9", 256, "$r9")
+    pc_eq_mem32_r_plus_i("$r6", 24)
+    fail()
+    place_symbol("ind_f1")
+    r_eq_I_plus_r("$r9", 512, "$r9")
+    # An indirect jump to the next instruction
+    pc_eq_mem32_r_plus_i("$r6", 32)
+    place_symbol("ind_g1")
+    r_eq_I_plus_r("$r9", 1024, "$r9")
+    check_reg("$r9", 2047)
+    terminate()
+    place_symbol("ind_fn")
+    pc_eq_r("$r14")
+
+
 # TODO: zero-compare branches; compare branches; bit-test branches
 #       stack operations
 #       load-stores
@@ -979,6 +1065,7 @@ if __name__ == "__main__":
     #test_branch_rc()
     #test_branch_bit()
     #test_ldst()
+    #test_branch_ind()
 
 if "pytest" in sys.modules:
     prep_test(top)
