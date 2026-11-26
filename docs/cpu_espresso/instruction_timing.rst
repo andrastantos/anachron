@@ -27,7 +27,7 @@ Burst of *n* 16-bit beats (bus occupancy)         *n* + 2            One beat pe
 Single 16-bit access (bus occupancy)              3
 32-bit access                                     4                  A 2-beat burst.
 8-bit access                                      3                  A 16-bit beat with one byte enabled.
-Arbitration                                       --                 Only in the idle state, fixed priority: refresh, DMA, memory, fetch. A burst is never interrupted, so a load or store waits for a running fetch burst (up to 12 cycles).
+Arbitration                                       --                 Only in the idle state, fixed priority: refresh, DMA, memory, fetch. A burst is never interrupted, so a load or store waits for a running fetch burst (up to 12 cycles); fetch starts no new burst while a load or store is on its way to the memory unit (see Fetch burst).
 Non-DRAM access                                   4 + wait states    8-bit transfers only; a 16-bit access is two transfers, a 32-bit access four (15 cycles for a 32-bit load with one wait state). Wait states come from address bits 31..28 (see :doc:`memory`).
 ================================================= ================== =================================================================
 
@@ -37,7 +37,7 @@ Instruction fetch
 ================================================= ================== =================================================================
 Item                                              Cycles             Notes
 ================================================= ================== =================================================================
-Fetch burst                                       up to 10 beats     A new burst starts when more than 8 entries of the 11-entry instruction queue are free, counting requests still outstanding; it is cut short when decode passes a load or store on to execute, so that the access doesn't wait behind it.
+Fetch burst                                       up to 10 beats     A new burst starts when more than 8 entries of the 11-entry instruction queue are free, counting requests still outstanding; it is cut short when decode passes a load or store on to execute, and no new burst starts from then until the memory unit has accepted every such access (a taken branch or an exception cancels them and lifts the hold), so the access doesn't wait behind a burst.
 Sustained fetch rate                              12 per 10 words    10 instruction words per 12 cycles (bursts of 10 beats plus 2 turn-around cycles), about 1.2 cycles per 16-bit word.
 16-bit instruction (fetch-bound)                  1.2                Independent 16-bit instructions execute at one per cycle until the queue drains, then wait 2-3 cycles every 10 instructions.
 32-bit instruction (fetch-bound)                  2.4
@@ -63,7 +63,7 @@ Conditional branch operand from an ALU result     latency 3
 Loads and stores
 ----------------
 
-Loads stall the pipeline: the instruction after a load enters execute, but everything after that waits until the load's data is back. The table assumes the bus is free when the load or store reaches the memory unit; otherwise add the wait for the running fetch burst.
+Loads stall the pipeline: the instruction after a load enters execute, but everything after that waits until the load's data is back. The table assumes the bus is free when the load or store reaches the memory unit; otherwise add the wait for the running fetch burst. Since fetch holds off new bursts while a load or store is on its way, that happens only when a burst was already running when decode passed the access: loads close together cost the same whether or not other instructions sit between them. The price is in tight loops with a memory access every few instructions, where fetch waits behind the accesses and decode can run out of instructions.
 
 ================================================= ================== =================================================================
 Instruction                                       Cycles             Notes
