@@ -1045,6 +1045,92 @@ def test_branch_ind(top):
     pc_eq_r("$r14")
 
 
+@prog_wrapper
+def test_burst_hold_exc(top):
+    """
+    Loads and stores cancelled by an exception: a TASK-mode load beyond the
+    data window (access violation), a misaligned load, and a load and store
+    right behind a SWI.  Each is decoded (so the fetch unit's burst hold counts
+    it) but never reaches the bus; the exception must clear the hold, or fetch
+    stays stopped and the test times out.  Each round checks ECAUSE, that the
+    store behind the SWI didn't happen, and that SCHEDULER-mode loads and
+    stores work afterwards.
+    """
+
+    top.set_timeout(6000)
+
+    create_segment("code", 0)
+    create_segment("code_dram", 0x800_0000)
+    create_segment("code_task", 0x800_1000)
+    set_active_segment("code_dram")
+    place_symbol("_start")
+    set_active_segment("code")
+    pc_eq_I("_start")
+    set_active_segment("code_dram")
+
+    data = 0x0800_2000
+    r_eq_I("$r0", 0xffffffff)
+    csr_eq_r(top.cpu.csr_pmem_limit_reg, "$r0")
+    r_eq_I("$r0", 0x0800_3000)                # data window ends at 0x0800_33ff (bits 27:10)
+    csr_eq_r(top.cpu.csr_dmem_limit_reg, "$r0")
+    r_eq_t("$r0", 0)
+    csr_eq_r(top.cpu.csr_pmem_base_reg, "$r0")
+    csr_eq_r(top.cpu.csr_dmem_base_reg, "$r0")
+    r_eq_I("$r6", data)
+    r_eq_I("$r1", 0x1111)
+    mem32_r_plus_i_eq_r("$r6", 0, "$r1")
+    r_eq_I("$r1", 0x2222)
+    mem32_r_plus_i_eq_r("$r6", 4, "$r1")
+    r_eq_I("$r1", 0x3333)
+    mem32_r_plus_i_eq_r("$r6", 8, "$r1")
+    r_eq_I("$r8", 0x0800_4000)                # beyond the window
+    r_eq_I("$r9", 0x5555)
+
+    # 1. Access violation
+    tpc_eq_I("task_av")
+    stm()
+    r_eq_csr("$r3", top.cpu.csr_ecause_reg)
+    check_reg("$r3", brew_exceptions.exc_mem_av.value)
+    r_eq_mem32_r_plus_i("$r4", "$r6", 4)       # scheduler loads still run
+    check_reg("$r4", 0x2222)
+    # 2. Misaligned load
+    tpc_eq_I("task_unaligned")
+    stm()
+    r_eq_csr("$r3", top.cpu.csr_ecause_reg)
+    check_reg("$r3", brew_exceptions.exc_unaligned.value)
+    r_eq_mem32_r_plus_i("$r4", "$r6", 0)
+    check_reg("$r4", 0x1111)
+    # 3. A load and a store in the shadow of a SWI
+    tpc_eq_I("task_swi")
+    stm()
+    r_eq_csr("$r3", top.cpu.csr_ecause_reg)
+    check_reg("$r3", brew_exceptions.exc_swi_3.value)
+    r_eq_mem32_r_plus_i("$r4", "$r6", 8)
+    check_reg("$r4", 0x3333)                  # the store behind the SWI didn't happen
+    mem32_r_plus_i_eq_r("$r6", 12, "$r9")
+    r_eq_mem32_r_plus_i("$r4", "$r6", 12)
+    check_reg("$r4", 0x5555)
+    terminate()
+
+    set_active_segment("code_task")
+    place_symbol("task_av")
+    r_eq_mem32_r_plus_i("$r1", "$r6", 0)
+    r_eq_mem32_r_plus_i("$r2", "$r8", 0)       # access violation
+    r_eq_mem32_r_plus_i("$r2", "$r6", 4)
+    fail()
+    place_symbol("task_unaligned")
+    r_eq_mem32_r_plus_i("$r1", "$r6", 0)
+    r_eq_mem32_r_plus_i("$r2", "$r6", 2)       # misaligned
+    r_eq_mem32_r_plus_i("$r2", "$r6", 4)
+    fail()
+    place_symbol("task_swi")
+    r_eq_mem32_r_plus_i("$r1", "$r6", 0)
+    swi(3)
+    mem32_r_plus_i_eq_r("$r6", 8, "$r9")       # cancelled by the SWI
+    r_eq_mem32_r_plus_i("$r2", "$r6", 4)
+    fail()
+
+
 # TODO: zero-compare branches; compare branches; bit-test branches
 #       stack operations
 #       load-stores

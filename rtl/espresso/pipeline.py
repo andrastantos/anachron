@@ -113,6 +113,24 @@ class Pipeline(GenericModule):
         fetch_stage.task_mode <<= task_mode
         fetch_stage.do_branch <<= do_branch
         fetch_stage.break_burst <<= decode_stage.break_fetch_burst
+        # Loads/stores that passed decode (break_fetch_burst) but haven't been accepted by the memory
+        # unit yet. While there are any, fetch starts no new burst, so the bus is free when they get
+        # there. A branch or exception (do_branch) flushes them, so it clears the count; otherwise
+        # a cancelled access would hold fetch forever. At most two are in flight (one in the register
+        # file stage, one in execute stage 1), so two bits are enough.
+        mem_pending = Wire(Unsigned(2))
+        mem_inc = decode_stage.break_fetch_burst
+        mem_dec = execute_stage.ldst_issued
+        mem_pending <<= Reg(Select(
+            do_branch,
+            Select(
+                mem_inc & ~mem_dec,
+                Select(mem_dec & ~mem_inc & (mem_pending != 0), mem_pending, (mem_pending - 1)[1:0]),
+                (mem_pending + 1)[1:0]
+            ),
+            0
+        ))
+        fetch_stage.fetch_hold <<= mem_pending != 0
 
         self.event_fetch <<= fetch_stage.event_fetch
         self.event_fetch_drop <<= fetch_stage.event_dropped

@@ -140,6 +140,7 @@ class InstBuffer(GenericModule):
     task_mode  = Input(logic)
     do_branch = Input(logic) # do_branch is active for one cycle only; in the same cycle the new spc/tpc/task_mode values are available
     break_burst = Input(logic) # active for one cycle, to break any progressing burst. Doesn't kill the queue or drop outstanding requests, simply stops requesting more...
+    fetch_hold = Input(logic) # a load/store passed decode but hasn't reached the memory unit yet: don't start a new burst
 
     # Events
     event_fetch = Output(logic)
@@ -232,11 +233,9 @@ class InstBuffer(GenericModule):
             next_outstanding_request
         ))
 
-
         # We have to make sure that we only start a new burst if we know for sure the queue can take all the responses,
         # including all the outstanding ones.
         # We need to delay out_of_page_branch to align with the request address, which is delayed
-        start_new_request = (self.queue_free_cnt > fetch_threshold + next_outstanding_request) | Reg(out_of_page_branch)
 
         if self.use_break_burst:
             if self.break_on_branch_early:
@@ -254,6 +253,14 @@ class InstBuffer(GenericModule):
                 break_burst = self.break_burst
         else:
             break_burst = 0
+
+        # Keep the bus free for loads and stores: no new burst starts in the cycle a load/store
+        # passes decode (break_burst), nor while one is on its way to the memory unit (fetch_hold).
+        # Otherwise a burst started in those few cycles makes the access wait for all of it.
+        start_new_request = (
+                (self.queue_free_cnt > fetch_threshold + next_outstanding_request) |
+                Reg(out_of_page_branch)
+            ) & ~break_burst & ~self.fetch_hold
 
         req_len = Wire(QueuePointerType)
         req_len <<= Reg(
@@ -509,6 +516,7 @@ class FetchStage(GenericModule):
     task_mode  = Input(logic)
     do_branch = Input(logic)
     break_burst = Input(logic) # active for one cycle, to break any progressing burst. Doesn't kill the queue or drop outstanding requests, simply stops requesting more...
+    fetch_hold = Input(logic) # a load/store is on its way to the memory unit: don't start a new burst (see InstBuffer)
 
     # Events
     event_fetch = Output(logic)
@@ -535,6 +543,7 @@ class FetchStage(GenericModule):
         inst_buf.task_mode <<= self.task_mode
         inst_buf.do_branch <<= self.do_branch
         inst_buf.break_burst <<= self.break_burst
+        inst_buf.fetch_hold <<= self.fetch_hold
 
         inst_queue.do_branch <<= self.do_branch
 

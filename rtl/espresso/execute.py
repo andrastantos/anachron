@@ -453,6 +453,7 @@ class ExecuteStage(GenericModule):
     interrupt = Input(logic)
 
     complete = Output(logic) # goes high for 1 cycle when an instruction completes. Used for verification
+    ldst_issued = Output(logic) # goes high for 1 cycle when the memory unit accepts a load/store (not an indirect branch through memory)
 
     def construct(self, has_multiply: bool = True, has_shift: bool = True):
         self.has_multiply = has_multiply
@@ -603,6 +604,7 @@ class ExecuteStage(GenericModule):
         s2_is_ld_st = (s2_exec_unit == op_class.ld_st) | (s2_exec_unit == op_class.branch_ind)
         mem_input.valid <<= stage_1_valid & ~block_mem & s1_is_ld_st
         stage_2_ready <<= Select(s1_is_ld_st & ~block_mem, stage_2_fsm.input_ready,  mem_input.ready)
+        self.ldst_issued <<= mem_input.valid & mem_input.ready & (s1_exec_unit == op_class.ld_st)
         stage_2_valid <<= Select(s2_is_ld_st & ~block_mem, stage_2_fsm.output_valid, s2_mem_output.valid | (s2_result_reg_addr_valid & (s2_ldst_op == ldst_ops.store))) & ~s2_was_branch
         stage_2_fsm.output_ready <<= Select(s2_is_ld_st & ((s2_ldst_op == ldst_ops.load) | (s2_ldst_op == ldst_ops.csr_load)) & ~block_mem, 1, s2_mem_output.valid)
 
