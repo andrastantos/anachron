@@ -1391,7 +1391,11 @@ module Pipeline (
 	output logic [2:0] event_inst_word
 );
 
-	logic [6:0] u4_output_port;
+	logic signed [2:0] u7_output_port;
+	logic [2:0] u11_output_port;
+	logic [1:0] mem_pending;
+	logic u18_output_port;
+	logic [6:0] u24_output_port;
 	logic will_execute;
 	logic [30:0] spc;
 	logic [30:0] tpc;
@@ -1424,7 +1428,7 @@ module Pipeline (
 	logic [3:0] decode_to_exec_result_reg_addr;
 	logic decode_to_exec_result_reg_addr_valid;
 	logic decode_to_exec_fetch_av;
-	logic fetch_stage_break_burst;
+	logic mem_inc;
 	logic decode_to_exec_valid;
 	logic rf_rsp_ready;
 	logic fetch_to_decode_ready;
@@ -1433,6 +1437,7 @@ module Pipeline (
 	logic [3:0] rf_req_rsv_addr;
 	logic [1:0] decode_to_exec_mem_access_len;
 	logic decode_to_exec_ready;
+	logic mem_dec;
 	logic execute_stage_complete;
 	logic exec_to_extend_valid;
 	logic [15:0] exec_to_extend_data_l;
@@ -1457,6 +1462,7 @@ module Pipeline (
 	logic rf_req_ready;
 	logic rf_rsp_valid;
 
+	always_ff @(posedge clk) mem_pending <= rst ? 2'h0 : do_branch ? 1'h0 : (mem_inc &  ~ mem_dec) ? u11_output_port[1:0] : (mem_dec &  ~ mem_inc & mem_pending != 1'h0) ? u7_output_port[1:0] : mem_pending;
 	assign event_fetch_wait_on_bus = fetch_to_bus_valid &  ~ fetch_to_bus_ready;
 	assign event_decode_wait_on_rf = rf_req_valid &  ~ rf_req_ready;
 	assign will_execute = decode_to_exec_ready & decode_to_exec_valid &  ~ decode_to_exec_fetch_av &  ~ execute_stage_do_branch;
@@ -1498,7 +1504,8 @@ module Pipeline (
 		.tpc(tpc),
 		.task_mode(task_mode),
 		.do_branch(do_branch),
-		.break_burst(fetch_stage_break_burst),
+		.break_burst(mem_inc),
+		.fetch_hold(u18_output_port),
 		.event_fetch(event_fetch),
 		.event_dropped(event_fetch_drop)
 	);
@@ -1550,7 +1557,7 @@ module Pipeline (
 		.reg_file_rsp_valid(rf_rsp_valid),
 
 		.do_branch(do_branch),
-		.break_fetch_burst(fetch_stage_break_burst)
+		.break_fetch_burst(mem_inc)
 	);
 
 	ExecuteStage execute_stage (
@@ -1613,12 +1620,13 @@ module Pipeline (
 		.tpc_out(execute_stage_tpc_out),
 		.task_mode_in(task_mode),
 		.task_mode_out(execute_stage_task_mode_out),
-		.ecause_in(u4_output_port),
+		.ecause_in(u24_output_port),
 		.ecause_out(execute_stage_ecause_out),
 		.eaddr_out(eaddr),
 		.do_branch(execute_stage_do_branch),
 		.interrupt(interrupt),
-		.complete(execute_stage_complete)
+		.complete(execute_stage_complete),
+		.ldst_issued(mem_dec)
 	);
 
 	ResultExtendStage result_extend_stage (
@@ -1663,7 +1671,10 @@ module Pipeline (
 		.do_branch(do_branch)
 	);
 
-	assign u4_output_port = ecause_clear_pulse ? `exceptions__exc_reset : ecause;
+	assign u7_output_port = mem_pending - 1'h1 + 3'b0;
+	assign u11_output_port = mem_pending + 1'h1 + 3'b0;
+	assign u18_output_port = mem_pending != 1'h0;
+	assign u24_output_port = ecause_clear_pulse ? `exceptions__exc_reset : ecause;
 	assign event_execute = will_execute;
 	assign event_branch_taken = do_branch;
 endmodule
@@ -2046,7 +2057,8 @@ module ExecuteStage (
 	output logic [31:0] eaddr_out,
 	output logic do_branch,
 	input logic interrupt,
-	output logic complete
+	output logic complete,
+	output logic ldst_issued
 );
 
 	logic branch_input_interrupt;
@@ -2113,22 +2125,22 @@ module ExecuteStage (
 	logic mem_input_valid;
 	logic stage_2_ready;
 	logic stage_2_valid;
-	logic u100_output_port;
-	logic u103_output_port;
+	logic u104_output_port;
+	logic u107_output_port;
 	logic stage_2_reg_en;
-	logic [31:0] u108_output_port;
+	logic [31:0] u112_output_port;
 	logic [30:0] branch_input_branch_addr;
 	logic branch_input_is_branch_insn;
 	logic mem_input_read_not_write;
 	logic [31:0] result;
 	logic s2_result_reg_addr_valid;
-	logic u138_output_port;
+	logic u142_output_port;
 	logic s2_indirect_branch_done;
 	logic [2:0] s2_exec_unit;
 	logic indirect_branch_lockout;
 	logic [1:0] s2_ldst_op;
-	logic [15:0] u160_output_port;
-	logic [15:0] u169_output_port;
+	logic [15:0] u164_output_port;
+	logic [15:0] u173_output_port;
 	logic sideband_strobe;
 	logic [30:0] straight_tpc_out;
 	logic [30:0] straight_spc_out;
@@ -2194,13 +2206,14 @@ module ExecuteStage (
 	assign s1_is_ld_st = s1_exec_unit == `op_class__ld_st | s1_exec_unit == `op_class__branch_ind;
 	assign mem_input_valid = stage_1_valid &  ~ block_mem & s1_is_ld_st;
 	assign stage_2_ready = (s1_is_ld_st &  ~ block_mem) ? mem_input_ready : stage_2_fsm_input_ready;
+	assign ldst_issued = mem_input_valid & mem_input_ready & s1_exec_unit == `op_class__ld_st;
 	assign s2_is_ld_st = s2_exec_unit == `op_class__ld_st | s2_exec_unit == `op_class__branch_ind;
 	always_ff @(posedge clk) s2_was_branch <= rst ? 1'h0 : s1_was_branch;
 	assign stage_2_valid = ((s2_is_ld_st &  ~ block_mem) ? s2_mem_output_valid | s2_result_reg_addr_valid & s2_ldst_op == `ldst_ops__store : stage_2_fsm_output_valid) &  ~ s2_was_branch;
-	always_ff @(posedge clk) u103_output_port <= rst ? 1'h0 : do_branch;
-	assign stage_2_reg_en = stage_1_valid & stage_2_ready &  ~ u103_output_port;
+	always_ff @(posedge clk) u107_output_port <= rst ? 1'h0 : do_branch;
+	assign stage_2_reg_en = stage_1_valid & stage_2_ready &  ~ u107_output_port;
 	always_ff @(posedge clk) s1_branch_op <= rst ? 4'h0 : stage_1_reg_en ? input_port_branch_op : s1_branch_op;
-	assign branch_input_branch_addr = s1_exec_unit == `op_class__branch_ind ? u108_output_port[31:1] : s1_branch_target_output_branch_addr;
+	assign branch_input_branch_addr = s1_exec_unit == `op_class__branch_ind ? u112_output_port[31:1] : s1_branch_target_output_branch_addr;
 	always_ff @(posedge clk) s1_op_a <= rst ? 32'h0 : stage_1_reg_en ? input_port_op_a : s1_op_a;
 	always_ff @(posedge clk) s1_op_b <= rst ? 32'h0 : stage_1_reg_en ? input_port_op_b : s1_op_b;
 	assign branch_input_is_branch_insn = s1_exec_unit == `op_class__branch | s1_exec_unit == `op_class__branch_ind;
@@ -2210,8 +2223,8 @@ module ExecuteStage (
 	always_ff @(posedge clk) s1_mem_access_len <= rst ? 2'h0 : stage_1_reg_en ? input_port_mem_access_len : s1_mem_access_len;
 	always_ff @(posedge clk) s1_result_reg_addr_valid <= rst ? 1'h0 : stage_1_reg_en ? input_port_result_reg_addr_valid : s1_result_reg_addr_valid;
 	always_ff @(posedge clk) s2_result_reg_addr_valid <= rst ? 1'h0 : stage_2_reg_en ? s1_result_reg_addr_valid : s2_result_reg_addr_valid;
-	always_ff @(posedge clk) u138_output_port <= rst ? 1'h0 : stage_2_reg_en;
-	assign output_port_valid = stage_2_valid & s2_result_reg_addr_valid & (u138_output_port | s2_mem_output_valid & s2_is_ld_st);
+	always_ff @(posedge clk) u142_output_port <= rst ? 1'h0 : stage_2_reg_en;
+	assign output_port_valid = stage_2_valid & s2_result_reg_addr_valid & (u142_output_port | s2_mem_output_valid & s2_is_ld_st);
 	assign s2_indirect_branch_done = s2_exec_unit == `op_class__branch_ind & s2_mem_output_valid;
 	always_ff @(posedge clk) s2_exec_unit <= rst ? 3'h0 : do_branch ? `op_class__invalid : stage_2_reg_en ? s1_exec_unit : s2_indirect_branch_done ? `op_class__invalid : s2_exec_unit;
 	assign indirect_branch_lockout = stage_1_valid & s1_exec_unit == `op_class__branch_ind | s2_exec_unit == `op_class__branch_ind;
@@ -2221,10 +2234,10 @@ module ExecuteStage (
 		(s1_exec_unit == `op_class__mult ? mult_output_result : 32'b0) | 
 		(s1_exec_unit == `op_class__shift ? s1_shifter_output_result : 32'b0) | 
 		(s1_exec_unit == `op_class__branch | s1_exec_unit == `op_class__branch_ind ? ({s1_branch_target_output_straight_addr, 1'h0}) : 32'b0) ;
-	always_ff @(posedge clk) u160_output_port <= rst ? 16'h0 : stage_2_reg_en ? result[15:0] : u160_output_port;
-	assign output_port_data_l = s2_exec_unit == `op_class__ld_st ? s2_ldst_op == `ldst_ops__store ? 1'h0 : s2_mem_output_data_l : u160_output_port;
-	always_ff @(posedge clk) u169_output_port <= rst ? 16'h0 : stage_2_reg_en ? result[31:16] : u169_output_port;
-	assign output_port_data_h = s2_exec_unit == `op_class__ld_st ? s2_ldst_op == `ldst_ops__store ? 1'h0 : s2_mem_output_data_h : u169_output_port;
+	always_ff @(posedge clk) u164_output_port <= rst ? 16'h0 : stage_2_reg_en ? result[15:0] : u164_output_port;
+	assign output_port_data_l = s2_exec_unit == `op_class__ld_st ? s2_ldst_op == `ldst_ops__store ? 1'h0 : s2_mem_output_data_l : u164_output_port;
+	always_ff @(posedge clk) u173_output_port <= rst ? 16'h0 : stage_2_reg_en ? result[31:16] : u173_output_port;
+	assign output_port_data_h = s2_exec_unit == `op_class__ld_st ? s2_ldst_op == `ldst_ops__store ? 1'h0 : s2_mem_output_data_h : u173_output_port;
 	always_ff @(posedge clk) s1_result_reg_addr <= rst ? 4'h0 : stage_1_reg_en ? input_port_result_reg_addr : s1_result_reg_addr;
 	always_ff @(posedge clk) output_port_addr <= rst ? 4'h0 : stage_2_reg_en ? s1_result_reg_addr : output_port_addr;
 	always_ff @(posedge clk) s1_do_bse <= rst ? 1'h0 : stage_1_reg_en ? input_port_do_bse : s1_do_bse;
@@ -2331,7 +2344,7 @@ module ExecuteStage (
 		.input_valid(stage_1_valid),
 		.input_ready(stage_2_fsm_input_ready),
 		.output_valid(stage_2_fsm_output_valid),
-		.output_ready(u100_output_port),
+		.output_ready(u104_output_port),
 		.out_reg_en(stage_2_fsm_out_reg_en),
 		.clear(branch_output_is_exception_or_interrupt)
 	);
@@ -2421,8 +2434,8 @@ module ExecuteStage (
 	assign branch_input_task_mode = s1_task_mode;
 	assign mem_input_access_len = s1_mem_access_len;
 	assign complete = stage_2_valid;
-	assign u100_output_port = (s2_is_ld_st & (s2_ldst_op == `ldst_ops__load | s2_ldst_op == `ldst_ops__csr_load) &  ~ block_mem) ? s2_mem_output_valid : 1'h1;
-	assign u108_output_port = {s2_mem_output_data_h, s2_mem_output_data_l};
+	assign u104_output_port = (s2_is_ld_st & (s2_ldst_op == `ldst_ops__load | s2_ldst_op == `ldst_ops__csr_load) &  ~ block_mem) ? s2_mem_output_valid : 1'h1;
+	assign u112_output_port = {s2_mem_output_data_h, s2_mem_output_data_l};
 endmodule
 
 
@@ -3478,6 +3491,7 @@ module FetchStage (
 	input logic task_mode,
 	input logic do_branch,
 	input logic break_burst,
+	input logic fetch_hold,
 	output logic event_fetch,
 	output logic [4:0] event_dropped
 );
@@ -3523,6 +3537,7 @@ module FetchStage (
 		.task_mode(task_mode),
 		.do_branch(do_branch),
 		.break_burst(break_burst),
+		.fetch_hold(fetch_hold),
 		.event_fetch(event_fetch),
 		.event_drop(inst_buf_event_drop)
 	);
@@ -4146,6 +4161,7 @@ module InstBuffer (
 	input logic task_mode,
 	input logic do_branch,
 	input logic break_burst,
+	input logic fetch_hold,
 	output logic event_fetch,
 	output logic event_drop
 );
@@ -4170,10 +4186,10 @@ module InstBuffer (
 	logic [1:0] drop_count;
 	logic u67_output_port;
 	logic start_new_request;
-	logic signed [4:0] u71_output_port;
+	logic signed [4:0] u75_output_port;
 	logic [3:0] req_len;
 	logic req_av;
-	logic u102_output_port;
+	logic u106_output_port;
 	logic state;
 	logic next_state;
 
@@ -4192,8 +4208,8 @@ module InstBuffer (
 	always_ff @(posedge clk) drop_count <= rst ? 2'h0 : do_branch ? next_outstanding_request : drop_count == 1'h0 ? 1'h0 : $unsigned(2'(drop_count - bus_if_response_valid + 3'b0));
 	assign out_of_page_branch = do_branch & xor_page != 1'h0;
 	always_ff @(posedge clk) u67_output_port <= rst ? 1'h0 : out_of_page_branch;
-	assign start_new_request = queue_free_cnt > 4'h8 + next_outstanding_request | u67_output_port;
-	always_ff @(posedge clk) req_len <= rst ? 4'h8 : start_new_request ? do_branch ? 4'h8 : queue_free_cnt >= 4'h8 ? 4'h8 : queue_free_cnt : break_burst ? 1'h0 : advance_request ? req_len > 1'h0 ? u71_output_port[3:0] : 1'h0 : req_len;
+	assign start_new_request = (queue_free_cnt > 4'h8 + next_outstanding_request | u67_output_port) &  ~ break_burst &  ~ fetch_hold;
+	always_ff @(posedge clk) req_len <= rst ? 4'h8 : start_new_request ? do_branch ? 4'h8 : queue_free_cnt >= 4'h8 ? 4'h8 : queue_free_cnt : break_burst ? 1'h0 : advance_request ? req_len > 1'h0 ? u75_output_port[3:0] : 1'h0 : req_len;
 	initial req_len <= 4'h8;
 	assign fetch_av = task_mode_fetch & u27_output_port[27:10] > mem_limit;
 	always_ff @(posedge clk) req_av <= rst ? 1'h0 : start_new_request ? fetch_av : req_av;
@@ -4215,7 +4231,7 @@ module InstBuffer (
 		.next_state(next_state),
 		.default_state(`InstBufferStates__idle),
 		.input_idle_to_request(start_new_request),
-		.input_request_to_idle(u102_output_port)
+		.input_request_to_idle(u106_output_port)
 	);
 
 	assign u1_output_port = {tpc, 1'h0};
@@ -4225,9 +4241,9 @@ module InstBuffer (
 	assign u27_output_port = {fetch_addr, 1'h0};
 	assign u43_output_port = outstanding_request + 1'h1 + 3'b0;
 	assign u47_output_port = outstanding_request - 1'h1 + 3'b0;
-	assign u71_output_port = req_len - 1'h1 + 5'b0;
+	assign u75_output_port = req_len - 1'h1 + 5'b0;
 	assign queue_av = req_av;
-	assign u102_output_port = fetch_page_limit | req_len == 1'h0;
+	assign u106_output_port = fetch_page_limit | req_len == 1'h0;
 endmodule
 
 
