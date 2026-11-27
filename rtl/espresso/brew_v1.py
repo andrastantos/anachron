@@ -85,9 +85,11 @@ class BrewV1Top(GenericModule):
         dmem_base  = Wire(BrewMemBase)
         dmem_limit = Wire(BrewMemBase)
 
+        # csr_capability: FP_SUPPORT (bit 0, no floating-point unit), MUL_SUPPORT (bit 1), SHIFT_SUPPORT (bit 2)
+        capability = (int(self.has_multiply) << 1) | (int(self.has_shift) << 2)
         self.csrs_cpu_task_mode = {
             self.csr_mach_arch:  RegMapEntry("csr_mach_arch",  (RegField("32'b0",access="R"),), "Machine architecture register"),
-            self.csr_capability: RegMapEntry("csr_capability", (RegField("32'b0",access="R"),), "Machine capability register")
+            self.csr_capability: RegMapEntry("csr_capability", (RegField(f"32'h{capability:x}",access="R"),), "Machine capability register")
         }
 
         self.csrs_cpu_scheduler_mode = {

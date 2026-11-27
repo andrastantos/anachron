@@ -1131,6 +1131,29 @@ def test_burst_hold_exc(top):
     fail()
 
 
+@prog_wrapper
+def test_capability(top):
+    """
+    csr_capability reports the multiplier (MUL_SUPPORT, bit 1) and the shifter
+    (SHIFT_SUPPORT, bit 2) of the default configuration, and no floating-point
+    unit (FP_SUPPORT, bit 0).
+    """
+
+    top.set_timeout(2000)
+
+    create_segment("code", 0)
+    create_segment("code_dram", 0x800_0000)
+    set_active_segment("code_dram")
+    place_symbol("_start")
+    set_active_segment("code")
+    pc_eq_I("_start")
+    set_active_segment("code_dram")
+
+    r_eq_csr("$r3", top.cpu.csr_capability_reg)
+    check_reg("$r3", 0x6)
+    terminate()
+
+
 # TODO: zero-compare branches; compare branches; bit-test branches
 #       stack operations
 #       load-stores
