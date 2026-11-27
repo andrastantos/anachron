@@ -1135,7 +1135,7 @@ module BrewV1Top (
 	always_ff @(posedge clk) event_select_5 <= rst ? 5'h0 : csr_if_paddr[4:0] == 4'hc & event_write_strobe ? timer_reg_if_pwdata[4:0] : event_select_5;
 	always_ff @(posedge clk) event_select_6 <= rst ? 5'h0 : csr_if_paddr[4:0] == 4'he & event_write_strobe ? timer_reg_if_pwdata[4:0] : event_select_6;
 	always_ff @(posedge clk) event_select_7 <= rst ? 5'h0 : csr_if_paddr[4:0] == 5'h10 & event_write_strobe ? timer_reg_if_pwdata[4:0] : event_select_7;
-	always_ff @(posedge clk) cpu_task_mode_csr_if_prdata <= rst ? 32'h0 : (cpu_task_mode_csr_if_paddr[0] == 1'h0 ? 32'h0 : 32'b0) | (cpu_task_mode_csr_if_paddr[0] == 1'h1 ? 32'h0 : 32'b0) ;
+	always_ff @(posedge clk) cpu_task_mode_csr_if_prdata <= rst ? 32'h0 : (cpu_task_mode_csr_if_paddr[0] == 1'h0 ? 32'h0 : 32'b0) | (cpu_task_mode_csr_if_paddr[0] == 1'h1 ? 32'h6 : 32'b0) ;
 	always_ff @(posedge clk) cpu_scheduler_mode_csr_if_prdata <= rst ? 32'h0 : 
 		(cpu_scheduler_mode_csr_if_paddr[7:0] == 1'h0 ? ecause : 32'b0) | 
 		(cpu_scheduler_mode_csr_if_paddr[7:0] == 1'h1 ? eaddr : 32'b0) | 
